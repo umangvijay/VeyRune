@@ -1,0 +1,415 @@
+"""
+AgentOS — Artifact builder.
+
+Generates a real website or small software project as files on disk from a
+natural-language brief. Files are stored under data/artifacts/<user>/<id>/
+and served via the artifacts API. Generated code is never executed.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import re
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from backend.config.settings import settings
+from backend.services import gemini_client
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_SUFFIXES = {
+    ".html", ".css", ".js", ".json", ".md", ".txt", ".svg", ".py",
+    ".ts", ".tsx", ".jsx", ".yml", ".yaml", ".toml",
+}
+MAX_FILES = 60
+MAX_FILE_BYTES = 220_000
+BATCH_SIZE = 6
+SAFE_PATH = re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
+
+
+class ArtifactError(Exception):
+    pass
+
+
+def artifacts_root() -> Path:
+    base = Path(settings.SQLITE_DB_PATH).parent if settings.SQLITE_DB_PATH else Path("data")
+    root = Path(base) / "artifacts"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _safe_relpath(path: str) -> str:
+    path = path.replace("\\", "/").lstrip("/")
+    if path.startswith(".") or ".." in path.split("/"):
+        raise ArtifactError(f"Illegal path: {path}")
+    if not SAFE_PATH.match(path):
+        raise ArtifactError(f"Illegal path: {path}")
+    suffix = Path(path).suffix.lower()
+    name = Path(path).name
+    if name.endswith(".env.example"):
+        return path
+    if suffix not in ALLOWED_SUFFIXES:
+        raise ArtifactError(f"Disallowed file type: {path}")
+    return path
+
+
+def _artifact_dir(user_id: str, artifact_id: str) -> Path:
+    for value in (user_id, artifact_id):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", value):
+            raise ArtifactError("Invalid artifact identity")
+    root = artifacts_root().resolve()
+    folder = root / user_id / artifact_id
+    try:
+        folder.resolve().relative_to(root)
+    except ValueError as exc:
+        raise ArtifactError("Artifact path escapes storage") from exc
+    return folder
+
+
+def _file_paths(metadata):
+    return [item["path"] if isinstance(item, dict) else item for item in metadata.get("files", [])]
+
+
+def _checksums(dest, paths):
+    return {path: hashlib.sha256((dest / path).read_bytes()).hexdigest() for path in paths}
+
+
+def _write_files(dest: Path, files: List[Dict[str, str]]) -> List[str]:
+    written: List[str] = []
+    if not files:
+        raise ArtifactError("Model produced no files")
+    if len(files) > MAX_FILES:
+        raise ArtifactError(f"Artifact exceeds the {MAX_FILES}-file limit")
+    for item in files:
+        rel = _safe_relpath(str(item.get("path") or ""))
+        if rel == "artifact.json" or rel in written:
+            raise ArtifactError("Reserved or duplicate artifact path")
+        content = str(item.get("content") or "")
+        encoded = content.encode("utf-8")
+        if len(encoded) > MAX_FILE_BYTES:
+            raise ArtifactError(f"Generated file {rel} exceeds the size limit")
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        written.append(rel)
+    return written
+
+
+async def generate_project(
+    user_id: str,
+    brief: str,
+    kind: str = "website",
+    name: str = "",
+    scale: str = "standard",
+    on_progress=None,
+) -> Dict[str, Any]:
+    """Generate a website or app as files. scale: compact | standard | full."""
+    async def progress(stage, completed=0, total=0):
+        if on_progress:
+            await on_progress({"stage": stage, "completed_files": completed, "total_files": total})
+    await progress("planning")
+    if not (brief or "").strip():
+        raise ArtifactError("A brief is required")
+    kind = (kind or "website").lower().strip()
+    if kind not in ("website", "app"):
+        kind = "website"
+    scale = (scale or "standard").lower().strip()
+    if scale not in ("compact", "standard", "full"):
+        scale = "standard"
+
+    size_guide = {
+        "compact": "Exactly 3 files: index.html, styles.css, and script.js. One complete page.",
+        "standard": "12-28 files. Multi-page site or a complete local app with components, styles, and docs.",
+        "full": "24-50 files. Production-shaped project: multiple pages/modules, shared layout, README, and config.",
+    }[scale]
+
+    if scale == "compact":
+        one_shot = f"""You are a production engineer. Build a compact {kind} as complete files.
+
+PROJECT NAME: {name or "hello-agentos"}
+BRIEF:
+{brief[:8000]}
+
+Return JSON only:
+{{
+  "name": "short-kebab-name",
+  "summary": "one paragraph",
+  "entrypoint": "index.html",
+  "files": [
+    {{"path": "index.html", "content": "full html"}},
+    {{"path": "styles.css", "content": "full css"}},
+    {{"path": "script.js", "content": "full js"}}
+  ]
+}}
+Escape every quote and newline inside content strings. No markdown.
+"""
+        payload = await gemini_client.generate_json(one_shot)
+        if not isinstance(payload, dict) or not payload.get("files"):
+            payload = await gemini_client.generate_json(
+                one_shot + "\n\nThe previous reply was not valid JSON with a files array. Return only the JSON object."
+            )
+        if not isinstance(payload, dict) or not payload.get("files"):
+            raise ArtifactError("Model returned an invalid project")
+        generated = [f for f in payload["files"] if isinstance(f, dict) and f.get("path")]
+        plan = payload
+    else:
+        if kind == "website":
+            extra = (
+                "Produce a complete static website with real pages (not lorem-only stubs). "
+                "Must include index.html plus additional pages as the brief requires (about, features, contact, etc.). "
+                "Use semantic HTML, accessible markup, shared CSS, and JS only where needed. No external paid APIs."
+            )
+        else:
+            extra = (
+                "Produce a complete local software project the user can run. "
+                "Include README.md with run instructions, source modules, tests if useful, and requirements.txt "
+                "or package.json. Prefer Python (FastAPI) or a static+JS app. Do not include secrets."
+            )
+
+        plan_prompt = f"""You are a production engineer. Plan a {kind} project, then we will fill each file.
+
+KIND: {kind}
+SCALE: {scale} — {size_guide}
+PROJECT NAME: {name or "(derive a short kebab-case name)"}
+BRIEF:
+{brief[:12000]}
+
+{extra}
+
+Return JSON only:
+{{
+  "name": "short-kebab-name",
+  "summary": "one paragraph of architecture and what was built",
+  "entrypoint": "index.html or main file",
+  "files": [{{"path": "relative/path.ext", "purpose": "what this file contains"}}]
+}}
+Only these extensions: {", ".join(sorted(ALLOWED_SUFFIXES))}.
+Every file must be necessary. Prefer a coherent multi-file structure over one giant HTML file.
+"""
+        plan = await gemini_client.generate_json(plan_prompt)
+        if not isinstance(plan, dict) or not plan.get("files"):
+            raise ArtifactError("Model returned an invalid project plan")
+
+        planned = [f for f in plan["files"] if isinstance(f, dict) and f.get("path")][:MAX_FILES]
+        generated = []
+
+        for i in range(0, len(planned), BATCH_SIZE):
+            await progress("writing_files", len(generated), len(planned))
+            chunk = planned[i:i + BATCH_SIZE]
+            listing = "\n".join(f"- {f['path']}: {f.get('purpose', '')}" for f in chunk)
+            batch_prompt = f"""Write COMPLETE file contents for this {kind} named "{plan.get('name') or name}".
+Do not stub. Match the brief. Return JSON {{"files": [{{"path","content"}}]}} covering ONLY these files:
+
+{listing}
+
+BRIEF:
+{brief[:6000]}
+
+Only these paths. Full source in each content field.
+"""
+            batch = await gemini_client.generate_json(batch_prompt)
+            if isinstance(batch, dict) and isinstance(batch.get("files"), list):
+                generated.extend(batch["files"])
+            elif isinstance(batch, list):
+                generated.extend(batch)
+
+    if not generated:
+        raise ArtifactError("Model produced no files")
+    if scale != "compact":
+        expected = {item["path"] for item in planned}
+        produced = {item.get("path") for item in generated if isinstance(item, dict) and item.get("content")}
+        if expected != produced:
+            raise ArtifactError("Generated files do not match the project plan; retry generation")
+
+    await progress("saving_files", len(generated), len(generated))
+    artifact_id = str(uuid.uuid4())
+    dest = _artifact_dir(user_id, artifact_id)
+    dest.mkdir(parents=True, exist_ok=True)
+    written = _write_files(dest, generated)
+
+    metadata = {
+        "artifact_id": artifact_id,
+        "user_id": user_id,
+        "kind": kind,
+        "scale": scale,
+        "name": plan.get("name") or name or kind,
+        "summary": plan.get("summary") or "",
+        "entrypoint": plan.get("entrypoint") or (written[0] if written else ""),
+        "files": written,
+        "checksums": _checksums(dest, written),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (dest / "artifact.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    logger.info("Generated %s/%s artifact %s (%d files) for user %s", kind, scale, artifact_id, len(written), user_id)
+    _persist_artifact_remote(metadata, dest)
+    return metadata
+
+
+def _use_firestore() -> bool:
+    return (settings.STORAGE_BACKEND or "").lower() == "firestore"
+
+
+def _firestore_sync():
+    from google.cloud import firestore as fs
+    project = settings.GOOGLE_CLOUD_PROJECT
+    if not project:
+        return None
+    return fs.Client(project=project)
+
+
+def _persist_artifact_remote(metadata: Dict[str, Any], dest: Path) -> None:
+    if not _use_firestore():
+        return
+    db = _firestore_sync()
+    if db is None:
+        raise ArtifactError("Cloud artifact storage is not configured")
+    aid = metadata["artifact_id"]
+    batch = db.batch()
+    total_bytes = 0
+    for rel in _file_paths(metadata):
+        path = dest / rel
+        if not path.is_file():
+            raise ArtifactError("Artifact file missing before upload")
+        content = path.read_text(encoding="utf-8")
+        total_bytes += len(content.encode("utf-8"))
+        if total_bytes > 8_000_000:
+            raise ArtifactError("Artifact exceeds the cloud transaction size limit")
+        doc_id = hashlib.sha256(f"{aid}/{rel}".encode("utf-8")).hexdigest()
+        batch.set(db.collection("artifact_files").document(doc_id),
+            {
+                "artifact_id": aid,
+                "user_id": metadata["user_id"],
+                "path": rel,
+                "content": content,
+            }
+        )
+    batch.set(db.collection("artifacts").document(aid), dict(metadata))
+    batch.commit()
+
+
+def save_user_files(user_id: str, name: str, files: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Persist arbitrary agent-produced files as a downloadable artifact.
+    Used by the create_files orchestrator tool (reports, CSVs, code, docs)."""
+    import re as _re
+    import uuid as _uuid
+    safe_name = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (name or "files").strip()).strip("-").lower()[:40] or "files"
+    artifact_id = f"{safe_name}-{_uuid.uuid4().hex[:8]}"
+    dest = _artifact_dir(user_id, artifact_id)
+    dest.mkdir(parents=True, exist_ok=True)
+    written = _write_files(dest, files)
+    metadata = {
+        "artifact_id": artifact_id,
+        "user_id": user_id,
+        "checksums": _checksums(dest, written),
+        "name": name or safe_name,
+        "kind": "files",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "file_count": len(written),
+        "files": [{"path": p} for p in written],
+    }
+    meta_path = dest / "artifact.json"
+    meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    _persist_artifact_remote(metadata, dest)
+    return metadata
+
+
+def list_artifacts(user_id: str) -> List[Dict[str, Any]]:
+    items: List[Dict[str, Any]] = []
+    seen = set()
+    folder = artifacts_root() / user_id
+    if folder.exists():
+        for child in sorted(folder.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            meta = child / "artifact.json"
+            if meta.is_file():
+                try:
+                    data = json.loads(meta.read_text(encoding="utf-8"))
+                    aid = data.get("artifact_id")
+                    if aid:
+                        seen.add(aid)
+                    items.append(data)
+                except Exception:
+                    logger.warning("Could not read artifact metadata at %s", meta)
+    if _use_firestore():
+        db = _firestore_sync()
+        if db is not None:
+            try:
+                for doc in db.collection("artifacts").where("user_id", "==", user_id).stream():
+                    data = doc.to_dict() or {}
+                    aid = data.get("artifact_id") or doc.id
+                    if aid in seen:
+                        continue
+                    seen.add(aid)
+                    items.append(data)
+            except Exception:
+                logger.exception("Firestore artifact list failed for user %s", user_id)
+                raise
+    items.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    return items
+
+
+def load_artifact(user_id: str, artifact_id: str) -> Dict[str, Any]:
+    meta = _artifact_dir(user_id, artifact_id) / "artifact.json"
+    if meta.is_file():
+        data = json.loads(meta.read_text(encoding="utf-8"))
+        if data.get("user_id") == user_id:
+            return data
+    if _use_firestore():
+        db = _firestore_sync()
+        if db is not None:
+            doc = db.collection("artifacts").document(artifact_id).get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                if data.get("user_id") == user_id:
+                    return data
+    raise ArtifactError("Artifact not found")
+
+
+def read_artifact_content(user_id: str, artifact_id: str, relpath: str) -> str:
+    rel = _safe_relpath(relpath)
+    metadata = load_artifact(user_id, artifact_id)
+    if rel not in _file_paths(metadata):
+        raise ArtifactError("File is not part of this artifact")
+    path = _artifact_dir(user_id, artifact_id) / rel
+    if path.is_file():
+        path.resolve().relative_to((artifacts_root() / user_id / artifact_id).resolve())
+        content = path.read_text(encoding="utf-8")
+        expected = metadata.get("checksums", {}).get(rel)
+        if expected and hashlib.sha256(content.encode()).hexdigest() != expected:
+            raise ArtifactError("Artifact integrity check failed")
+        return content
+    if _use_firestore():
+        db = _firestore_sync()
+        if db is not None:
+            doc_id = hashlib.sha256(f"{artifact_id}/{rel}".encode("utf-8")).hexdigest()
+            doc = db.collection("artifact_files").document(doc_id).get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                if data.get("user_id") == user_id:
+                    content = str(data.get("content") or "")
+                    expected = metadata.get("checksums", {}).get(rel)
+                    if expected and hashlib.sha256(content.encode()).hexdigest() != expected:
+                        raise ArtifactError("Artifact integrity check failed")
+                    return content
+    raise ArtifactError("File not found")
+
+
+def read_artifact_file(user_id: str, artifact_id: str, relpath: str) -> Path:
+    rel = _safe_relpath(relpath)
+    metadata = load_artifact(user_id, artifact_id)
+    if rel not in _file_paths(metadata):
+        raise ArtifactError("File is not part of this artifact")
+    path = _artifact_dir(user_id, artifact_id) / rel
+    if path.is_file():
+        path.resolve().relative_to((artifacts_root() / user_id / artifact_id).resolve())
+        read_artifact_content(user_id, artifact_id, rel)
+        return path
+    content = read_artifact_content(user_id, artifact_id, rel)
+    dest = _artifact_dir(user_id, artifact_id) / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(content, encoding="utf-8")
+    return dest

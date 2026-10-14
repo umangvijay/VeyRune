@@ -1,0 +1,630 @@
+"""
+AgentOS — API Entry Point (PRODUCTION)
+
+FastAPI application with:
+- Repository Factory initialization (SQLite or Firestore)
+- JWT + Security initialization
+- Auth router (signup, login, Google OAuth, refresh, logout)
+- Workflow router (intent → plan → execute)
+- SSE event streaming
+- CSRF middleware
+- Security headers
+"""
+
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from pydantic import BaseModel
+import uuid
+import logging
+import asyncio
+import json
+import traceback
+
+from pathlib import Path
+
+from backend.config.settings import settings
+from backend.api.dependencies.auth import get_current_user, AuthenticatedUser
+from backend.security.input_sanitizer import sanitize_goal, InputValidationError
+from backend.security.rate_limiter import check_rate_limit
+from backend.security.csrf import validate_csrf, set_csrf_cookie
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Sentry error tracking — no-op if SENTRY_DSN is not set
+import os as _os
+_sentry_dsn = _os.environ.get("SENTRY_DSN", "")
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            environment=settings.APP_ENV,
+            traces_sample_rate=0.1,
+            integrations=[FastApiIntegration(), StarletteIntegration()],
+        )
+        logger.info("Sentry initialized (DSN set)")
+    except ImportError:
+        logger.warning("SENTRY_DSN set but sentry-sdk not installed — pip install sentry-sdk[fastapi]")
+
+# ══════════════════════════════════════════════════════════════════
+#  APPLICATION
+# ══════════════════════════════════════════════════════════════════
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="2.0.0",
+    description="The autonomous workspace that builds its own tools.",
+    docs_url="/api/docs" if settings.APP_ENV == "development" else None,
+    redoc_url="/api/redoc" if settings.APP_ENV == "development" else None,
+)
+
+# ── CORS ──────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=[
+        "X-RateLimit-Limit", "X-RateLimit-Remaining",
+        "X-RateLimit-Reset", "Retry-After",
+    ],
+)
+
+
+def _cors_headers_for(request: Request) -> dict:
+    """CORS on responses that never reach CORSMiddleware (middleware 403/500)."""
+    origin = request.headers.get("origin") or ""
+    if origin in settings.CORS_ALLOWED_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, X-CSRF-Token",
+            "Vary": "Origin",
+        }
+    return {}
+
+# ── Routers ───────────────────────────────────────────────────────
+from backend.api.routers import approvals
+from backend.api.routers.auth import router as auth_router
+from backend.api.routers.workflows import router as workflows_router
+from backend.api.routers.integrations import router as integrations_router
+from backend.api.routers.notifications import router as notifications_router
+from backend.api.routers.settings_router import router as settings_router
+from backend.api.routers.schedules import router as schedules_router
+from backend.api.routers.admin import router as admin_router
+from backend.api.routers.memory import router as memory_router
+from backend.api.routers.resume import router as resume_router
+from backend.api.routers.webhooks import router as webhooks_router
+from backend.api.routers.credentials import router as credentials_router
+from backend.api.routers.artifacts import router as artifacts_router
+from backend.api.routers.capabilities import router as capabilities_router
+from backend.api.routers.usage import router as usage_router
+from backend.api.routers.agents import router as agents_router
+from backend.api.routers.contact import router as contact_router  # public contact inbox + email delivery
+
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(contact_router, prefix="/api/v1")
+app.include_router(workflows_router, prefix="/api/v1")
+app.include_router(integrations_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
+app.include_router(schedules_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
+app.include_router(memory_router, prefix="/api/v1")
+app.include_router(resume_router, prefix="/api/v1")
+app.include_router(approvals.router, prefix="/api/v1")
+app.include_router(webhooks_router, prefix="/api/v1")
+app.include_router(credentials_router, prefix="/api/v1")
+app.include_router(artifacts_router, prefix="/api/v1")
+app.include_router(capabilities_router, prefix="/api/v1")
+app.include_router(usage_router, prefix="/api/v1")
+app.include_router(agents_router, prefix="/api/v1")
+
+
+
+# ── Security Headers Middleware ───────────────────────────────────
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    origins = " ".join(settings.CORS_ALLOWED_ORIGINS) if settings.CORS_ALLOWED_ORIGINS else "'self'"
+    connect_src = f"connect-src 'self' {origins}"
+    if settings.APP_ENV == "development":
+        connect_src += " http://127.0.0.1:8000 http://localhost:8000"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        f"{connect_src}"
+    )
+    if settings.APP_ENV != "development":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+
+# ── CSRF Middleware ───────────────────────────────────────────────
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    """Validate CSRF on state-changing requests."""
+    try:
+        validate_csrf(request)
+    except HTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=_cors_headers_for(request),
+        )
+    try:
+        return await call_next(request)
+    except StarletteHTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=_cors_headers_for(request),
+        )
+    except Exception as exc:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+            headers=_cors_headers_for(request),
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+#  STARTUP / SHUTDOWN
+# ══════════════════════════════════════════════════════════════════
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"Starting {settings.APP_NAME} v2.0.0 [{settings.APP_ENV}]")
+    logger.info(f"Storage backend: {settings.STORAGE_BACKEND}")
+    logger.info(f"Gemini model: {settings.GEMINI_MODEL}")
+
+    # Probe the configured LLM credential so a revoked/expired key is loud and
+    # queryable via /health instead of surfacing as opaque 401s on every run.
+    from backend.services.gemini_client import probe_key_status
+    llm_status = await probe_key_status()
+    app.state.llm_status = llm_status
+    log = logger.info if llm_status["status"] in ("catalog_ok", "vertex") else logger.warning
+    log("LLM credential: [%s] %s", llm_status["status"], llm_status["detail"])
+
+    if settings.APP_ENV == "production":
+        if not (settings.SECRETS_MASTER_KEY or "").strip():
+            raise RuntimeError(
+                "SECRETS_MASTER_KEY is required when APP_ENV=production. "
+                "Mount it from Secret Manager on Cloud Run."
+            )
+        has_jwt_env = bool(
+            (settings.JWT_PRIVATE_KEY or "").strip()
+            and (settings.JWT_PUBLIC_KEY or "").strip()
+        )
+        has_jwt_files = (
+            Path(settings.JWT_PRIVATE_KEY_PATH).exists()
+            and Path(settings.JWT_PUBLIC_KEY_PATH).exists()
+        )
+        if not has_jwt_env and not has_jwt_files:
+            raise RuntimeError(
+                "JWT_PRIVATE_KEY and JWT_PUBLIC_KEY are required when APP_ENV=production "
+                "(or persist PEM files). Mount the PEMs from Secret Manager on Cloud Run."
+            )
+
+    # 1. Initialize Repository Factory
+    from backend.repositories.factory import RepositoryFactory
+    factory = RepositoryFactory()
+    await factory.initialize()
+    app.state.factory = factory
+
+    # 2. Initialize JWT Manager (auto-generates RSA keys on first run)
+    from backend.security.jwt_manager import jwt_manager
+    jwt_manager.initialize()
+
+    # 3. Initialize Secrets Vault (auto-generates master key on first run)
+    from backend.security.secrets_vault import secrets_vault
+    secrets_vault.initialize()
+
+    # 4. Initialize ToolRouter and Approvals
+    from backend.mcp.tool_router import ToolRouter
+    from backend.mcp.tool_policy import ToolPolicy
+    from backend.services.approvals_engine import ApprovalsEngine
+    
+    approvals_engine = ApprovalsEngine()
+    tool_policy = ToolPolicy()
+    tool_router = ToolRouter(
+        factory.mcp_repo, tool_policy, approvals_engine,
+        factory.idempotency_repo, secrets_repo=factory.secrets_repo,
+    )
+    
+    app.state.tool_router = tool_router
+
+    # 5. Initialize AgentFactory
+    from backend.agents.agent_factory import AgentFactory
+    from backend.services.runtime_snapshot import RuntimeSnapshotRegistry
+    snapshot_registry = RuntimeSnapshotRegistry()
+    from backend.services.plugin_registry_service import PluginRegistryService
+    plugin_registry = PluginRegistryService(factory.plugin_repo, snapshot_registry)
+    await plugin_registry.refresh_snapshot()
+    app.state.snapshot_registry = snapshot_registry
+    app.state.plugin_registry = plugin_registry
+    agent_factory = AgentFactory(snapshot_registry, tool_router)
+    app.state.agent_factory = agent_factory
+
+    # 6. Initialize Workflow Engine
+    from backend.engine.engine import WorkflowEngine
+    from backend.instrumentation.wrappers import InstrumentedWorkflowEngine
+    workflow_engine = InstrumentedWorkflowEngine(
+        WorkflowEngine(factory.workflow_repo, factory.message_bus, agent_factory, factory.memory_repo, factory.settings_repo)
+    )
+    app.state.workflow_engine = workflow_engine
+
+    # 7. Start background worker — ONLY if RUN_WORKER env is set.
+    # Production: worker runs as a separate Cloud Run service (Dockerfile.worker).
+    # Local dev: set RUN_WORKER=1 for convenience (single-process mode).
+    import os
+    run_worker_flag = os.environ.get("RUN_WORKER", "1" if settings.APP_ENV == "development" else "0")
+    if run_worker_flag == "1":
+        from backend.worker import start_worker
+        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo))
+        logger.info("Worker started IN-PROCESS (RUN_WORKER=1). For production, deploy a separate worker service.")
+    else:
+        logger.info("Worker NOT started in API process (RUN_WORKER=%s). Expecting separate worker service.", run_worker_flag)
+
+    logger.info("All systems initialized. Ready to serve requests.")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down...")
+    factory = getattr(app.state, "factory", None)
+    if factory:
+        await factory.shutdown()
+    logger.info("Shutdown complete.")
+
+
+# ══════════════════════════════════════════════════════════════════
+#  HEALTH CHECK
+# ══════════════════════════════════════════════════════════════════
+
+@app.get("/health")
+async def health_check():
+    factory = getattr(app.state, "factory", None)
+    return {
+        "status": "healthy",
+        "app": settings.APP_NAME,
+        "version": "2.0.0",
+        "storage": settings.STORAGE_BACKEND,
+        "model": settings.HF_MODEL if settings.LLM_PROVIDER == "huggingface" else settings.GEMINI_MODEL,
+        "llm": settings.LLM_PROVIDER if settings.LLM_PROVIDER != "auto" else (
+            "gemini" if settings.GEMINI_API_KEY else (
+                "vertex" if settings.GOOGLE_CLOUD_PROJECT else (
+                    "groq" if settings.GROQ_API_KEY else ("huggingface" if settings.HF_TOKEN else "unset")
+                )
+            )
+        ),
+        "llm_status": getattr(app.state, "llm_status", None),
+        "vertex_location": settings.GOOGLE_CLOUD_REGION,
+        "factory_initialized": factory is not None and factory._initialized,
+    }
+
+
+@app.get("/api/v1/csrf-token")
+async def get_csrf_token(request: Request):
+    """Get a CSRF token. Frontend calls this on page load."""
+    from fastapi.responses import JSONResponse
+    from backend.security.csrf import generate_csrf_token
+    token = generate_csrf_token()
+    response = JSONResponse({"csrf_token": token})
+    set_csrf_cookie(response, token)
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception(request: Request, exc: Exception):
+    """JSON errors with CORS headers so the browser can read them (not Failed to fetch)."""
+    if isinstance(exc, StarletteHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=_cors_headers_for(request),
+        )
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=_cors_headers_for(request),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════
+#  INTENT → PLAN → EXECUTE (Main workflow endpoint)
+# ══════════════════════════════════════════════════════════════════
+
+class GoalRequest(BaseModel):
+    goal: str
+
+
+@app.post("/api/v1/intent")
+async def process_goal(
+    body: GoalRequest,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Process a user's goal through the intent → plan → execute pipeline.
+    Real-time AI processing: no hardcoded responses.
+    """
+    factory = getattr(request.app.state, "factory", None)
+    workflow_engine = getattr(request.app.state, "workflow_engine", None)
+    if not factory or not workflow_engine:
+        raise HTTPException(status_code=500, detail="Server not initialized")
+
+    # Rate limit
+    check_rate_limit(f"user:{user.user_id}", "workflow")
+
+    # Sanitize the goal
+    try:
+        goal = sanitize_goal(body.goal)
+    except InputValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
+    if not goal:
+        raise HTTPException(status_code=400, detail="Goal cannot be empty")
+
+    run_id = str(uuid.uuid4())
+    workflow_id = f"wf-{run_id[:8]}"
+
+    try:
+        from backend.models.schemas import (
+            WorkflowRun, Task, TaskStatus, WorkflowDefinition,
+            WorkflowEvent, WorkflowEventType,
+        )
+        from backend.agents.intent.intent_agent import get_intent_agent
+        from backend.agents.planner.planner_agent import get_planner_agent
+        from backend.engine.dag_validator import prepare_dag, enrich_plan_from_intent, DAGValidationError
+        from backend.services import gemini_client
+        from tenacity import retry, stop_after_attempt, wait_exponential
+
+        @retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            reraise=True
+        )
+        async def run_with_retries(build_agent, input_data):
+            return await gemini_client.run_adk_debug(build_agent, input_data, settings.APP_NAME)
+
+        def extract_event_text(events):
+            for event in reversed(events):
+                if getattr(event, "output", None) is not None:
+                    if hasattr(event.output, 'model_dump'):
+                        return event.output.model_dump()
+                    return event.output
+                if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            return part.text
+            return None
+
+        intent_events = await run_with_retries(lambda model: get_intent_agent(model=model), goal)
+        raw_intent = extract_event_text(intent_events)
+
+        if isinstance(raw_intent, dict):
+            intent_result = raw_intent
+        elif isinstance(raw_intent, str):
+            intent_result = json.loads(raw_intent)
+        else:
+            intent_result = {"action": "unknown", "target": goal}
+
+        logger.info(f"[{run_id[:8]}] Intent: {intent_result}")
+
+        tool_router = getattr(request.app.state, "tool_router", None)
+        live_catalog = await tool_router.get_tool_catalog(user.user_id) if tool_router else []
+        catalog_blob = json.dumps(live_catalog)
+        plan_events = await run_with_retries(
+            lambda model: get_planner_agent(catalog_json=catalog_blob, model=model),
+            json.dumps(intent_result),
+        )
+        raw_plan = extract_event_text(plan_events)
+
+        if isinstance(raw_plan, dict):
+            workflow_def = WorkflowDefinition(**raw_plan)
+        elif isinstance(raw_plan, str):
+            workflow_def = WorkflowDefinition(**json.loads(raw_plan))
+        else:
+            raise Exception(f"Planner returned unexpected output type: {type(raw_plan)}")
+
+        workflow_def = enrich_plan_from_intent(workflow_def, intent_result, live_catalog, goal=goal)
+
+        from backend.engine.plan_repair import validate_or_repair
+        async def repair_plan(prompt):
+            repaired_events = await gemini_client.run_adk_debug(
+                lambda model: get_planner_agent(catalog_json=catalog_blob, model=model),
+                prompt, settings.APP_NAME,
+            )
+            return extract_event_text(repaired_events)
+        workflow_def = await validate_or_repair(
+            workflow_def, goal=goal, intent=intent_result, catalog=live_catalog, repair=repair_plan,
+        )
+        logger.info(f"[{run_id[:8]}] DAG: {len(workflow_def.tasks)} tasks")
+
+        # 3. Validate DAG
+        prepare_dag(workflow_def)
+
+        # 4. Create WorkflowRun with real user identity
+        run = WorkflowRun(
+            run_id=run_id,
+            workflow_id=workflow_id,
+            user_id=user.user_id,  # Real authenticated user
+            goal=goal,
+            status=TaskStatus.RUNNING,
+        )
+        for t_def in workflow_def.tasks:
+            task = Task(
+                task_id=t_def.task_id,
+                workflow_id=workflow_id,
+                run_id=run_id,
+                user_id=user.user_id,  # Real authenticated user
+                agent=t_def.agent,
+                tool=t_def.tool,
+                input_data=t_def.input_data,
+                dependencies=t_def.dependencies,
+                timeout_seconds=max(t_def.timeout_seconds, 180) if t_def.agent in ("Orchestrator", "OrchestratorAgent", "core.mcp_build") or "orchestrator" in (t_def.agent or "").lower() else t_def.timeout_seconds,
+                max_retries=t_def.max_retries,
+                recovery_enabled=True,
+                status=TaskStatus.PENDING,
+            )
+            run.tasks.append(task)
+
+        # Save to repository (SQLite or Firestore, based on config)
+        run_dict = run.model_dump(mode="json")
+        tasks_dicts = [t.model_dump(mode="json") for t in run.tasks]
+        run_dict["tasks"] = tasks_dicts
+        await factory.workflow_repo.save_run(run_dict)
+
+        # Emit WORKFLOW_STARTED event
+        start_event = WorkflowEvent(
+            type=WorkflowEventType.WORKFLOW_STARTED,
+            workflow_id=workflow_id,
+            run_id=run_id,
+            summary=f"Workflow started for goal: {goal}",
+        )
+        await factory.workflow_repo.save_event(start_event.model_dump(mode="json"))
+
+        # Audit log
+        await factory.audit_repo.log_event({
+            "event_type": "WORKFLOW_CREATED",
+            "actor_id": user.user_id,
+            "actor_type": "USER",
+            "resource_id": run_id,
+            "workflow_id": workflow_id,
+            "run_id": run_id,
+            "details": {"goal": goal, "task_count": len(workflow_def.tasks)},
+        })
+
+        # 5. Evaluate DAG to trigger root tasks
+        await workflow_engine.evaluate_dag(run_id)
+
+        return {
+            "run_id": run_id,
+            "workflow_id": workflow_id,
+            "status": run.status,
+            "task_count": len(run.tasks),
+            "message": "Workflow created and executing.",
+        }
+
+    except DAGValidationError as e:
+        logger.error(f"DAG Validation failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid Plan: {e}")
+    except Exception as e:
+        traceback.print_exc()
+        logger.error(f"Execution failed: {e}")
+        msg = str(e)
+        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            raise HTTPException(status_code=429, detail="The Gemini quota is exhausted. Retry after the quota resets.")
+        raise HTTPException(status_code=500, detail=msg)
+
+
+# ══════════════════════════════════════════════════════════════════
+#  WORKFLOW ENDPOINTS
+# ══════════════════════════════════════════════════════════════════
+
+@app.get("/api/v1/workflows")
+async def list_workflows(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List the authenticated user's workflow runs."""
+    factory = getattr(request.app.state, "factory", None)
+    if not factory:
+        raise HTTPException(status_code=500, detail="Server not initialized")
+
+    runs = await factory.workflow_repo.list_runs(user.user_id, limit=limit, offset=offset)
+    return {"workflows": runs, "count": len(runs)}
+
+
+@app.get("/api/v1/workflows/{run_id}")
+async def get_workflow(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Get a specific workflow run with all its tasks."""
+    factory = getattr(request.app.state, "factory", None)
+    if not factory:
+        raise HTTPException(status_code=500, detail="Server not initialized")
+
+    run = await factory.workflow_repo.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Resource-level access control — users can only see their own workflows
+    if run.get("user_id") != user.user_id and not user.is_admin():
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return run
+
+
+@app.get("/api/v1/workflows/{run_id}/events")
+async def stream_workflow_events(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Stream workflow events via SSE."""
+    factory = getattr(request.app.state, "factory", None)
+    if not factory:
+        raise HTTPException(status_code=500, detail="Server not initialized")
+
+    run = await factory.workflow_repo.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if run.get("user_id") != user.user_id and not user.is_admin():
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    async def event_generator():
+        last_event_id = None
+        try:
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    events = await factory.workflow_repo.get_events(run_id, after_event_id=last_event_id)
+                except Exception as exc:
+                    logger.exception("SSE get_events failed for run %s", run_id)
+                    yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+                    return
+                for event in events:
+                    last_event_id = event.get("event_id")
+                    yield f"id: {last_event_id}\ndata: {json.dumps(event, default=str)}\n\n"
+                await asyncio.sleep(1)
+        except Exception as exc:
+            logger.exception("SSE stream failed for run %s", run_id)
+            yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            **_cors_headers_for(request),
+        },
+    )

@@ -1,0 +1,54 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "dev:fast": "next dev --webpack",
+    "build": "npx @tailwindcss/cli -i ./src/app/globals.css -o ./src/app/built.css --minify && next build --webpack && node strip-polyfills.js",
+    "postbuild": "node strip-polyfills.js && node prepare-standalone.mjs",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "@react-oauth/google": "^0.13.5",
+    "@sentry/nextjs": "^10.73.0",
+    "@types/dagre": "^0.7.54",
+    "@xyflow/react": "^12.11.3",
+    "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
+    "date-fns": "^4.4.0",
+    "framer-motion": "^13.2.0",
+    "lucide-react": "^1.33.0",
+    "next": "16.4.0",
+    "radash": "^12.1.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@next/bundle-analyzer": "16.4.0",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/cli": "4.3.3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "critters": "^0.0.23",
+    "cross-env": "^10.1.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "browserslist": [
+    "Chrome >= 109",
+    "Safari >= 15.6",
+    "Edge >= 114",
+    "Firefox >= 115"
+  ]
+}

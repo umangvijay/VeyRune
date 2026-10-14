@@ -1,0 +1,21 @@
+# Build immutable API and worker images. Deployment is deliberately separate:
+# API secrets/IAM and a Cloud Run Worker Pool must be configured explicitly.
+timeout: 1800s
+options:
+  logging: CLOUD_LOGGING_ONLY
+steps:
+  # Build API image (root Dockerfile)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_API_IMAGE}', '-f', 'Dockerfile', '.']
+
+  # Build Worker image (Dockerfile.worker)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_WORKER_IMAGE}', '-f', 'Dockerfile.worker', '.']
+
+images:
+  - '${_API_IMAGE}'
+  - '${_WORKER_IMAGE}'
+substitutions:
+  _API_IMAGE: 'gcr.io/${PROJECT_ID}/agentos-api'
+  _WORKER_IMAGE: 'gcr.io/${PROJECT_ID}/agentos-worker'
+  _REGION: 'us-central1'

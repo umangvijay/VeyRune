@@ -1,0 +1,36 @@
+# Credentials and local runtime state
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*credentials*.json
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+# Build and dependency outputs
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars

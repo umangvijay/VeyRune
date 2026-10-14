@@ -1,0 +1,39 @@
+# Worker service — runs ONLY the background worker, NOT the API.
+# This is a long-running pull consumer. On Google Cloud deploy it as a Cloud
+# Run Worker Pool, not a Cloud Run Service (it has no HTTP listener).
+# The API sets RUN_WORKER=0 and does NOT start the worker in-process.
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN pip install --no-cache /wheels/* \
+    && python -m playwright install --with-deps chromium
+
+COPY backend ./backend
+COPY main.py ./main.py
+
+ENV PYTHONPATH=/app
+ENV APP_ENV=production
+# STORAGE_BACKEND is supplied at deploy time. Cloud workers must share the
+# API's Firestore database; baking SQLite here creates an isolated data store.
+# Worker-only mode — the API does NOT start a worker when this is running
+ENV WORKER_ONLY=1
+
+# Start ONLY the worker process, not the API server.
+# Run the API/worker and browser as an unprivileged identity.
+RUN groupadd --gid 10001 agentos && useradd --uid 10001 --gid 10001 --create-home agentos \
+    && mkdir -p /app/data \
+    && chown -R agentos:agentos /app/data \
+    && chmod -R a+rX /ms-playwright
+USER 10001:10001
+
+CMD ["python", "-m", "backend.worker"]
