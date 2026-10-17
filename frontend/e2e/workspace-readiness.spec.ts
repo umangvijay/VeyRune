@@ -25,7 +25,8 @@ test('completed thread handles null output and invalid event timestamp', async (
     await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.goto('/dashboard/workspace/regression-run');
-  await expect(page.getByText('Live response · HTTP 200')).toBeVisible();
+  // Round 5 (audit bug 6): the assistant line reports the full check, not just 'HTTP 200'.
+  await expect(page.getByText('HTTP 200', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Model for this message')).toHaveValue('gemini-2.5-pro');
   await expect(page.getByText("This page couldn't load")).toHaveCount(0);
   expect(errors).toEqual([]);

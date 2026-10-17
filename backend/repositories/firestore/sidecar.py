@@ -19,6 +19,7 @@ from backend.repositories.base import (
     BaseSettingsRepository,
     BaseTokenDenylistRepository,
     BaseAdaptivePolicyRepository,
+    BaseApiKeysRepository,
 )
 from backend.repositories.firestore.database import FirestoreDB
 from backend.repositories.sqlite.settings_repository import DEFAULT_SETTINGS
@@ -244,6 +245,57 @@ class FirestoreTokenDenylistRepository(BaseTokenDenylistRepository):
             await doc.reference.delete()
             count += 1
         return count
+
+
+class FirestoreApiKeysRepository(BaseApiKeysRepository):
+    """Per-user programmatic API keys. Hashes only."""
+
+    async def create_key(self, user_id: str, key_hash: str, prefix: str, name: str) -> str:
+        db = await _db()
+        key_id = key_hash[:16]
+        await db.collection("api_keys").document(key_id).set({
+            "id": key_id,
+            "user_id": user_id,
+            "name": name,
+            "key_hash": key_hash,
+            "prefix": prefix,
+            "created_at": _now(),
+            "revoked_at": None,
+        })
+        return key_id
+
+    async def resolve_key(self, key_hash: str) -> Optional[Dict[str, Any]]:
+        db = await _db()
+        rows = []
+        async for doc in db.collection("api_keys").where("key_hash", "==", key_hash).stream():
+            rows.append(doc.to_dict() or {})
+        live = [r for r in rows if not r.get("revoked_at")]
+        if not live:
+            return None
+        await db.collection("api_keys").document(live[0]["id"]).set(
+            {**live[0], "last_used_at": _now()}
+        )
+        return {"user_id": live[0]["user_id"], "key_id": live[0]["id"]}
+
+    async def list_keys(self, user_id: str) -> List[Dict[str, Any]]:
+        db = await _db()
+        rows = []
+        async for doc in db.collection("api_keys").where("user_id", "==", user_id).stream():
+            data = doc.to_dict() or {}
+            data.pop("key_hash", None)
+            rows.append(data)
+        rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        return rows
+
+    async def revoke_key(self, user_id: str, key_id: str) -> bool:
+        db = await _db()
+        ref = db.collection("api_keys").document(key_id)
+        doc = await ref.get()
+        data = doc.to_dict() or {}
+        if not doc.exists or data.get("user_id") != user_id or data.get("revoked_at"):
+            return False
+        await ref.set({**data, "revoked_at": _now()})
+        return True
 
 
 class FirestoreAdaptivePolicyRepository(BaseAdaptivePolicyRepository):

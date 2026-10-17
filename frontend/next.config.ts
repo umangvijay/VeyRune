@@ -45,8 +45,10 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
           // Match the API's header stack (audit P1.8: frontend lacked HSTS/CSP).
-          // script-src keeps 'unsafe-inline' because Next.js injects inline
-          // hydration scripts; hardening it needs nonce-based middleware.
+          // script-src keeps 'unsafe-inline': this app's marketing pages are
+          // statically prerendered, so nonce-based CSP (middleware) cannot
+          // stamp its scripts — tried in Round 8 and reverted for exactly
+          // that reason. Hardening requires giving up static prerendering.
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains",
@@ -59,11 +61,15 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              // 'unsafe-eval' is dev-only: react-refresh evaluates strings.
+              // (This gap is what broke the workspace e2e spec since Round 3.)
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.run.app https://accounts.google.com",
+              // localhost:8000 matches the API's own dev CSP exception — the
+              // CSRF bootstrap needs it in dev/e2e; unreachable in production.
+              "connect-src 'self' https://*.run.app https://accounts.google.com http://localhost:8000 http://127.0.0.1:8000",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

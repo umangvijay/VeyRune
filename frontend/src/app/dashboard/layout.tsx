@@ -45,6 +45,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    label: "Catalog",
+    href: "/dashboard/catalog",
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path d="M4 6h16M4 12h16M4 18h10" />
+      </svg>
+    ),
+  },
+  {
     label: "Agents",
     href: "/dashboard/agents",
     icon: (
@@ -160,6 +169,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
       "/dashboard": "New chat · Veyrune",
       "/dashboard/workflows": "Runs · Veyrune",
       "/dashboard/integrations": "Integrations · Veyrune",
+      "/dashboard/catalog": "Catalog · Veyrune",
       "/dashboard/integrations/create": "Create MCP · Veyrune",
       "/dashboard/agents": "Agents · Veyrune",
       "/dashboard/studio": "Studio · Veyrune",

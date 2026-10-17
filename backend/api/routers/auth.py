@@ -24,6 +24,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 
 from fastapi import APIRouter, HTTPException, Depends, Request, status
+from pydantic import BaseModel
 
 from backend.models.user import (
     SignupRequest, LoginRequest, GoogleAuthRequest, RefreshRequest,
@@ -576,3 +577,79 @@ async def create_guest_session(request: Request):
         expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=UserPublic.from_db(user_data),
     )
+
+# ══════════════════════════════════════════════════════════════════
+#  API KEYS (programmatic access — the stable alternative to
+#  15-minute JWTs for MCP clients and automations)
+# ══════════════════════════════════════════════════════════════════
+
+class CreateApiKeyRequest(BaseModel):
+    name: str = ""
+
+
+@router.post("/api-keys", status_code=status.HTTP_201_CREATED)
+async def create_api_key(
+    body: CreateApiKeyRequest,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Create an API key. The raw key is returned ONCE — only its hash is stored."""
+    factory = _get_factory(request)
+    keys_repo = getattr(factory, "api_keys_repo", None)
+    if keys_repo is None:
+        raise HTTPException(status_code=501, detail="API keys are not available on this deployment")
+
+    check_rate_limit(f"user:{user.user_id}", "auth")
+    import secrets as _secrets
+    raw_key = "vry_" + _secrets.token_urlsafe(24)
+    key_hash = __import__("hashlib").sha256(raw_key.encode("utf-8")).hexdigest()
+    try:
+        name = sanitize_text(body.name or "default", "name", max_length=100)
+    except InputValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
+    key_id = await keys_repo.create_key(user.user_id, key_hash, raw_key[:8], name)
+    await factory.audit_repo.log_event({
+        "event_type": "API_KEY_CREATED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": key_id,
+        "details": {"name": name, "prefix": raw_key[:8]},
+    })
+    return {
+        "id": key_id,
+        "name": name,
+        "key": raw_key,
+        "prefix": raw_key[:8],
+        "warning": "Store this key now — it is never shown again.",
+    }
+
+
+@router.get("/api-keys")
+async def list_api_keys(request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """List the caller's API keys — metadata only, never the raw key or hash."""
+    factory = _get_factory(request)
+    keys_repo = getattr(factory, "api_keys_repo", None)
+    if keys_repo is None:
+        raise HTTPException(status_code=501, detail="API keys are not available on this deployment")
+    keys = await keys_repo.list_keys(user.user_id)
+    return {"keys": keys, "count": len(keys)}
+
+
+@router.delete("/api-keys/{key_id}", status_code=status.HTTP_200_OK)
+async def revoke_api_key(key_id: str, request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """Revoke one API key. Takes effect immediately on the next request."""
+    factory = _get_factory(request)
+    keys_repo = getattr(factory, "api_keys_repo", None)
+    if keys_repo is None:
+        raise HTTPException(status_code=501, detail="API keys are not available on this deployment")
+    revoked = await keys_repo.revoke_key(user.user_id, key_id)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="API key not found or already revoked")
+    await factory.audit_repo.log_event({
+        "event_type": "API_KEY_REVOKED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": key_id,
+        "details": {},
+    })
+    return {"id": key_id, "revoked": True}
+

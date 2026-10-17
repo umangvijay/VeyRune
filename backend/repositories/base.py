@@ -438,6 +438,35 @@ class BaseAdaptivePolicyRepository(ABC):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  API KEYS REPOSITORY
+# ═══════════════════════════════════════════════════════════════════
+
+class BaseApiKeysRepository(ABC):
+    """Per-user programmatic API keys. Only hashes are stored; the raw
+    key is returned exactly once at creation. Revocable individually."""
+
+    @abstractmethod
+    async def create_key(self, user_id: str, key_hash: str, prefix: str, name: str) -> str:
+        """Store a key hash. Returns the key id."""
+        ...
+
+    @abstractmethod
+    async def resolve_key(self, key_hash: str) -> Optional[Dict[str, Any]]:
+        """Resolve a hash to {user_id, key_id} if live. Touches last_used_at."""
+        ...
+
+    @abstractmethod
+    async def list_keys(self, user_id: str) -> List[Dict[str, Any]]:
+        """List the user's keys — metadata only, never the hash."""
+        ...
+
+    @abstractmethod
+    async def revoke_key(self, user_id: str, key_id: str) -> bool:
+        """Revoke one key. Returns True if a live key was revoked."""
+        ...
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  TOKEN DENYLIST REPOSITORY
 # ═══════════════════════════════════════════════════════════════════
 

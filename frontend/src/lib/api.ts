@@ -931,3 +931,55 @@ export interface OperationsSummary {
 export async function getOperationsSummary(): Promise<OperationsSummary> {
   return apiFetch("/usage/operations");
 }
+
+// ── API keys (programmatic access) ─────────────────────────────
+
+export interface ApiKeyRow {
+  id: string;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at?: string | null;
+  revoked_at?: string | null;
+}
+
+export async function createApiKey(name: string) {
+  return apiFetch<{ id: string; name: string; key: string; prefix: string; warning: string }>(
+    "/auth/api-keys",
+    { method: "POST", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function listApiKeys() {
+  return apiFetch<{ keys: ApiKeyRow[]; count: number }>("/auth/api-keys");
+}
+
+export async function revokeApiKey(id: string) {
+  return apiFetch<{ id: string; revoked: boolean }>(`/auth/api-keys/${id}`, { method: "DELETE" });
+}
+
+// ── Shared integration catalog ─────────────────────────────────
+
+export interface CatalogEntry {
+  mcp_id: string;
+  name: string;
+  description?: string;
+  source_type: string;
+  trust_tier: string;
+  spec_version?: string;
+  updated_at?: string;
+  tools: { name?: string; description?: string }[];
+  tool_count: number;
+}
+
+export async function listCatalog() {
+  return apiFetch<{ integrations: CatalogEntry[]; count: number }>("/integrations/catalog");
+}
+
+export async function installFromCatalog(mcpId: string) {
+  return apiFetch<{ mcp_id: string; installed: boolean; tools?: number; name?: string; message?: string }>(
+    `/integrations/${mcpId}/install`,
+    { method: "POST" },
+  );
+}
+

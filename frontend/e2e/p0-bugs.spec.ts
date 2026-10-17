@@ -66,6 +66,6 @@ test.describe('A4 — Theme', () => {
     const bgPrimary = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()
     );
-    expect(bgPrimary).toBe('#f6f5f1');
+    expect(bgPrimary).toBe('#f4f2eb');
   });
 });

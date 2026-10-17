@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getSettings, updateSettings, UserSettings, storeCredential, validateCredential, pingGemini, listAdminUsers, setUserActive, adminStats } from "@/lib/api";
+import ApiKeyManager from "@/components/ApiKeyManager";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
@@ -341,6 +342,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+
+      <ApiKeyManager />
     </div>
   );
 }
