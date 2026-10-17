@@ -21,12 +21,6 @@ class EmbeddingService(ABC):
         pass
 
 
-class MockEmbeddingService(EmbeddingService):
-    def embed_text(self, text: str) -> List[float]:
-        # Return a mock 768-dimensional embedding
-        return [0.1] * 768
-
-
 def _embedding_configured() -> bool:
     """True when an embedding provider can plausibly work right now."""
     from backend.services.llm_context import effective_gemini_key, active_llm_provider

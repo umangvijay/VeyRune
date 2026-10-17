@@ -315,6 +315,7 @@ export interface UserSettings {
   notifications_enabled: boolean;
   daily_token_limit: number;
   auto_approve_low_risk: boolean;
+  webhook_url?: string;
 }
 
 export interface GoalAttachment {
@@ -917,6 +918,24 @@ export async function restoreConnectorRevision(mcpId: string, revisionId: string
   return apiFetch(`/integrations/${encodeURIComponent(mcpId)}/revisions/${encodeURIComponent(revisionId)}/restore`, { method: "POST" });
 }
 
+export interface CostTrackingEstimate {
+  mode: string;
+  note: string;
+  estimated_tokens: number;
+  estimated_cost_usd: number;
+  usd_per_1m_tokens: number;
+}
+
+export interface ModelLeaderboardRow {
+  model: string;
+  attempts: number;
+  successes: number;
+  failures: number;
+  ewma_latency_ms: number;
+  success_rate: number | null;
+  score: number;
+}
+
 export interface OperationsSummary {
   sample_size: number;
   sample_limit: number;
@@ -926,7 +945,11 @@ export interface OperationsSummary {
   failed_tasks_by_agent: Record<string, number>;
   attention: { run_id: string; status: string; reason: string; age_seconds: number | null }[];
   generated_at: string;
-  cost_tracking: string;
+  cost_tracking: CostTrackingEstimate;
+}
+
+export async function getModelLeaderboard() {
+  return apiFetch<{ policy: string; models: ModelLeaderboardRow[]; note: string }>("/usage/models");
 }
 export async function getOperationsSummary(): Promise<OperationsSummary> {
   return apiFetch("/usage/operations");

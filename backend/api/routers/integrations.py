@@ -415,6 +415,7 @@ async def publish_integration(
     Gate: only the owner may publish, and only *verified* integrations
     (probe-passed OpenAPI builds) — pending-review or website browser
     tools stay private, so nothing unreviewed is ever shared."""
+    check_rate_limit(f"user:{user.user_id}", "general")
     factory = _get_factory(request)
     mcp = await factory.mcp_repo.get_mcp(mcp_id)
     if not mcp or mcp.get("owner") != user.user_id:
@@ -441,6 +442,7 @@ async def unpublish_integration(
     user: AuthenticatedUser = Depends(require_not_viewer),
 ):
     """Remove an integration from the shared catalog (owner or admin)."""
+    check_rate_limit(f"user:{user.user_id}", "general")
     factory = _get_factory(request)
     mcp = await factory.mcp_repo.get_mcp(mcp_id)
     if not mcp or (mcp.get("owner") != user.user_id and not user.is_admin()):
@@ -476,6 +478,7 @@ async def install_from_catalog(
     owner's credentials are NEVER copied — the auth *placement* metadata
     (header vs query, key name) carries over; each user attaches their
     own secret via /integrations/{id}/credentials or the Vault."""
+    check_rate_limit(f"user:{user.user_id}", "general")
     import hashlib
     factory = _get_factory(request)
     mcp = await factory.mcp_repo.get_mcp(mcp_id)

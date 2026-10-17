@@ -197,6 +197,25 @@ export default function SettingsPage() {
         </div>
 
         <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, borderBottom: "1px solid var(--border-primary)", paddingBottom: 12 }}>
+            Run Webhooks (outbound)
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+            We POST a signed summary (HMAC-SHA256) to this HTTPS URL every time one of your runs
+            finishes (COMPLETED or FAILED). Must be a public HTTPS endpoint. Leave empty to disable.
+            Optionally store a Vault secret named <code>webhook_out</code> to override the default signing key.
+          </p>
+          <input
+            type="url"
+            className="input"
+            placeholder="https://your-service.example.com/hooks/veyrune"
+            value={settings?.webhook_url || ""}
+            onChange={e => setSettings(s => s ? { ...s, webhook_url: e.target.value } : s)}
+            style={{ maxWidth: 480 }}
+          />
+        </div>
+
+        <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, borderBottom: "1px solid var(--border-primary)", paddingBottom: 12 }}>
             Agent Autonomy
           </h2>
