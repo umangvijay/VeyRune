@@ -1,13 +1,35 @@
 # Production readiness and improvement plan
 
-## Current assessment
+## Current assessment — updated 2026-10-17 (post-audit remediation, v2.1.1)
 
-**Maturity: pre-production. No production score has been certified.** This is a
-qualitative engineering assessment, not a compliance certification. The repo
-contains real API, persistence, workflow, MCP, browser, and security code, but
-that does not establish reliable operation under real credentials, workload,
-or cloud failure. No GCP project, Vertex credentials, deployed Firestore,
-Pub/Sub, or worker pool was available for an end-to-end verification here.
+**Code maturity: release-candidate (v2.1.1). Production maturity: pending one
+action — the deploy.** The external audit's 17 findings are fixed, with 192
+backend tests, 11 frontend e2e tests, and per-round live-measured evidence in
+`VEYRUNE_AUDIT_REPORT.md` (rounds 3–11). All three Docker images build and
+pass runtime smoke inside the actual container. What remains unverified is
+exactly one thing: **the deployed Cloud Run services still run the pre-fix
+build** because the deploy is gated on `gcloud auth login`. Deploy with
+`scripts/gcp/deploy-safe.sh`, then prove it with
+`scripts/gcp/verify-p0-production.py` (14 live checks) before accepting users.
+
+Two sessions have audited this system independently: the original deep audit
+(Rounds 1–2, live production testing) and a deployed-site re-audit (Round 10A)
+that confirmed production still serves the pre-fix build. The consolidated
+scorecard for the code as of v2.1.1: production-grade ~95%, enterprise-grade
+~81%; the residual gap is product scope (orgs/teams, Stripe) and deploy-level
+rate limiting, documented in the audit report.
+
+---
+
+## Historical assessment (2026-10-11, pre-remediation — kept for record)
+
+**Maturity at the time: pre-production. No production score had been
+certified.** This is a qualitative engineering assessment, not a compliance
+certification. The repo contained real API, persistence, workflow, MCP,
+browser, and security code, but that did not establish reliable operation
+under real credentials, workload, or cloud failure. No GCP project, Vertex
+credentials, deployed Firestore, Pub/Sub, or worker pool was available for an
+end-to-end verification at that time.
 
 ### Verification update — 2026-10-11
 

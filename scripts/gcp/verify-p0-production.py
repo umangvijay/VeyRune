@@ -97,14 +97,6 @@ if mem2.get("memory_id"):
     code, _, listing = req("/api/v1/memory", token=token)
     check("P0.1 strict JSON with HTML in payload", code == 200 and isinstance(listing, dict), f"HTTP {code}")
 
-# ── Bug 4: task title + started_at ──────────────────────────────────
-code, _, runs = req("/api/v1/workflows?limit=5", token=token)
-tasks = [t for w in runs.get("workflows", []) for t in (w.get("tasks") or [])]
-health_tasks = [t for t in tasks if t.get("status") == "COMPLETED"]
-titled = [t for t in health_tasks if t.get("title") and t.get("started_at")]
-check("bug 4 task.title + started_at populated", bool(titled),
-      titled[0]["title"][:60] if titled else "no completed tasks yet")
-
 # ── Bug 17/P0.4: petstore relative-servers build (LLM-free) ─────────
 code, _, build = req("/api/v1/integrations/build-from-url", "POST",
                      json.dumps({"url": "https://petstore3.swagger.io/api/v3/openapi.json",
@@ -136,6 +128,31 @@ if sid:
     code2, _, run = req(f"/api/v1/workflows/{rid}", token=token)
     check("R2 run-now creates observable run immediately", code2 == 200 and rid.startswith("sch-"), f"HTTP {code2}")
     req(f"/api/v1/schedules/{sid}", "DELETE", b"", token)
+
+# ── v2.1 features: catalog + API keys ───────────────────────────────
+code, _, key = req("/api/v1/auth/api-keys", "POST",
+                   json.dumps({"name": "p0-verify"}).encode(), token)
+check("v2.1 API key created (raw shown once)", code == 201 and key.get("key", "").startswith("vry_"), f"HTTP {code}")
+if key.get("key"):
+    code, _, me = req("/api/v1/auth/me", token=key["key"])
+    check("v2.1 API key authenticates like a JWT", code == 200 and me.get("id"), f"HTTP {code}")
+    code, _, _ = req(f"/api/v1/auth/api-keys/{key['id']}", "DELETE", token=token)
+    code, _, _ = req("/api/v1/auth/me", token=key["key"])
+    check("v2.1 revoked API key → 401 immediately", code == 401, f"HTTP {code}")
+
+code, _, catalog = req("/api/v1/integrations/catalog", token=token)
+check("v2.1 catalog endpoint (empty is valid)", code == 200 and "integrations" in catalog, f"HTTP {code}")
+
+code, _, board = req("/api/v1/usage/models", token=token)
+check("v2.1 adaptive-policy leaderboard", code == 200 and "policy" in board, f"HTTP {code}")
+
+# ── Bug 4: task title + started_at (runs completed by now) ──────────
+time.sleep(4)
+code, _, runs = req("/api/v1/workflows?limit=20", token=token)
+tasks = [t for w in runs.get("workflows", []) for t in (w.get("tasks") or [])]
+titled = [t for t in tasks if t.get("title") and t.get("started_at") and t.get("status") == "COMPLETED"]
+check("bug 4 task.title + started_at populated", bool(titled),
+      titled[0]["title"][:60] if titled else "no completed tasks yet")
 
 # ── Summary ─────────────────────────────────────────────────────────
 failed = [r for r in results if not r[1]]

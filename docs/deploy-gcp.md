@@ -159,6 +159,13 @@ This creates real persisted test runs and consumes inference credits. It does no
 
 ## 9. Updates, rollback, and cost control
 
+> **Repeat deploys:** use `bash scripts/gcp/deploy-safe.sh` — it is
+> image-only and preserves the service's env vars, secrets, and IAM. Do NOT
+> re-run any command with `--set-env-vars` against an existing service unless
+> you intend to replace the full env set (it wipes anything not listed).
+> After deploying, run `python3 scripts/gcp/verify-p0-production.py` and see
+> `docs/ops-runbook.md` for rollback and incident playbooks.
+
 For updates: `git pull --ff-only`, set `RELEASE` to the new commit, rebuild the three images and repeat deploy commands using the same secrets, service identities and database. Record previous image digests and service revisions before updating. Roll HTTP traffic back to a known revision with `gcloud run services update-traffic SERVICE --to-revisions=REVISION=100 --region="$REGION"`; redeploy the previous worker image separately. Database changes may require a migration rollback plan.
 
 To pause test execution, scale the Worker Pool to zero in Cloud Run and stop submitting workflows. API/frontend with minimum zero scale down when idle; storage, builds and retained images can still consume credit. Delete unused images and review Billing regularly. Back up Firestore and test restoration before a public launch. Keep exports before the trial ends; without upgrading, Google stops resources at expiry/exhaustion.
