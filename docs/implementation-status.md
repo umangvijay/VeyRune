@@ -1,4 +1,13 @@
-# Implementation status — 2026-10-11
+# Implementation status
+
+> **Update — 2026-10-18 (v2.1.1):** the open items below have since been
+> closed by the audit remediation rounds (see `VEYRUNE_AUDIT_REPORT.md`
+> rounds 3–11): durable token accounting with an enforced daily budget and
+> cost estimates, audit log (API + admin UI), revocation, retention, and
+> the concurrency/queueing hardening. The 2026-10-11 snapshot below is kept
+> as history.
+
+## Snapshot — 2026-10-11
 
 This is a partial implementation of the production improvement program. It is
 not a release certification. No deployment or Git push was performed.

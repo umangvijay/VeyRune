@@ -1,5 +1,12 @@
 # Repository Assessment
 
+> **Stale snapshot (greenfield-era).** The environment described below
+> (Python 3.9, no Node/Docker/gcloud) no longer resembles reality — see
+> `docs/production-readiness.md` and `VEYRUNE_AUDIT_REPORT.md` for the
+> current state. Kept only as a historical record.
+
+# Repository Assessment
+
 ## Current Environment Status
 This is a newly initialized (greenfield) project for AgentOS.
 
