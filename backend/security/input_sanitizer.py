@@ -101,7 +101,10 @@ def sanitize_text(text: str, field_name: str = "input", max_length: int = MAX_FI
         if pattern.search(text):
             logger.warning(f"XSS pattern detected in {field_name}")
             raise InputValidationError(
-                f"Potentially dangerous content detected in {field_name}",
+                f"Potentially dangerous content detected in {field_name}. "
+                "Remove code, HTML, or event handlers (for example <script>, <iframe>, onclick=, "
+                "javascript: links) and describe the outcome you want in plain language instead — "
+                "for example: 'check the health of https://example.com and report the TLS expiry'.",
                 field_name,
             )
 

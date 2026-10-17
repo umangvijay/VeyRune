@@ -45,7 +45,19 @@ function assistantText(task: Task): string | null {
   }
   if (typeof out.status_code === "number") {
     const snippet = safeSnippet(out.data);
-    return `Live response · HTTP ${out.status_code}${snippet ? `\n\n${snippet}` : ""}`;
+    // Health-check results get a full report line, not just "HTTP 200"
+    // (audit bug 6: the chat answer under-reported the check).
+    const health: string[] = [`HTTP ${out.status_code}`];
+    if (typeof out.latency_ms === "number") health.push(`${out.latency_ms} ms`);
+    const tls = out.tls as { days_until_expiry?: number; expires_at?: string } | undefined;
+    if (tls && typeof tls.days_until_expiry === "number") {
+      health.push(`TLS expires in ${tls.days_until_expiry}d${tls.expires_at ? ` (${tls.expires_at.slice(0, 10)})` : ""}`);
+    }
+    if (typeof out.grade === "string") health.push(`grade: ${out.grade}`);
+    const headers = out.security_headers as { missing?: string[] } | undefined;
+    const missing = headers && Array.isArray(headers.missing) ? headers.missing : [];
+    if (missing.length) health.push(`missing headers: ${missing.join(", ")}`);
+    return `${health.join(" · ")}${snippet ? `\n\n${snippet}` : ""}`;
   }
   if (out.ok === true || out.reachable === true || out.sent === true) {
     return safeSnippet(out);

@@ -7,7 +7,7 @@ import re
 from typing import Any, Optional, Type
 
 from backend.config.settings import settings
-from backend.services.llm_context import effective_gemini_key, effective_groq_key, effective_grok_key, effective_hf_token
+from backend.services.llm_context import effective_gemini_key, effective_groq_key, effective_grok_key, effective_hf_token, get_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +343,23 @@ def _coerce_json(text: str) -> Any:
         return json.loads(text, strict=False)
 
 
+
+def _record_usage_estimate(prompt: str, output: str) -> None:
+    """Record an estimated token spend for the user in context (4 chars/token),
+    so the daily budget check in workflow creation actually has data. The
+    budget is a cost guardrail, not billing. Never raises."""
+    try:
+        user_id = get_user_id()
+        if not user_id:
+            return
+        from backend.agents.context_manager import context_manager
+        inp = max(0, (len(prompt or "") + 3) // 4)
+        out = max(0, (len(output or "") + 3) // 4)
+        context_manager.record_usage(user_id, inp, out)
+    except Exception:
+        logger.debug("usage estimate recording failed", exc_info=True)
+
+
 async def generate_text(prompt: str, model: Optional[str] = None) -> str:
     if _huggingface_is_only_configured_provider():
         return await _huggingface_complete(prompt, json_mode=False, model=model)
@@ -368,6 +385,7 @@ async def generate_text(prompt: str, model: Optional[str] = None) -> str:
             if text:
                 if candidate != (model or settings.GEMINI_MODEL):
                     logger.info("Gemini text used fallback model %s", candidate)
+                _record_usage_estimate(prompt, text)
                 return text
             last = ValueError(f"empty response from {candidate}")
         except Exception as e:
@@ -385,18 +403,24 @@ async def generate_text(prompt: str, model: Optional[str] = None) -> str:
         raise last
     if last and is_quota_error(last):
         try:
-            return await _groq_complete(prompt, json_mode=False)
+            _t = await _groq_complete(prompt, json_mode=False)
+            _record_usage_estimate(prompt, _t)
+            return _t
         except Exception as groq_err:
             logger.warning("Groq text fallback failed (%s)", type(groq_err).__name__)
         try:
-            return await _grok_complete(prompt, json_mode=False)
+            _t = await _grok_complete(prompt, json_mode=False)
+            _record_usage_estimate(prompt, _t)
+            return _t
         except Exception as grok_err:
             logger.warning("Grok text fallback failed: %s", grok_err)
         raise GeminiQuotaExceeded(
             "Gemini quota exhausted. Add a Gemini, Groq, or xAI key in Settings."
         ) from last
     try:
-        return await _groq_complete(prompt, json_mode=False)
+        _t = await _groq_complete(prompt, json_mode=False)
+        _record_usage_estimate(prompt, _t)
+        return _t
     except Exception as groq_err:
         logger.warning("Groq text fallback failed (%s)", type(groq_err).__name__)
     try:
@@ -445,6 +469,7 @@ async def generate_json(prompt: str, schema: Optional[Type] = None, model: Optio
                 parsed = _coerce_json(fixed)
             if candidate != (model or settings.GEMINI_MODEL):
                 logger.info("Gemini JSON used fallback model %s", candidate)
+            _record_usage_estimate(prompt, text)
             return parsed
         except Exception as e:
             last = e
@@ -462,11 +487,15 @@ async def generate_json(prompt: str, schema: Optional[Type] = None, model: Optio
         raise last
     if last and (is_quota_error(last) or isinstance(last, GeminiQuotaExceeded)):
         try:
-            return _coerce_json(await _groq_complete(prompt, json_mode=True))
+            _t = await _groq_complete(prompt, json_mode=True)
+            _record_usage_estimate(prompt, str(_t))
+            return _coerce_json(_t)
         except Exception as groq_err:
             logger.warning("Groq JSON fallback failed (%s)", type(groq_err).__name__)
         try:
-            return _coerce_json(await _grok_complete(prompt, json_mode=True))
+            _t = await _grok_complete(prompt, json_mode=True)
+            _record_usage_estimate(prompt, str(_t))
+            return _coerce_json(_t)
         except Exception as grok_err:
             logger.warning("Grok JSON fallback failed: %s", grok_err)
         raise GeminiQuotaExceeded(

@@ -164,7 +164,17 @@ async def create_workflow(
         raise HTTPException(status_code=500, detail="Workflow engine not initialized")
 
     check_rate_limit(f"user:{user.user_id}", "workflow")
-    from backend.services.llm_context import load_user_llm_keys
+    # Cost guardrail: a hard stop once the user's daily token budget is spent.
+    from backend.services.llm_context import load_user_llm_keys, check_user_budget
+    budget = await check_user_budget(factory.settings_repo, user.user_id)
+    if budget and budget.get("exceeded"):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily token budget exhausted "
+                   f"({budget.get('used', 0)}/{budget.get('limit', 0)} tokens). "
+                   "Raise the limit in Settings or wait for the window to reset; "
+                   "live actions that don't need the planner (site health, GET a URL) still work.",
+        )
     await load_user_llm_keys(factory.secrets_repo, user.user_id)
     from backend.services.llm_context import load_user_model
     try:

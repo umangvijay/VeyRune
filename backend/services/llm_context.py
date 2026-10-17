@@ -13,6 +13,12 @@ _user_hf_token: ContextVar[Optional[str]] = ContextVar("user_hf_token", default=
 
 _user_model: ContextVar[Optional[str]] = ContextVar("user_model", default=None)
 
+_user_id: ContextVar[Optional[str]] = ContextVar("user_id", default=None)
+
+
+def get_user_id() -> Optional[str]:
+    return _user_id.get()
+
 
 def get_user_model() -> Optional[str]:
     return _user_model.get()
@@ -180,6 +186,7 @@ async def load_user_grok_key(secrets_repo, user_id: str) -> Optional[str]:
 
 async def load_user_llm_keys(secrets_repo, user_id: str) -> None:
     """Load vault provider credentials into this task's context."""
+    _user_id.set(user_id)
     if not secrets_repo or not user_id:
         set_user_gemini_key(None)
         set_user_grok_key(None)
@@ -196,3 +203,22 @@ async def load_user_llm_keys(secrets_repo, user_id: str) -> None:
         secrets_repo, user_id, "huggingface", ("token", "api_key", "key", "HF_TOKEN")
     )
     set_user_hf_token(hf_token)
+
+async def check_user_budget(settings_repo, user_id: str) -> Optional[Dict[str, Any]]:
+    """Daily token-budget guardrail (audit §9: cost guardrails with a hard stop).
+
+    Returns the budget dict from context_manager.check_budget, or None when
+    budgeting is unavailable. `exceeded` means creation should be refused."""
+    if not user_id:
+        return None
+    try:
+        from backend.agents.context_manager import context_manager
+        daily_limit = None
+        if settings_repo:
+            saved = await settings_repo.get_settings(user_id) or {}
+            if saved.get("daily_token_limit"):
+                daily_limit = int(saved["daily_token_limit"])
+        return context_manager.check_budget(user_id, daily_limit=daily_limit)
+    except Exception:
+        return None
+

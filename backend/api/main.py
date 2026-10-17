@@ -422,6 +422,17 @@ async def process_goal(
     # Rate limit
     check_rate_limit(f"user:{user.user_id}", "workflow")
 
+    # Cost guardrail: hard stop once the daily token budget is spent.
+    from backend.services.llm_context import check_user_budget
+    budget = await check_user_budget(factory.settings_repo, user.user_id)
+    if budget and budget.get("exceeded"):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily token budget exhausted "
+                   f"({budget.get('used', 0)}/{budget.get('limit', 0)} tokens). "
+                   "Raise the limit in Settings or wait for the window to reset.",
+        )
+
     # Sanitize the goal
     try:
         goal = sanitize_goal(body.goal)

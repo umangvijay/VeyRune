@@ -595,7 +595,12 @@ class WorkflowEngine:
                 "You are AgentOS, an autonomous workspace. Answer in a short, friendly chat message. "
                 "You can plan work, build MCP tools for ANY app or HTTP API from a description, "
                 "call live HTTPS APIs, check site health, and draft email. "
-                "Do not invent live API results. Do not say you are limited to Stripe or Gmail.\n\nUser: "
+                "Do not invent live API results. Do not say you are limited to Stripe or Gmail.\n\n"
+                "REPORTING RULE: when the dependency results contain a website/health or HTTP check, "
+                "your reply must be a mini report that includes the actual numbers — HTTP status code, "
+                "latency in ms, TLS days-until-expiry (and its expiry date when present), the health grade, "
+                "and any missing security headers. Do not reduce a completed check to just "
+                "'it works' or 'HTTP 200'.\n\nUser: "
             )
             try:
                 text = await gemini_client.generate_text(instruction + prompt)

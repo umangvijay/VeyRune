@@ -183,7 +183,19 @@ class MCPFactoryAgent:
                     await self._log(build_id, f"Self-heal regeneration failed ({heal_exc}); registering the original build", logs)
 
             trust_tier = "verified" if method in ("url", "spec", "openapi") and probe.get("ok") is True else "pending_review"
+            # Golden-run gate (audit §9): a spec from a trusted URL that still
+            # CRASHED at probe time (exception, not an HTTP status) registers
+            # disabled — the user flips it on after checking, instead of a
+            # runtime surprise. Auth-required APIs that answered HTTP (401/403)
+            # are not crashes and stay enabled.
             auto_enable = True
+            if method in ("url", "spec", "openapi") and probe.get("status") == "probe_error":
+                auto_enable = False
+                await self._log(
+                    build_id,
+                    "Golden-run gate: probe crashed, registering DISABLED for review",
+                    logs,
+                )
             # Prefer the spec's own security scheme placement; fall back to the requested auth_type.
             auth_meta = auth_metadata_from_spec(model, fallback_type=auth_type)
 
@@ -218,12 +230,19 @@ class MCPFactoryAgent:
             probe_warning = ""
             if probe.get("status") in ("probe_error",) or probe.get("ok") is False:
                 probe_warning = f"\nLive probe did not succeed ({probe.get('http_status') or probe.get('error') or 'error'}) — verify the API is reachable and the spec's server URL is correct."
+            gate_warning = ""
+            if not auto_enable:
+                gate_warning = (
+                    "\nThe integration was registered DISABLED because the live probe crashed. "
+                    "Review it on the Integrations page and enable it when ready."
+                )
             msg = (
                 f"Built {display_name} with {len(tools)} tool{'s' if len(tools) != 1 else ''}"
                 + (f": {names}." if names else ".")
                 + f"\nmcp_id: {mcp_id}."
                 + auth_hint
                 + probe_warning
+                + gate_warning
             )
             result = {
                 "status": "success",
