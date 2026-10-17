@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
+from backend.security.json_safety import safe_json_dumps
 from backend.api.dependencies.auth import AuthenticatedUser, require_not_viewer
 from backend.config.settings import settings
 from backend.security.rate_limiter import check_rate_limit
@@ -208,7 +209,7 @@ async def generate_events(job_id: str, request: Request, user: AuthenticatedUser
         previous = None
         while not await request.is_disconnected():
             job = await generate_status(job_id, user)
-            payload = json.dumps(job, default=str)
+            payload = safe_json_dumps(job)
             if payload != previous:
                 yield f"event: progress\ndata: {payload}\n\n"
                 previous = payload

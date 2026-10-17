@@ -27,12 +27,13 @@ logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 class WorkflowEngine:
-    def __init__(self, workflow_repo: WorkflowRepository, message_bus: MessageBus, agent_factory: AgentFactory = None, memory_repo=None, settings_repo=None):
+    def __init__(self, workflow_repo: WorkflowRepository, message_bus: MessageBus, agent_factory: AgentFactory = None, memory_repo=None, settings_repo=None, notification_repo=None):
         self.repo = workflow_repo
         self.message_bus = message_bus
         self.agent_factory = agent_factory
         self.memory_repo = memory_repo
         self.settings_repo = settings_repo
+        self.notification_repo = notification_repo
 
     async def _call_matching_catalog_tool(self, run, catalog, tool_router, context) -> Optional[Dict[str, Any]]:
         """When the model cannot pick a tool, call the catalog tool that matches the goal."""
@@ -165,6 +166,59 @@ class WorkflowEngine:
             else:
                 await persist_run(self.repo, run)
             logger.info(f"Run {run_id} marked as {run.status}")
+            asyncio.create_task(self._on_run_finished(run, run.status))
+
+    async def _on_run_finished(self, run, final_status: str) -> None:
+        """Post-terminal side effects: user notification + outbound webhook.
+        Best-effort — must never affect the run's own state."""
+        try:
+            if final_status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                from backend.services.notification_service import NotificationService
+                notify_enabled = True
+                if self.settings_repo:
+                    try:
+                        saved = await maybe_await(self.settings_repo.get_settings(run.user_id)) or {}
+                        notify_enabled = bool(saved.get("notifications_enabled", True))
+                    except Exception:
+                        pass
+                if notify_enabled:
+                    service = NotificationService(getattr(self, "notification_repo", None))
+                    if final_status == TaskStatus.COMPLETED:
+                        await service.notify_workflow_completed(run.user_id, run.run_id, run.goal)
+                    else:
+                        failed = next((t for t in run.tasks if t.status == TaskStatus.FAILED), None)
+                        await service.notify_workflow_failed(
+                            run.user_id, run.run_id, run.goal,
+                            (failed.error if failed else None) or "One or more tasks failed",
+                        )
+        except Exception:
+            logger.debug("Completion notification failed for run %s", run.run_id, exc_info=True)
+        try:
+            if final_status in (TaskStatus.COMPLETED, TaskStatus.FAILED) and self.settings_repo:
+                from backend.engine.repo_adapter import maybe_await as _ma
+                from backend.services.run_webhooks import deliver_run_webhook
+                from backend.security.json_safety import sanitize_json_value
+                payload = {
+                    "event": "run.finished",
+                    "run_id": run.run_id,
+                    "workflow_id": run.workflow_id,
+                    "status": final_status,
+                    "goal": run.goal,
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "tasks": [
+                        {
+                            "task_id": t.task_id, "title": t.title, "agent": t.agent,
+                            "status": t.status, "error": t.error,
+                        }
+                        for t in run.tasks
+                    ],
+                }
+                secrets_repo = getattr(getattr(self.agent_factory, "tool_router", None), "secrets_repo", None)
+                await deliver_run_webhook(
+                    self.settings_repo, secrets_repo, run.user_id, sanitize_json_value(payload),
+                )
+        except Exception:
+            logger.debug("Outbound webhook delivery failed for run %s", run.run_id, exc_info=True)
 
     def _calculate_backoff(self, attempt: int) -> float:
         """Exponential backoff with jitter."""
@@ -213,7 +267,13 @@ class WorkflowEngine:
 
         run = await load_run(self.repo, run_id)
         task = next((t for t in run.tasks if t.task_id == task_id), None)
-        
+
+        # Record the true execution start once, on first claim — the UI and
+        # the timeline depend on started_at being set for completed tasks.
+        if task.started_at is None:
+            task.started_at = datetime.now(timezone.utc)
+            await persist_task(self.repo, run_id, task)
+
         self._emit_event(WorkflowEventType.TASK_STARTED, run_id, run.workflow_id, task_id, task.status, f"Task {task_id} started execution")
         
         try:
@@ -221,6 +281,12 @@ class WorkflowEngine:
                 span.set_attribute("workflow.id", run.workflow_id)
                 span.set_attribute("task.agent", task.agent)
                 span.set_attribute("task.tool", str(task.tool))
+
+                # Populate the schema's trace_id (audit: "trace_id exists but is
+                # always null") with the active W3C trace id for correlation.
+                span_context = trace.get_current_span().get_span_context()
+                if span_context and span_context.trace_id:
+                    task.trace_id = format(span_context.trace_id, "032x")
 
                 secrets_repo = None
                 if self.agent_factory and getattr(self.agent_factory, "tool_router", None):
@@ -252,7 +318,11 @@ class WorkflowEngine:
                 if task.status != TaskStatus.SKIPPED:
                     task.status = TaskStatus.COMPLETED
                 task.completed_at = datetime.now(timezone.utc)
-                task.output_data = result if isinstance(result, dict) else {"result": result}
+                # Tool/LLM output can carry lone surrogates or control bytes
+                # (scraped HTML, PDF text) — sanitize before any persistence
+                # layer has to encode or serialize it.
+                from backend.security.json_safety import sanitize_json_value
+                task.output_data = sanitize_json_value(result if isinstance(result, dict) else {"result": result})
                 await persist_task(self.repo, run_id, task)
                 logger.info(f"Task {task_id} completed successfully.")
                 self._emit_event(WorkflowEventType.TASK_COMPLETED, run_id, run.workflow_id, task_id, task.status, f"Task {task_id} completed", metadata={"output": task.output_data})
@@ -769,11 +839,21 @@ class WorkflowEngine:
         task.error_type = error_type
         
         total_attempts = task.attempt + task.recovery_attempts
-        
+
         if total_attempts >= task.max_total_attempts:
             logger.error(f"Task {task.task_id} exhausted max_total_attempts ({task.max_total_attempts}). Failing permanently.")
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now(timezone.utc)
+            # Surface the failure in output_data too (audit: runtime errors were
+            # invisible because output_data stayed empty on failed tasks).
+            from backend.security.json_safety import sanitize_json_value
+            task.output_data = sanitize_json_value({
+                "failed": True,
+                "error": error_msg,
+                "error_type": error_type,
+                "failed_at": datetime.now(timezone.utc).isoformat(),
+                "attempts": total_attempts,
+            })
             await persist_task(self.repo, run_id, task)
             self._emit_event(WorkflowEventType.TASK_FAILED, run_id, task.workflow_id, task.task_id, task.status, f"Task {task.task_id} failed", metadata={"error": error_msg, "error_type": error_type})
             asyncio.create_task(self.evaluate_dag(run_id))
@@ -820,6 +900,14 @@ class WorkflowEngine:
         else:
             task.status = TaskStatus.FAILED
             task.completed_at = datetime.now(timezone.utc)
+            from backend.security.json_safety import sanitize_json_value
+            task.output_data = sanitize_json_value({
+                "failed": True,
+                "error": error_msg,
+                "error_type": error_type,
+                "failed_at": datetime.now(timezone.utc).isoformat(),
+                "attempts": total_attempts,
+            })
             await persist_task(self.repo, run_id, task)
             self._emit_event(WorkflowEventType.TASK_FAILED, run_id, task.workflow_id, task.task_id, task.status, f"Task {task.task_id} failed", metadata={"error": error_msg, "error_type": error_type})
             asyncio.create_task(self.evaluate_dag(run_id))

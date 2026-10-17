@@ -28,6 +28,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   compress: true,
   devIndicators: false,
+  // Don't advertise the framework version (audit: x-powered-by leak)
+  poweredByHeader: false,
   experimental: {
     optimizePackageImports: ["lucide-react", "radash", "@xyflow/react"],
     optimizeCss: true,
@@ -42,6 +44,31 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
+          // Match the API's header stack (audit P1.8: frontend lacked HSTS/CSP).
+          // script-src keeps 'unsafe-inline' because Next.js injects inline
+          // hydration scripts; hardening it needs nonce-based middleware.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self' https://*.run.app https://accounts.google.com",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join("; "),
+          },
         ],
       },
       {

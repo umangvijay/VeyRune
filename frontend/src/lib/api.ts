@@ -203,6 +203,7 @@ export interface Task {
   run_id: string;
   agent: string;
   tool?: string;
+  title?: string;
   status: string;
   input_data: Record<string, unknown>;
   output_data?: Record<string, unknown>;
@@ -279,9 +280,17 @@ export interface Schedule {
   goal: string;
   cron_expression: string;
   timezone: string;
-  is_enabled: boolean;
+  /** Backend source of truth: "ACTIVE" | "PAUSED" */
+  status?: string;
+  /** Derived flag (backend also sends it); undefined falls back to status */
+  is_enabled?: boolean;
   next_run_at?: string;
   created_at: string;
+}
+
+export function scheduleIsEnabled(schedule: Schedule): boolean {
+  if (typeof schedule.is_enabled === "boolean") return schedule.is_enabled;
+  return (schedule.status || "ACTIVE").toUpperCase() === "ACTIVE";
 }
 
 export interface ApprovalRequest {
@@ -563,6 +572,7 @@ export async function createSchedule(data: {
   goal: string;
   cron_expression: string;
   timezone?: string;
+  is_enabled?: boolean;
 }) {
   return apiFetch<Schedule>("/schedules", {
     method: "POST",

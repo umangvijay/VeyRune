@@ -68,7 +68,7 @@ export const DOC_PAGES: {
         bullets: [
           "OpenAPI URL: “Create MCP tools from https://…/openapi.json then list …”. Factory fetches, normalizes, probes, registers HTTP tools.",
           "Any HTTP API (no OpenAPI): “Build MCP tools for [app] so I can [list / get / create …]”. The factory sketches a small OpenAPI from your words (or uses Gemini) against the public HTTPS host.",
-          "Website (no API): Vault → save e.g. bharatenglish (username/email + password). Chat: “Create MCP tools for https://…”. Then: “Log in with vault credential bharatenglish and open home / use runOnSite …”. That is Playwright on a locked origin, not a hidden REST API.",
+          "Website (no API): Vault → save e.g. mysite-login (username/email + password). Chat: “Create MCP tools for https://…”. Then: “Log in with vault credential mysite-login and open home / use runOnSite …”. That is Playwright on a locked origin, not a hidden REST API.",
         ],
       },
       {

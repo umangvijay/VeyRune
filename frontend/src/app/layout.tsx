@@ -19,6 +19,11 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
+// The public site URL is deploy-specific; set NEXT_PUBLIC_SITE_URL at build
+// time. It must never fall back to a placeholder domain — a leftover
+// hackathon URL here used to leak into every og:url tag.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "";
+
 export const metadata: Metadata = {
   title: {
     default: "Veyrune — A workspace that builds its own tools",
@@ -27,12 +32,13 @@ export const metadata: Metadata = {
   description:
     "Veyrune turns goals into reviewed, executable workflows and can build missing API tools along the way.",
   keywords: ["AI", "autonomous", "workspace", "agents", "MCP", "integrations", "automation"],
+  ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   openGraph: {
     title: "Veyrune — A workspace that builds its own tools",
     description: "Turn a goal into a workflow. Veyrune can build missing API tools, execute the work, and keep people in control.",
     type: "website",
-    url: "https://agentos.devpost.local",
     siteName: "Veyrune",
+    ...(SITE_URL ? { url: SITE_URL } : {}),
   },
   twitter: {
     card: "summary_large_image",

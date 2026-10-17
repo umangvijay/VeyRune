@@ -46,12 +46,13 @@ async def scan_resume(
     Parse a PDF resume and analyze it against a job description using Gemini.
     """
     check_rate_limit(f"user:{user.user_id}", "resume_analyze")
-    
+
     try:
-        # Extract text from PDF
+        # Extract text from PDF (filename may be absent — don't crash on it)
         text = ""
         content = await file.read()
-        if file.filename.endswith('.pdf'):
+        filename = (file.filename or "").lower()
+        if filename.endswith(".pdf") or content[:4] == b"%PDF":
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 for page in pdf.pages:
                     extracted = page.extract_text()
@@ -59,11 +60,13 @@ async def scan_resume(
                         text += extracted + "\n"
         else:
             text = content.decode('utf-8')
-            
+
         if not text.strip():
             raise HTTPException(status_code=400, detail="Could not extract text from the file.")
-            
+
         # Analyze with Gemini (Flash fallbacks + Vertex region from settings).
+        # The analyzer is intermittently flaky upstream (audit R2.6.3), so
+        # transient model errors get one internal retry before surfacing.
         from backend.services import gemini_client
 
         prompt = f"""
@@ -84,15 +87,43 @@ Provide your analysis in JSON format with exactly these keys:
 
 Output ONLY valid JSON.
 """
-        result = await gemini_client.generate_json(prompt)
+        last_error: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                result = await gemini_client.generate_json(prompt)
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt == 0 and gemini_client.is_retryable_model_error(exc):
+                    logger.warning("ATS scan model call failed transiently (%s); retrying once", exc)
+                    await asyncio.sleep(1.0)
+                    continue
+                raise
         if not isinstance(result, dict):
             raise HTTPException(status_code=500, detail="Resume analysis returned an unexpected payload.")
         result["extracted_text"] = text[:20000]
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error scanning resume: {e}")
-        raise HTTPException(status_code=500, detail="Resume processing failed. Check the submitted data and model configuration.")
+        logger.exception("Error scanning resume")
+        detail = str(e)
+        from backend.services.gemini_client import GeminiQuotaExceeded, is_quota_error
+        if isinstance(e, GeminiQuotaExceeded) or is_quota_error(e):
+            raise HTTPException(
+                status_code=429,
+                detail="The model quota is exhausted for resume analysis. Add a key in Settings and retry.",
+            )
+        if isinstance(e, (ValueError, KeyError)) or "pdf" in detail.lower() or "decode" in detail.lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Could not read the resume file. Upload a text-based PDF or plain text.",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail="Resume analysis failed upstream. Please retry; if it persists, check model configuration.",
+        )
 
 class CreateResumeRequest(BaseModel):
     profile_text: str

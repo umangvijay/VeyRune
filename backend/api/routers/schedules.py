@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, status
+from fastapi import APIRouter, HTTPException, Request, Depends, status, Query
 from pydantic import BaseModel
 
 from backend.api.dependencies.auth import get_current_user, AuthenticatedUser, require_not_viewer
@@ -32,6 +32,14 @@ def _get_factory(request: Request):
     if not factory:
         raise HTTPException(status_code=500, detail="Server not initialized")
     return factory
+
+
+def _schedule_public(schedule: dict) -> dict:
+    """Expose a stable is_enabled flag alongside the status string so the
+    UI (which reads is_enabled) and API clients (which read status) agree."""
+    s = dict(schedule or {})
+    s["is_enabled"] = str(s.get("status") or "").upper() == "ACTIVE"
+    return s
 
 
 class CreateScheduleRequest(BaseModel):
@@ -93,6 +101,7 @@ async def create_schedule(
         "next_run_at": next_run,
         "created_at": now,
         "updated_at": now,
+        "is_enabled": bool(body.is_enabled),
     }
 
     await factory.schedule_repo.create_schedule(schedule)
@@ -115,7 +124,8 @@ async def list_schedules(
     """List the user's schedules."""
     factory = _get_factory(request)
     schedules = await factory.schedule_repo.list_schedules(user.user_id)
-    return {"schedules": schedules, "count": len(schedules)}
+    out = [_schedule_public(s) for s in schedules]
+    return {"schedules": out, "count": len(out)}
 
 
 @router.get("/{schedule_id}")
@@ -130,7 +140,7 @@ async def get_schedule(
         raise HTTPException(status_code=404, detail="Schedule not found")
     if schedule.get("user_id") != user.user_id and not user.is_admin():
         raise HTTPException(status_code=403, detail="Access denied")
-    return schedule
+    return _schedule_public(schedule)
 
 
 @router.put("/{schedule_id}")
@@ -201,7 +211,12 @@ async def run_now(
     schedule_id: str, request: Request,
     user: AuthenticatedUser = Depends(require_not_viewer),
 ):
-    """Execute a schedule immediately (on-demand run)."""
+    """Execute a schedule immediately (on-demand run).
+
+    The run is created synchronously and idempotently so it is observable
+    in the workflows list the moment this returns; the worker picks the
+    trigger up from the bus and executes it (create_if_absent keeps this
+    exactly-once across API and worker)."""
     factory = _get_factory(request)
     schedule = await factory.schedule_repo.get_schedule(schedule_id)
     if not schedule:
@@ -209,20 +224,25 @@ async def run_now(
     if schedule.get("user_id") != user.user_id and not user.is_admin():
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Publish a real trigger event — the worker creates and executes the run
     from backend.models.schedule import SchedulerTriggerEvent
+    from backend.scheduler.run_factory import build_scheduled_run, scheduled_run_id
+
     scheduled_time = datetime.now(timezone.utc)
     event = SchedulerTriggerEvent(schedule_id=schedule_id, scheduled_time=scheduled_time)
-    await factory.message_bus.publish("agentos-scheduler-triggers", event.model_dump(mode="json"))
+    run_id = scheduled_run_id(schedule_id, scheduled_time)
 
-    import hashlib
-    execution_key = f"{schedule_id}|{scheduled_time.isoformat()}"
-    run_id = "sch-" + hashlib.sha256(execution_key.encode("utf-8")).hexdigest()
+    # Materialize the run before returning so clients can immediately GET it.
+    from backend.engine.repo_adapter import maybe_await
+    run = build_scheduled_run(schedule, run_id)
+    await maybe_await(factory.workflow_repo.create_if_absent(run.model_dump(mode="json")))
+
+    await factory.message_bus.publish("agentos-scheduler-triggers", event.model_dump(mode="json"))
     await factory.schedule_repo.record_execution(schedule_id, run_id, "TRIGGERED")
 
     return {
         "schedule_id": schedule_id,
         "run_id": run_id,
+        "status": "PENDING",
         "message": "Schedule execution triggered.",
         "goal": schedule.get("goal"),
     }
@@ -252,7 +272,7 @@ async def toggle_pause(
 async def get_history(
     schedule_id: str, request: Request,
     user: AuthenticatedUser = Depends(get_current_user),
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=100),
 ):
     """Get execution history for a schedule."""
     factory = _get_factory(request)

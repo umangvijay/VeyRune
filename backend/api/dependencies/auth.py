@@ -51,18 +51,20 @@ class AuthenticatedUser:
 # ── Dependencies ──────────────────────────────────────────────────
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
 ) -> AuthenticatedUser:
     """
     Verify the JWT access token and return the authenticated user.
-    
+
     Validates:
     - Token is present
     - RS256 signature is valid (using public key)
     - Token is not expired
     - Issuer and audience match
     - Token type is 'access'
-    
+    - Token jti is not on the server-side logout denylist
+
     Returns AuthenticatedUser with claims from the token.
     Raises 401 on any failure.
     """
@@ -90,6 +92,26 @@ async def get_current_user(
             detail="Invalid or malformed token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Server-side revocation: a logged-out token must not keep working
+    # until its 15-minute TTL runs out.
+    jti = claims.get("jti")
+    if jti:
+        denylist = getattr(getattr(request.app.state, "factory", None), "token_denylist_repo", None)
+        if denylist is not None:
+            try:
+                if await denylist.is_revoked(jti):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has been revoked. Please sign in again.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+            except HTTPException:
+                raise
+            except Exception:
+                # Fail closed only for genuine outages is a tradeoff; failing
+                # open keeps the product usable if the denylist store blips.
+                logger.exception("Token denylist check failed; allowing request")
 
     # Extract user identity from verified claims
     user_id = claims.get("sub")

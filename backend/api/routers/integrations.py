@@ -19,6 +19,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request, Depends, status
 from pydantic import BaseModel
 
+from backend.security.json_safety import safe_json_dumps
 from backend.api.dependencies.auth import get_current_user, AuthenticatedUser, require_not_viewer
 from backend.security.rate_limiter import check_rate_limit
 from backend.security.input_sanitizer import sanitize_text, InputValidationError
@@ -458,7 +459,7 @@ async def stream_build_events(build_id: str, request: Request,
             current = await factory.mcp_repo.get_build(build_id)
             if not current:
                 return
-            payload = json.dumps(current, default=str)
+            payload = safe_json_dumps(current)
             if payload != previous:
                 yield f'event: build\ndata: {payload}\n\n'
                 previous = payload

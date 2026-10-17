@@ -71,6 +71,7 @@ class Task(BaseModel):
     user_id: str = "default_user"
     agent: str
     tool: Optional[str] = None
+    title: Optional[str] = None
     status: str = TaskStatus.PENDING
     input_data: Dict[str, Any] = Field(default_factory=dict)
     output_data: Optional[Dict[str, Any]] = None
@@ -104,7 +105,7 @@ class WorkflowRun(BaseModel):
     goal: str
     status: str = TaskStatus.PENDING
     tasks: List[Task] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     parent_run_id: Optional[str] = None
     thread_id: Optional[str] = None
 

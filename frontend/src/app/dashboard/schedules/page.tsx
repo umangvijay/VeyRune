@@ -2,13 +2,14 @@
 
 import { FormEvent, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { listSchedules, deleteSchedule, toggleSchedulePause, runScheduleNow, createSchedule, Schedule } from "@/lib/api";
+import { listSchedules, deleteSchedule, toggleSchedulePause, runScheduleNow, createSchedule, Schedule, scheduleIsEnabled } from "@/lib/api";
 
 export default function SchedulesPage() {
   const { user } = useAuth();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
@@ -45,6 +46,7 @@ export default function SchedulesPage() {
         goal: goal.trim(),
         cron_expression: cron.trim(),
         timezone: timezone.trim() || "UTC",
+        is_enabled: true,
       });
       setModalOpen(false);
       setName("");
@@ -68,18 +70,30 @@ export default function SchedulesPage() {
     }
   };
 
-  const handleToggle = async (id: string) => {
+  const handleToggle = async (schedule: Schedule) => {
     try {
-      const res: { is_enabled?: boolean } = await toggleSchedulePause(id);
-      setSchedules(prev => prev.map(s => s.schedule_id === id ? { ...s, is_enabled: Boolean(res.is_enabled) } : s));
+      const res: { status?: string; is_enabled?: boolean } = await toggleSchedulePause(schedule.schedule_id);
+      const enabled = typeof res.is_enabled === "boolean"
+        ? res.is_enabled
+        : (res.status || "").toUpperCase() === "ACTIVE";
+      setSchedules(prev => prev.map(s => s.schedule_id === schedule.schedule_id
+        ? { ...s, status: enabled ? "ACTIVE" : "PAUSED", is_enabled: enabled }
+        : s));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to toggle schedule");
     }
   };
 
   const handleRunNow = async (id: string) => {
+    setInfo("");
+    setError("");
     try {
-      await runScheduleNow(id);
+      const res = await runScheduleNow(id) as { run_id?: string };
+      setInfo(res.run_id
+        ? `Run started: ${res.run_id}. Track it on the Workflows page in a few seconds.`
+        : "Run triggered.");
+      // The run appears in the list right away now — give the engine a beat, then refresh schedules' next_run_at.
+      setTimeout(() => void loadData(), 1500);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to run schedule");
     }
@@ -103,6 +117,12 @@ export default function SchedulesPage() {
       {error && (
         <div style={{ padding: "12px 16px", background: "var(--error-subtle)", color: "var(--error)", borderRadius: "var(--radius-md)", marginBottom: 24 }}>
           {error}
+        </div>
+      )}
+
+      {info && (
+        <div style={{ padding: "12px 16px", background: "var(--success-subtle, rgba(34,197,94,0.12))", color: "var(--success, #22c55e)", borderRadius: "var(--radius-md)", marginBottom: 24 }}>
+          {info}
         </div>
       )}
 
@@ -142,8 +162,8 @@ export default function SchedulesPage() {
                 <div style={{ flex: 1, paddingRight: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{schedule.name}</h3>
-                    <span className={`badge ${schedule.is_enabled ? 'badge-success' : 'badge-neutral'}`}>
-                      {schedule.is_enabled ? 'Active' : 'Paused'}
+                    <span className={`badge ${scheduleIsEnabled(schedule) ? 'badge-success' : 'badge-neutral'}`}>
+                      {scheduleIsEnabled(schedule) ? 'Active' : 'Paused'}
                     </span>
                     <span className="badge badge-info" style={{ fontFamily: "var(--font-mono)", textTransform: "none" }}>
                       {schedule.cron_expression}
@@ -156,15 +176,15 @@ export default function SchedulesPage() {
                     Next run: {schedule.next_run_at ? new Date(schedule.next_run_at).toLocaleString() : "Not scheduled"}
                   </div>
                 </div>
-                
+
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => handleRunNow(schedule.schedule_id)} title="Run Now">
                     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path d="M5 3l14 9-14 9V3z" />
                     </svg>
                   </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(schedule.schedule_id)} title={schedule.is_enabled ? "Pause" : "Resume"}>
-                    {schedule.is_enabled ? (
+                  <button className="btn btn-ghost btn-sm" onClick={() => handleToggle(schedule)} title={scheduleIsEnabled(schedule) ? "Pause" : "Resume"}>
+                    {scheduleIsEnabled(schedule) ? (
                       <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path d="M10 4H6v16h4V4zM18 4h-4v16h4V4z" />
                       </svg>

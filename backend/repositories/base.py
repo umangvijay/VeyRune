@@ -413,6 +413,35 @@ class BaseAuditRepository(ABC):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  TOKEN DENYLIST REPOSITORY
+# ═══════════════════════════════════════════════════════════════════
+
+class BaseTokenDenylistRepository(ABC):
+    """
+    Revoked access-token jti registry (server-side logout).
+
+    Logout must invalidate the still-valid access JWT immediately, not
+    only the refresh tokens. Entries are stored with the token's own
+    expiry so the purge is trivial and the denylist cannot grow forever.
+    """
+
+    @abstractmethod
+    async def revoke_jti(self, jti: str, expires_at: datetime) -> None:
+        """Mark a token jti as revoked until its natural expiry."""
+        ...
+
+    @abstractmethod
+    async def is_revoked(self, jti: str) -> bool:
+        """True if the jti has been revoked and has not yet expired."""
+        ...
+
+    @abstractmethod
+    async def purge_expired(self) -> int:
+        """Delete expired denylist entries. Returns count purged."""
+        ...
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  REFRESH TOKEN REPOSITORY
 # ═══════════════════════════════════════════════════════════════════
 

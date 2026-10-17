@@ -15,11 +15,12 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends, status
+from fastapi import APIRouter, HTTPException, Request, Depends, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.api.dependencies.auth import get_current_user, AuthenticatedUser, require_not_viewer
+from backend.security.json_safety import safe_json_dumps
 from backend.security.input_sanitizer import sanitize_goal, InputValidationError
 from backend.security.rate_limiter import check_rate_limit
 from backend.security.rbac import require_resource_owner
@@ -51,6 +52,12 @@ class GoalRequest(BaseModel):
     parent_run_id: Optional[str] = None
     thread_id: Optional[str] = None
     model: Optional[str] = None
+
+
+def _task_title(t_def) -> str:
+    """Human-readable task title for the timeline and details UI."""
+    from backend.engine.task_titles import task_title
+    return task_title(t_def)
 
 
 def _as_run_dict(run) -> Optional[dict]:
@@ -328,6 +335,7 @@ async def create_workflow(
                 task_id=t_def.task_id, workflow_id=workflow_id,
                 run_id=run_id, user_id=user.user_id,
                 agent=t_def.agent, tool=t_def.tool,
+                title=_task_title(t_def),
                 input_data={**t_def.input_data, "_model": selected_model, **({"_agent_id": t_def.agent_id} if t_def.agent_id else {})}, dependencies=t_def.dependencies,
                 timeout_seconds=max(t_def.timeout_seconds, 180) if t_def.agent in ("Orchestrator", "OrchestratorAgent", "core.mcp_build") or "orchestrator" in (t_def.agent or "").lower() else t_def.timeout_seconds,
                 max_retries=t_def.max_retries,
@@ -391,7 +399,8 @@ async def create_workflow(
 async def list_workflows(
     request: Request,
     user: AuthenticatedUser = Depends(get_current_user),
-    limit: int = 50, offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     """List the authenticated user's workflow runs."""
     factory = _get_factory(request)
@@ -457,15 +466,15 @@ async def stream_events(
                     events = await factory.workflow_repo.get_events(run_id, after_event_id=last_event_id)
                 except Exception as exc:
                     logger.exception("SSE get_events failed for run %s", run_id)
-                    yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+                    yield f"event: error\ndata: {safe_json_dumps({'error': str(exc)[:800]})}\n\n"
                     return
                 for event in events:
                     last_event_id = event.get("event_id")
-                    yield f"id: {last_event_id}\ndata: {json.dumps(event, default=str)}\n\n"
+                    yield f"id: {last_event_id}\ndata: {safe_json_dumps(event)}\n\n"
                 await asyncio.sleep(1)
         except Exception as exc:
             logger.exception("SSE stream failed for run %s", run_id)
-            yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+            yield f"event: error\ndata: {safe_json_dumps({'error': str(exc)[:800]})}\n\n"
 
     origin = request.headers.get("origin") or ""
     cors = {}

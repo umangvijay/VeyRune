@@ -64,3 +64,29 @@ class SQLiteAuditRepository(BaseAuditRepository):
             r["details"] = json.loads(r.get("details", "{}"))
             results.append(r)
         return results
+
+    async def list_recent(self, limit: int = 100, offset: int = 0, event_type: str = None) -> List[Dict[str, Any]]:
+        """Admin listing: most recent audit events across all resources."""
+        limit = max(1, min(int(limit), 500))
+        offset = max(0, int(offset))
+        if event_type:
+            rows = await self.db.fetch_all(
+                """
+                SELECT * FROM audit_logs
+                WHERE event_type = ?
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (event_type, limit, offset),
+            )
+        else:
+            rows = await self.db.fetch_all(
+                "SELECT * FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+        results = []
+        for row in rows:
+            r = dict(row)
+            r["details"] = json.loads(r.get("details", "{}"))
+            results.append(r)
+        return results

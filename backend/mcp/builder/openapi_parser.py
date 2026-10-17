@@ -105,9 +105,17 @@ class OpenAPIParser:
         for s in servers_data:
             if not isinstance(s, dict) or not s.get("url"):
                 continue
+            url = str(s.get("url", ""))
+            # Relative server URLs ("https://api.example.com/v1") are valid
+            # OpenAPI 3 — keep them and let the builder resolve them against
+            # the spec's own URL. Only absolute URLs are SSRF-checked here;
+            # resolved results are checked before any request is made.
+            if not url.startswith(("http://", "https://")):
+                servers.append(ServerModel(url=url, description=s.get("description")))
+                continue
             try:
-                self._validate_ssrf(s.get("url", ""))
-                servers.append(ServerModel(url=s.get("url", ""), description=s.get("description")))
+                self._validate_ssrf(url)
+                servers.append(ServerModel(url=url, description=s.get("description")))
             except Exception:
                 continue
             
@@ -161,8 +169,12 @@ class OpenAPIParser:
                 for s in op_data.get("servers") or []:
                     if not isinstance(s, dict) or not s.get("url"):
                         continue
+                    op_url = str(s.get("url", ""))
+                    if not op_url.startswith(("http://", "https://")):
+                        op_servers.append(ServerModel(url=op_url, description=s.get("description")))
+                        continue
                     try:
-                        self._validate_ssrf(s.get("url", ""))
+                        self._validate_ssrf(op_url)
                         op_servers.append(ServerModel(**s))
                     except Exception:
                         continue

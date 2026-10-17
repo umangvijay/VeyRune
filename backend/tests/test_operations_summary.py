@@ -7,7 +7,11 @@ def test_summary_is_user_scoped_and_reports_unknown_metrics():
     assert summary['completion_rate'] is None
     assert summary['median_completion_seconds'] is None
     assert summary['attention'] == []
-    assert summary['cost_tracking'] == 'not_available'
+    # Cost figures are token estimates (audit: "cost_tracking not_available");
+    # with no visible runs the estimate is zero, mode still reported.
+    assert summary['cost_tracking']['mode'] == 'estimated'
+    assert summary['cost_tracking']['estimated_tokens'] == 0
+    assert summary['cost_tracking']['estimated_cost_usd'] == 0.0
 
 
 def test_completion_rate_durations_failures_and_approval_attention():

@@ -71,6 +71,27 @@ async def list_users(request: Request, admin = Depends(require_admin)):
     return {"users": users, "count": len(users), "window_hours": WINDOW_HOURS}
 
 
+@router.get("/audit")
+async def list_audit_events(
+    request: Request,
+    admin = Depends(require_admin),
+    limit: int = 100,
+    offset: int = 0,
+    event_type: str = None,
+):
+    """Recent audit events across the platform (audit-log surface, audit P2.11)."""
+    factory = _get_factory(request)
+    lister = getattr(factory.audit_repo, "list_recent", None)
+    if not callable(lister):
+        raise HTTPException(status_code=501, detail="Audit listing is not available on this storage backend")
+    try:
+        events = await lister(limit=limit, offset=offset, event_type=event_type)
+    except Exception:
+        logger.exception("admin audit listing failed")
+        raise HTTPException(status_code=500, detail="Could not list audit events")
+    return {"events": events, "count": len(events), "limit": limit, "offset": offset}
+
+
 @router.post("/users/{user_id}/disable")
 async def disable_user(user_id: str, request: Request, admin = Depends(require_admin)):
     if user_id == admin.user_id:

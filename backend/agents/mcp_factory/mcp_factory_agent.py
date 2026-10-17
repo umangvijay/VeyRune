@@ -98,9 +98,14 @@ class MCPFactoryAgent:
                     if op.servers:
                         model.servers = list(op.servers)
                         break
-            if not model.servers:
-                raise ValueError("OpenAPI spec has no HTTPS servers")
+            # Relative server URLs must be resolved against the spec's own URL
+            # BEFORE deciding the spec is unusable — "/api/v3" alone is common.
             self._resolve_relative_servers(model, source_uri)
+            if not model.servers:
+                raise ValueError(
+                    "OpenAPI spec has no usable HTTPS server URLs. If it uses relative "
+                    "server URLs, build from the spec's URL (or paste the spec) so they can be resolved."
+                )
 
             spec_hash = hashlib.sha256(json.dumps(self.parser.raw_spec, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
             spec_version = str(model.info.get("version") or "1.0.0")
@@ -141,6 +146,41 @@ class MCPFactoryAgent:
                     probe = await self._probe(candidate.model_dump(mode="json"), model)
                     break
             await self._log(build_id, f"Probe result: {probe.get('status', probe)}", logs)
+
+            # Self-healing codegen (audit §9): a crashed probe on a model-built
+            # spec means the generated integration is broken, not the API. Feed
+            # the error back once and rebuild before registering.
+            if probe.get("status") == "probe_error" and method == "prompt" and source_uri is None:
+                try:
+                    await self._log(build_id, "Probe crashed; regenerating the spec with the error fed back", logs)
+                    healed_source = (
+                        f"{source}\n\nThe previously generated integration crashed at runtime: "
+                        f"{str(probe.get('error'))[:400]}. Produce a simpler, correct OpenAPI 3 spec."
+                    )
+                    healed_spec = await self._spec_from_prompt(healed_source, logs, build_id)
+                    healed_model = self.parser.parse_text(healed_spec)
+                    if healed_model.operations:
+                        if not healed_model.servers:
+                            for op in healed_model.operations:
+                                if op.servers:
+                                    healed_model.servers = list(op.servers)
+                                    break
+                        self._resolve_relative_servers(healed_model, None)
+                        if healed_model.servers:
+                            healed_hash = hashlib.sha256(json.dumps(self.parser.raw_spec, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+                            model = healed_model
+                            spec_hash = healed_hash
+                            spec_version = str(model.info.get("version") or "1.0.0")
+                            mcp_id = hashlib.sha256(f"{user_id}:{spec_hash}".encode("utf-8")).hexdigest()[:16]
+                            tools = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent)
+                            probe = {"status": "skipped", "reason": "regenerated spec"}
+                            for candidate in tools:
+                                if (candidate.operation or {}).get("http_method") == "GET" and not candidate.input_schema.get("required"):
+                                    probe = await self._probe(candidate.model_dump(mode="json"), model)
+                                    break
+                            await self._log(build_id, f"Rebuilt spec; probe result: {probe.get('status', probe)}", logs)
+                except Exception as heal_exc:
+                    await self._log(build_id, f"Self-heal regeneration failed ({heal_exc}); registering the original build", logs)
 
             trust_tier = "verified" if method in ("url", "spec", "openapi") and probe.get("ok") is True else "pending_review"
             auto_enable = True
@@ -295,13 +335,20 @@ class MCPFactoryAgent:
     def _resolve_relative_servers(model, source_uri: Optional[str]) -> None:
         """OpenAPI allows relative server URLs; resolve them against the spec's own URL."""
         from urllib.parse import urljoin
+        from backend.mcp.builder.openapi_parser import OpenAPIParser
+
+        ssrf = OpenAPIParser()._validate_ssrf
 
         def fix(servers):
             for server in servers:
                 if server.url.startswith(("http://", "https://")):
                     continue
                 if source_uri:
-                    server.url = urljoin(source_uri, server.url)
+                    resolved = urljoin(source_uri, server.url)
+                    # A scheme-relative or crafty relative URL must not escape
+                    # the spec's own origin — validate like any absolute URL.
+                    ssrf(resolved)
+                    server.url = resolved
                 else:
                     raise ValueError(
                         f"Spec uses relative server URL '{server.url}' but no source URL is known"

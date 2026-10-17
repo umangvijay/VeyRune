@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 
+-- ── Token Denylist (server-side logout) ──────────────────────────
+CREATE TABLE IF NOT EXISTS token_denylist (
+    jti TEXT PRIMARY KEY,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_denylist_expires ON token_denylist(expires_at);
+
 -- ── Workflows ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS workflow_runs (
     run_id TEXT PRIMARY KEY,
@@ -82,6 +91,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     user_id TEXT NOT NULL,
     agent TEXT NOT NULL,
     tool TEXT,
+    title TEXT,
     status TEXT NOT NULL DEFAULT 'PENDING',
     input_data TEXT NOT NULL DEFAULT '{}',   -- JSON
     output_data TEXT,                         -- JSON
@@ -394,6 +404,7 @@ class DatabaseManager:
         await self._connection.executescript(SCHEMA_SQL)
         await self._migrate_mcp_columns()
         await self._migrate_workflow_thread_columns()
+        await self._migrate_task_columns()
         await self._connection.commit()
         logger.info("Database schema migration complete")
 
@@ -428,6 +439,12 @@ class DatabaseManager:
         await self._connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_runs_thread ON workflow_runs(user_id, thread_id)"
         )
+
+    async def _migrate_task_columns(self) -> None:
+        cursor = await self._connection.execute("PRAGMA table_info(tasks)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        if "title" not in cols:
+            await self._connection.execute("ALTER TABLE tasks ADD COLUMN title TEXT")
 
     async def connection(self) -> aiosqlite.Connection:
         """Get the database connection. Raises if not initialized."""

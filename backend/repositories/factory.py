@@ -40,6 +40,7 @@ class RepositoryFactory:
         self.secrets_repo = None
         self.schedule_repo = None
         self.refresh_token_repo = None
+        self.token_denylist_repo = None
         self.notification_repo = None
         self.settings_repo = None
         self.idempotency_repo = None
@@ -77,6 +78,7 @@ class RepositoryFactory:
         from backend.repositories.sqlite.secrets_repository import SQLiteSecretsRepository
         from backend.repositories.sqlite.schedule_repository import SQLiteScheduleRepository
         from backend.repositories.sqlite.refresh_token_repository import SQLiteRefreshTokenRepository
+        from backend.repositories.sqlite.token_denylist_repository import SQLiteTokenDenylistRepository
         from backend.repositories.sqlite.notification_repository import SQLiteNotificationRepository
         from backend.repositories.sqlite.settings_repository import SQLiteSettingsRepository
         from backend.repositories.sqlite.idempotency_repository import SQLiteIdempotencyRepository
@@ -96,6 +98,7 @@ class RepositoryFactory:
         self.secrets_repo = SQLiteSecretsRepository(self.db_manager)
         self.schedule_repo = SQLiteScheduleRepository(self.db_manager)
         self.refresh_token_repo = SQLiteRefreshTokenRepository(self.db_manager)
+        self.token_denylist_repo = SQLiteTokenDenylistRepository(self.db_manager)
         self.notification_repo = SQLiteNotificationRepository(self.db_manager)
         self.settings_repo = SQLiteSettingsRepository(self.db_manager)
         self.idempotency_repo = SQLiteIdempotencyRepository(self.db_manager)
@@ -139,10 +142,12 @@ class RepositoryFactory:
             FirestoreScheduleRepository,
             FirestoreSecretsRepository,
             FirestoreSettingsRepository,
+            FirestoreTokenDenylistRepository,
         )
         self.secrets_repo = FirestoreSecretsRepository()
         self.schedule_repo = FirestoreScheduleRepository()
         self.refresh_token_repo = FirestoreRefreshTokenRepository()
+        self.token_denylist_repo = FirestoreTokenDenylistRepository()
         self.notification_repo = FirestoreNotificationRepository()
         self.settings_repo = FirestoreSettingsRepository()
         self.audit_repo = FirestoreAuditRepository()

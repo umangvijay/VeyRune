@@ -10,7 +10,7 @@ DELETE /api/v1/memory/{id}      — Delete a memory entry
 import asyncio
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, Depends, status
+from fastapi import APIRouter, HTTPException, Query, Request, Depends, status
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -20,6 +20,8 @@ from backend.security.input_sanitizer import sanitize_text, InputValidationError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/memory", tags=["memory"])
+
+ALLOWED_MEMORY_TYPES = {"profile", "workflow", "semantic"}
 
 
 def _get_factory(request: Request):
@@ -41,6 +43,17 @@ class SearchMemoryRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=100)
 
 
+def _validate_memory_type(memory_type: Optional[str]) -> Optional[str]:
+    if memory_type is None:
+        return None
+    if memory_type not in ALLOWED_MEMORY_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"memory_type must be one of {sorted(ALLOWED_MEMORY_TYPES)}",
+        )
+    return memory_type
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def add_memory(
     body: AddMemoryRequest, request: Request,
@@ -48,11 +61,15 @@ async def add_memory(
 ):
     """Add a memory entry with optional embedding."""
     factory = _get_factory(request)
+    memory_type = _validate_memory_type(body.memory_type)
 
     try:
         content = sanitize_text(body.content, "content", max_length=10_000)
     except InputValidationError as e:
         raise HTTPException(status_code=400, detail=e.message)
+
+    if not content.strip():
+        raise HTTPException(status_code=422, detail="content cannot be empty")
 
     embedding = None
     try:
@@ -66,13 +83,22 @@ async def add_memory(
     metadata = dict(body.metadata or {})
     if body.tags:
         metadata["tags"] = body.tags
-    memory_id = await factory.memory_repo.store_memory(
-        user_id=user.user_id,
-        content=content,
-        memory_type=body.memory_type,
-        metadata=metadata,
-        embedding=embedding or [],
-    )
+    try:
+        memory_id = await factory.memory_repo.store_memory(
+            user_id=user.user_id,
+            content=content,
+            memory_type=memory_type,
+            metadata=metadata,
+            embedding=embedding or [],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("store_memory failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not store the memory entry on this storage backend: {type(e).__name__}",
+        ) from e
 
     return {"memory_id": memory_id, "embedded": embedding is not None}
 
@@ -82,11 +108,12 @@ async def list_memories(
     request: Request,
     user: AuthenticatedUser = Depends(get_current_user),
     memory_type: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     """List memory entries for the current user."""
     factory = _get_factory(request)
+    _validate_memory_type(memory_type)
     lister = getattr(factory.memory_repo, "list_memories", None)
     if not callable(lister):
         raise HTTPException(
@@ -113,6 +140,7 @@ async def search_memory(
 ):
     """Semantic search over memory using embeddings."""
     factory = _get_factory(request)
+    _validate_memory_type(body.memory_type)
 
     try:
         query = sanitize_text(body.query, "query", max_length=2000)
@@ -133,6 +161,22 @@ async def search_memory(
         results = await keyword_search(factory.memory_repo, user.user_id, query, body.memory_type, body.limit)
         mode = "keyword"
     return {"results": results, "count": len(results), "retrieval_mode": mode}
+
+
+@router.get("/search")
+async def search_memory_get(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    q: str = Query(..., min_length=1, max_length=2000),
+    memory_type: Optional[str] = None,
+    limit: int = Query(10, ge=1, le=100),
+):
+    """GET-form of memory search — consistent with the rest of the GET surface.
+
+    The POST form stays the canonical rich-search endpoint (embedding mode);
+    this alias runs the same pipeline with query parameters."""
+    body = SearchMemoryRequest(query=q, memory_type=memory_type, limit=limit)
+    return await search_memory(body, request, user)
 
 
 @router.delete("/{memory_id}")

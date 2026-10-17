@@ -117,10 +117,16 @@ async def check_website(url: str, timeout: float = 15.0) -> Dict[str, Any]:
     error: Optional[str] = None
 
     try:
+        from backend.config.settings import settings as app_settings
+        probe_headers = {
+            "User-Agent": getattr(app_settings, "HEALTH_USER_AGENT", None) or "VeyruneHealth/2.0",
+            "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             for hop in range(9):
                 await asyncio.to_thread(assert_public_https_url, final_url)
-                async with client.stream("GET", final_url, headers={"User-Agent": "AgentOS-HealthCheck/1.0"}) as resp:
+                async with client.stream("GET", final_url, headers=probe_headers) as resp:
                     if resp.is_redirect and resp.headers.get("location"):
                         if hop == 8:
                             raise HealthCheckError("Too many redirects")

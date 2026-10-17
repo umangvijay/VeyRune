@@ -1,16 +1,15 @@
 import logging
 import asyncio
-from backend.models.schemas import TaskTriggerEvent, WorkflowRun, Task, TaskStatus
+from backend.models.schemas import TaskTriggerEvent
 from backend.models.schedule import SchedulerTriggerEvent
 from backend.repositories.message_bus import MessageBus, MessageContext
 from backend.repositories.schedule_repository import ScheduleRepository
 from backend.engine.engine import WorkflowEngine
-from backend.engine.repo_adapter import maybe_await, persist_run
-import hashlib
+from backend.engine.repo_adapter import maybe_await
 
 logger = logging.getLogger(__name__)
 
-async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None):
+async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None):
     logger.info("Worker started, listening for events...")
     
     async def handle_event(event, ctx: MessageContext):
@@ -39,50 +38,51 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
             if not schedule_repo:
                 await ctx.ack()
                 return
-                
+
             logger.info(f"Worker received schedule trigger: {event}")
             if isinstance(event, SchedulerTriggerEvent):
                 trigger = event
             else:
                 trigger = SchedulerTriggerEvent(**event)
             schedule = await maybe_await(schedule_repo.get_schedule(trigger.schedule_id))
-            
+
             if not schedule or str(schedule.get("status", "")).upper() != "ACTIVE":
                 logger.warning(f"Schedule {trigger.schedule_id} not found or not ACTIVE")
                 await ctx.ack()
                 return
-                
-            # Create idempotency key: schedule_id + logical scheduled time in UTC
-            scheduled_time_str = trigger.scheduled_time.isoformat()
-            execution_key = f"{trigger.schedule_id}|{scheduled_time_str}"
-            run_id = "sch-" + hashlib.sha256(execution_key.encode("utf-8")).hexdigest()
-            
-            # Construct a dynamic WorkflowRun containing the goal
-            run = WorkflowRun(
-                run_id=run_id,
-                user_id=schedule["user_id"],
-                goal=schedule["goal"],
-                status=TaskStatus.PENDING,
-                tasks=[]
-            )
-            
-            # Persist the root task in the same creation operation as the run.
-            # A process crash must not leave a deduplicated run with no tasks.
-            from backend.engine.direct_plan import plan_from_goal
-            direct = plan_from_goal(schedule["goal"])
-            if direct:
-                for definition in direct.tasks:
-                    run.tasks.append(Task(
-                        **definition.model_dump(), workflow_id=run.workflow_id,
-                        run_id=run_id, user_id=schedule["user_id"],
-                    ))
-            else:
-                run.tasks.append(Task(
-                    task_id=f"root-{run_id}", workflow_id=run.workflow_id,
-                    run_id=run_id, user_id=schedule["user_id"],
-                    agent="OrchestratorAgent", input_data={"goal": schedule["goal"]},
-                    status=TaskStatus.PENDING, dependencies=[], timeout_seconds=300,
-                ))
+
+            # Max-concurrency guard (audit P2.12): skip this window if the
+            # schedule's previous run is still in flight, and tell the user.
+            try:
+                history = await maybe_await(schedule_repo.get_execution_history(trigger.schedule_id, limit=3)) or []
+                for entry in history:
+                    prev_run_id = entry.get("run_id")
+                    if not prev_run_id:
+                        continue
+                    prev = await maybe_await(workflow_engine.repo.get_run(prev_run_id))
+                    if prev and prev.get("status") in ("PENDING", "RUNNING", "WAITING", "RECOVERING", "RETRYING"):
+                        logger.info("Skipping schedule %s trigger: previous run %s still %s",
+                                    trigger.schedule_id, prev_run_id[:12], prev.get("status"))
+                        await maybe_await(schedule_repo.record_execution(trigger.schedule_id, prev_run_id, "SKIPPED_BUSY"))
+                        from backend.services.notification_service import NotificationService
+                        await NotificationService(getattr(workflow_engine, "notification_repo", None)).create(
+                            user_id=schedule["user_id"],
+                            notification_type="SCHEDULE_SKIPPED",
+                            title="Schedule skipped",
+                            body=f"'{schedule.get('name')}' did not fire: its previous run is still in progress.",
+                            metadata={"schedule_id": trigger.schedule_id, "run_id": prev_run_id},
+                        )
+                        await ctx.ack()
+                        return
+            except Exception:
+                logger.warning("Concurrency guard check failed; proceeding with trigger", exc_info=True)
+
+            # Deterministic id: schedule_id + logical scheduled time. The API's
+            # run-now creates the same run; create_if_absent keeps it exactly-once.
+            from backend.scheduler.run_factory import build_scheduled_run, scheduled_run_id
+            run_id = scheduled_run_id(trigger.schedule_id, trigger.scheduled_time)
+            run = build_scheduled_run(schedule, run_id)
+
             created = await maybe_await(workflow_engine.repo.create_if_absent(run.model_dump(mode="json")))
             if created:
                 logger.info(f"Successfully enqueued new run {run_id} for schedule {trigger.schedule_id}")
@@ -102,8 +102,15 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
             await ctx.nack()
 
     async def cron_ticker():
-        """Local scheduler: fire due cron schedules (Cloud Scheduler replaces this in prod)."""
+        """Local scheduler: fire due cron schedules (Cloud Scheduler replaces this in prod).
+
+        Catch-up policy: skip missed windows — each due schedule fires at most
+        once per pass and next_run_at advances from *now*, so a backlog of
+        missed windows during downtime collapses into a single run. A large
+        miss is surfaced to the user instead of firing silently."""
         from datetime import datetime, timezone
+        from backend.services.notification_service import NotificationService
+        notification_repo = getattr(workflow_engine, "notification_repo", None)
         while True:
             try:
                 if schedule_repo and hasattr(schedule_repo, "list_due_schedules"):
@@ -113,6 +120,21 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                         trigger = SchedulerTriggerEvent(
                             schedule_id=schedule["schedule_id"], scheduled_time=datetime.fromisoformat(schedule["next_run_at"].replace("Z", "+00:00"))
                         )
+                        # Missed-run alert: the window is far in the past, i.e.
+                        # the worker was unavailable when it was due.
+                        try:
+                            missed_by = (now - trigger.scheduled_time).total_seconds()
+                            if missed_by > 300:
+                                NotificationService(notification_repo).create(
+                                    user_id=schedule["user_id"],
+                                    notification_type="SYSTEM",
+                                    title="Schedule caught up",
+                                    body=f"'{schedule.get('name')}' missed its {trigger.scheduled_time:%H:%M} UTC window "
+                                         f"({int(missed_by // 60)} min late). Running it once now; later missed windows are skipped.",
+                                    metadata={"schedule_id": schedule["schedule_id"], "missed_by_seconds": int(missed_by)},
+                                )
+                        except Exception:
+                            logger.debug("Missed-run notification failed", exc_info=True)
                         await message_bus.publish(
                             "agentos-scheduler-triggers", trigger.model_dump(mode="json")
                         )
@@ -128,6 +150,13 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                         ))
             except Exception as e:
                 logger.error(f"Cron ticker error: {e}")
+            # Housekeeping: expired denylist entries are dead weight; purge
+            # opportunistically instead of needing a separate cron job.
+            try:
+                if token_denylist_repo is not None:
+                    await maybe_await(token_denylist_repo.purge_expired())
+            except Exception:
+                logger.debug("Denylist purge failed", exc_info=True)
             await asyncio.sleep(30)
 
     from backend.workers.recovery_worker import RecoveryWorker
@@ -187,10 +216,11 @@ if __name__ == "__main__":
         workflow_engine = WorkflowEngine(
             factory.workflow_repo, factory.message_bus,
             agent_factory, factory.memory_repo, factory.settings_repo,
+            factory.notification_repo,
         )
 
         logger.info("Worker initialized. Listening for events...")
-        await start_worker(factory.message_bus, workflow_engine, factory.schedule_repo)
+        await start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo)
 
     try:
         asyncio.run(_boot_and_run())

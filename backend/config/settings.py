@@ -110,8 +110,13 @@ class Settings(BaseSettings):
     RESEND_API_KEY: Optional[str] = None
 
     # ── Rate Limiting ────────────────────────────────────────────
+    # Workflow creation burns real Gemini quota, so it is capped tightly
+    # (the audit's quota-burn loophole was a 30/min default: 10 rapid 201s
+    # sailed through). Sliding-window counters are per process; on
+    # multi-instance Cloud Run deployments multiply by instance count or
+    # front the API with a shared limiter (APIGateway / Cloud Armor).
     RATE_LIMIT_AUTH: int = 20         # per minute on auth endpoints
-    RATE_LIMIT_WORKFLOW: int = 30     # per minute on workflow creation
+    RATE_LIMIT_WORKFLOW: int = 10     # per minute on workflow creation
     RATE_LIMIT_MCP_BUILD: int = 10    # per minute on MCP builder
     RATE_LIMIT_GENERAL: int = 60      # per minute general
 
@@ -121,6 +126,15 @@ class Settings(BaseSettings):
     MAX_TASK_TIMEOUT_SECONDS: int = Field(default=600, ge=30, le=3600)
     MAX_TASK_RETRIES: int = Field(default=3, ge=0, le=10)
     RESEARCH_MAX_HOPS: int = 10                 # max hops for research agent
+
+    # ── Observability / cost estimates ───────────────────────────
+    # USD per 1M estimated tokens, per model ("model:rate,model:rate").
+    # Planning numbers only — the pipeline does not receive billing data.
+    MODEL_COST_PER_1M_TOKENS: str = "gemini-3.8-flash:0.60,gemini-4-argon:2.50"
+
+    # User-Agent for site-health probes. Some sites (e.g. Wikipedia) reject
+    # generic datacenter-UA requests; a descriptive UA raises the success rate.
+    HEALTH_USER_AGENT: str = "Mozilla/5.0 (compatible; VeyruneHealth/2.0; +https://veyrune.app/bot)"
 
     @field_validator(
         "GEMINI_API_KEY",

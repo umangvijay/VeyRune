@@ -17,6 +17,7 @@ from backend.repositories.base import (
     BaseScheduleRepository,
     BaseSecretsRepository,
     BaseSettingsRepository,
+    BaseTokenDenylistRepository,
 )
 from backend.repositories.firestore.database import FirestoreDB
 from backend.repositories.sqlite.settings_repository import DEFAULT_SETTINGS
@@ -208,6 +209,42 @@ class FirestoreRefreshTokenRepository(BaseRefreshTokenRepository):
         return count
 
 
+class FirestoreTokenDenylistRepository(BaseTokenDenylistRepository):
+    """Revoked access-token jti registry. Logout writes here; every
+    authenticated request reads once. Entries carry the token's own expiry."""
+
+    async def revoke_jti(self, jti: str, expires_at: datetime) -> None:
+        if not jti:
+            return
+        db = await _db()
+        expiry = expires_at.isoformat() if hasattr(expires_at, "isoformat") else str(expires_at)
+        await db.collection("token_denylist").document(jti).set(
+            {"jti": jti, "expires_at": expiry, "revoked_at": _now()}
+        )
+
+    async def is_revoked(self, jti: str) -> bool:
+        if not jti:
+            return False
+        db = await _db()
+        doc = await db.collection("token_denylist").document(jti).get()
+        if not doc.exists:
+            return False
+        data = doc.to_dict() or {}
+        # Treated as purged once past expiry — no lingering false positives.
+        if (data.get("expires_at") or "") <= _now():
+            return False
+        return True
+
+    async def purge_expired(self) -> int:
+        db = await _db()
+        now = _now()
+        count = 0
+        async for doc in db.collection("token_denylist").where("expires_at", "<=", now).stream():
+            await doc.reference.delete()
+            count += 1
+        return count
+
+
 class FirestoreNotificationRepository(BaseNotificationRepository):
     async def create_notification(self, notification_data: Dict[str, Any]) -> str:
         nid = notification_data.get("id") or str(uuid.uuid4())
@@ -263,3 +300,16 @@ class FirestoreAuditRepository(BaseAuditRepository):
             rows.append(doc.to_dict() or {})
         rows.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
         return rows[:limit]
+
+    async def list_recent(self, limit: int = 100, offset: int = 0, event_type: str = None) -> List[Dict[str, Any]]:
+        """Admin listing: most recent audit events across all resources."""
+        db = await _db()
+        col = db.collection("audit_logs")
+        if event_type:
+            col = col.where("event_type", "==", event_type)
+        rows = []
+        async for doc in col.stream():
+            rows.append(doc.to_dict() or {})
+        rows.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
+        start = max(0, int(offset))
+        return rows[start : start + max(1, min(int(limit), 500))]

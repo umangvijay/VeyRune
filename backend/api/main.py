@@ -13,7 +13,7 @@ FastAPI application with:
 
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 import uuid
@@ -21,11 +21,13 @@ import logging
 import asyncio
 import json
 import traceback
+from datetime import datetime, timezone
 
 from pathlib import Path
 
 from backend.config.settings import settings
 from backend.api.dependencies.auth import get_current_user, AuthenticatedUser
+from backend.security.json_safety import SafeJSONResponse, safe_json_dumps
 from backend.security.input_sanitizer import sanitize_goal, InputValidationError
 from backend.security.rate_limiter import check_rate_limit
 from backend.security.csrf import validate_csrf, set_csrf_cookie
@@ -64,6 +66,9 @@ app = FastAPI(
     description="The autonomous workspace that builds its own tools.",
     docs_url="/api/docs" if settings.APP_ENV == "development" else None,
     redoc_url="/api/redoc" if settings.APP_ENV == "development" else None,
+    # One canonical JSON layer for every response: guarantees RFC-8259-valid,
+    # clean UTF-8 output even when AI/tool output contains HTML or raw bytes.
+    default_response_class=SafeJSONResponse,
 )
 
 # ── CORS ──────────────────────────────────────────────────────────
@@ -145,9 +150,13 @@ async def security_headers_middleware(request: Request, call_next):
     connect_src = f"connect-src 'self' {origins}"
     if settings.APP_ENV == "development":
         connect_src += " http://127.0.0.1:8000 http://localhost:8000"
+    # The API serves JSON, not HTML — production script-src stays tight.
+    # 'unsafe-inline' is kept only in development so the Swagger/ReDoc docs
+    # UI (inline scripts) still loads when docs_url is enabled.
+    script_src = "'self' 'unsafe-inline'" if settings.APP_ENV == "development" else "'self'"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
+        f"script-src {script_src}; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         f"{connect_src}"
@@ -164,7 +173,7 @@ async def csrf_middleware(request: Request, call_next):
     try:
         validate_csrf(request)
     except HTTPException as exc:
-        return JSONResponse(
+        return SafeJSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers=_cors_headers_for(request),
@@ -172,14 +181,14 @@ async def csrf_middleware(request: Request, call_next):
     try:
         return await call_next(request)
     except StarletteHTTPException as exc:
-        return JSONResponse(
+        return SafeJSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers=_cors_headers_for(request),
         )
     except Exception as exc:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse(
+        return SafeJSONResponse(
             status_code=500,
             content={"detail": "Internal server error"},
             headers=_cors_headers_for(request),
@@ -268,7 +277,7 @@ async def startup_event():
     from backend.engine.engine import WorkflowEngine
     from backend.instrumentation.wrappers import InstrumentedWorkflowEngine
     workflow_engine = InstrumentedWorkflowEngine(
-        WorkflowEngine(factory.workflow_repo, factory.message_bus, agent_factory, factory.memory_repo, factory.settings_repo)
+        WorkflowEngine(factory.workflow_repo, factory.message_bus, agent_factory, factory.memory_repo, factory.settings_repo, factory.notification_repo)
     )
     app.state.workflow_engine = workflow_engine
 
@@ -279,7 +288,7 @@ async def startup_event():
     run_worker_flag = os.environ.get("RUN_WORKER", "1" if settings.APP_ENV == "development" else "0")
     if run_worker_flag == "1":
         from backend.worker import start_worker
-        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo))
+        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo))
         logger.info("Worker started IN-PROCESS (RUN_WORKER=1). For production, deploy a separate worker service.")
     else:
         logger.info("Worker NOT started in API process (RUN_WORKER=%s). Expecting separate worker service.", run_worker_flag)
@@ -300,35 +309,66 @@ async def shutdown_event():
 #  HEALTH CHECK
 # ══════════════════════════════════════════════════════════════════
 
-@app.get("/health")
-async def health_check():
-    factory = getattr(app.state, "factory", None)
+_STARTED_AT = datetime.now(timezone.utc)
+
+
+def _build_info() -> dict:
+    """Version/build metadata. Cloud Run injects K_REVISION / COMMIT_SHA."""
+    import os
+    commit = (
+        os.environ.get("COMMIT_SHA")
+        or (os.environ.get("K_REVISION", "").rsplit("-", 1)[-1] or None)
+    )
     return {
-        "status": "healthy",
-        "app": settings.APP_NAME,
         "version": "2.0.0",
-        "storage": settings.STORAGE_BACKEND,
-        "model": settings.HF_MODEL if settings.LLM_PROVIDER == "huggingface" else settings.GEMINI_MODEL,
-        "llm": settings.LLM_PROVIDER if settings.LLM_PROVIDER != "auto" else (
+        "commit": commit,
+        "environment": settings.APP_ENV,
+        "started_at": _STARTED_AT.isoformat(),
+        "uptime_seconds": int((datetime.now(timezone.utc) - _STARTED_AT).total_seconds()),
+    }
+
+
+def _health_payload() -> dict:
+    factory = getattr(app.state, "factory", None)
+    llm = settings.LLM_PROVIDER
+    if llm == "auto":
+        llm = (
             "gemini" if settings.GEMINI_API_KEY else (
                 "vertex" if settings.GOOGLE_CLOUD_PROJECT else (
                     "groq" if settings.GROQ_API_KEY else ("huggingface" if settings.HF_TOKEN else "unset")
                 )
             )
-        ),
+        )
+    return {
+        "status": "healthy",
+        "app": settings.APP_NAME,
+        "storage": settings.STORAGE_BACKEND,
+        "model": settings.HF_MODEL if settings.LLM_PROVIDER == "huggingface" else settings.GEMINI_MODEL,
+        "llm": llm,
         "llm_status": getattr(app.state, "llm_status", None),
         "vertex_location": settings.GOOGLE_CLOUD_REGION,
         "factory_initialized": factory is not None and factory._initialized,
+        **_build_info(),
     }
+
+
+@app.get("/health")
+async def health_check():
+    return _health_payload()
+
+
+@app.get("/api/v1/health")
+async def api_health_check():
+    """Versioned health endpoint for monitors, MCP clients, and the status page."""
+    return _health_payload()
 
 
 @app.get("/api/v1/csrf-token")
 async def get_csrf_token(request: Request):
     """Get a CSRF token. Frontend calls this on page load."""
-    from fastapi.responses import JSONResponse
     from backend.security.csrf import generate_csrf_token
     token = generate_csrf_token()
-    response = JSONResponse({"csrf_token": token})
+    response = SafeJSONResponse({"csrf_token": token})
     set_csrf_cookie(response, token)
     return response
 
@@ -337,13 +377,13 @@ async def get_csrf_token(request: Request):
 async def unhandled_exception(request: Request, exc: Exception):
     """JSON errors with CORS headers so the browser can read them (not Failed to fetch)."""
     if isinstance(exc, StarletteHTTPException):
-        return JSONResponse(
+        return SafeJSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers=_cors_headers_for(request),
         )
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-    return JSONResponse(
+    return SafeJSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
         headers=_cors_headers_for(request),
@@ -356,6 +396,12 @@ async def unhandled_exception(request: Request, exc: Exception):
 
 class GoalRequest(BaseModel):
     goal: str
+
+
+def _task_title(t_def):
+    """Human-readable task title (shared with the /workflows router)."""
+    from backend.api.routers.workflows import _task_title as derive
+    return derive(t_def)
 
 
 @app.post("/api/v1/intent")
@@ -480,6 +526,7 @@ async def process_goal(
                 user_id=user.user_id,  # Real authenticated user
                 agent=t_def.agent,
                 tool=t_def.tool,
+                title=_task_title(t_def),
                 input_data=t_def.input_data,
                 dependencies=t_def.dependencies,
                 timeout_seconds=max(t_def.timeout_seconds, 180) if t_def.agent in ("Orchestrator", "OrchestratorAgent", "core.mcp_build") or "orchestrator" in (t_def.agent or "").lower() else t_def.timeout_seconds,
@@ -608,15 +655,15 @@ async def stream_workflow_events(
                     events = await factory.workflow_repo.get_events(run_id, after_event_id=last_event_id)
                 except Exception as exc:
                     logger.exception("SSE get_events failed for run %s", run_id)
-                    yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+                    yield f"event: error\ndata: {safe_json_dumps({'error': str(exc)[:800]})}\n\n"
                     return
                 for event in events:
                     last_event_id = event.get("event_id")
-                    yield f"id: {last_event_id}\ndata: {json.dumps(event, default=str)}\n\n"
+                    yield f"id: {last_event_id}\ndata: {safe_json_dumps(event)}\n\n"
                 await asyncio.sleep(1)
         except Exception as exc:
             logger.exception("SSE stream failed for run %s", run_id)
-            yield f"event: error\ndata: {json.dumps({'error': str(exc)[:800]})}\n\n"
+            yield f"event: error\ndata: {safe_json_dumps({'error': str(exc)[:800]})}\n\n"
 
     return StreamingResponse(
         event_generator(),

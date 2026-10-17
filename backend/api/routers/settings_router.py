@@ -32,6 +32,7 @@ class SettingsUpdate(BaseModel):
     notifications_enabled: Optional[bool] = None
     daily_token_limit: Optional[int] = None
     auto_approve_low_risk: Optional[bool] = None
+    webhook_url: Optional[str] = None              # outbound run-finished webhook (public HTTPS)
 
 
 @router.get("")
@@ -68,6 +69,19 @@ async def update_settings(
                 from backend.services.gemini_client import allowed_models
                 if value not in allowed_models():
                     raise HTTPException(status_code=400, detail="Model is not enabled on this server")
+            if field == "webhook_url":
+                value = str(value).strip()
+                if value:
+                    from backend.mcp.builder.openapi_parser import OpenAPIParser, SSRFViolationError
+                    try:
+                        OpenAPIParser()._validate_ssrf(value)
+                    except SSRFViolationError:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="webhook_url must be a public HTTPS URL",
+                        )
+                updates[field] = value
+                continue
             updates[field] = value
 
     if not updates:

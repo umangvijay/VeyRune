@@ -392,17 +392,36 @@ async def refresh_token(body: RefreshRequest, request: Request):
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(request: Request, user: AuthenticatedUser = Depends(get_current_user)):
-    """Revoke all refresh tokens for the user (logout everywhere)."""
+    """Revoke all refresh tokens for the user (logout everywhere) and the
+    presented access token itself, so it stops working immediately."""
     factory = _get_factory(request)
 
     count = await factory.refresh_token_repo.revoke_all_for_user(user.user_id)
+
+    # Denylist the presented access token's jti until its natural expiry.
+    denylist = getattr(factory, "token_denylist_repo", None)
+    auth_header = request.headers.get("authorization") or ""
+    if denylist is not None and auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+        try:
+            claims = jwt_manager.verify_access_token(token)
+            expires_at = datetime.fromtimestamp(claims["exp"], tz=timezone.utc)
+            await denylist.revoke_jti(claims.get("jti") or "", expires_at)
+        except Exception:
+            logger.warning("Could not denylist access token on logout", exc_info=True)
+
+    # Opportunistic purge keeps the denylist small without a cron.
+    try:
+        await denylist.purge_expired()
+    except Exception:
+        pass
 
     await factory.audit_repo.log_event({
         "event_type": "USER_LOGOUT",
         "actor_id": user.user_id,
         "actor_type": "USER",
         "resource_id": user.user_id,
-        "details": {"tokens_revoked": count},
+        "details": {"tokens_revoked": count, "access_token_revoked": True},
     })
 
 

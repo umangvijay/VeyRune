@@ -27,8 +27,8 @@ export default function DashboardPage() {
             <strong>Any HTTP API (no OpenAPI).</strong> “Build MCP tools for [app] so I can [list / get / create …]”
           </li>
           <li>
-            <strong>Website (no API).</strong> Vault → save e.g. <code>bharatenglish</code> (username/email + password).
-            Chat: “Create MCP tools for https://…”. Then: “Log in with vault credential bharatenglish and open home / use runOnSite …”
+            <strong>Website (no API).</strong> Vault → save a short name like <code>mysite-login</code> (username/email + password).
+            Chat: “Create MCP tools for https://…”. Then: “Log in with vault credential mysite-login and open home / use runOnSite …”
           </li>
         </ol>
         <p>

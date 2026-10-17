@@ -356,13 +356,13 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
         await conn.execute(
             """
             INSERT INTO tasks (
-                task_id, run_id, workflow_id, user_id, agent, tool, status,
+                task_id, run_id, workflow_id, user_id, agent, tool, title, status,
                 input_data, output_data, dependencies, started_at, completed_at,
                 lease_started_at, lease_expires_at, attempt, timeout_seconds,
                 max_retries, recovery_enabled, max_recoveries, max_total_attempts,
                 recovery_attempts, original_input, recovery_history,
                 error, error_type, trace_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, task_id) DO UPDATE SET
                 status = excluded.status,
                 input_data = excluded.input_data,
@@ -385,6 +385,7 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
                 task.get("user_id", "default_user"),
                 task["agent"],
                 task.get("tool"),
+                task.get("title"),
                 task.get("status", "PENDING"),
                 json.dumps(task.get("input_data", {})),
                 json.dumps(task.get("output_data")) if task.get("output_data") else None,
