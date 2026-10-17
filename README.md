@@ -30,7 +30,11 @@ Repository: [umangvijay/AgentOS-an-Automation-tool](https://github.com/umangvija
 - **Dynamic MCP factory** — three ways to get tools: an OpenAPI URL, a description of any HTTP API with no spec, or a website with no API (origin-locked Playwright tools). Not a reverse-engineered private API.
 - **Chat-first automation** — workspace chat plans, builds missing integrations mid-run, then calls the new tools. Follow-up messages reuse the catalog.
 - **Orchestrator + DAG engine** — planner *is* the decomposer. Core nodes (HTTP, health, chat) run without a model.
-- **Self-healing** — timeouts, network errors, and 429/quota retry. CAPTCHA, OTP, and MFA pause for you instead of being treated as failures.
+- **Self-healing** — timeouts, network errors, and 429/quota retry, lease-based task reclaim after worker crashes, bounded retry storms, and MCP-factory codegen that regenerates itself when its live probe crashes. CAPTCHA, OTP, and MFA pause for you instead of being treated as failures.
+- **Self-evolving routing** — an adaptive policy (UCB1 bandit) learns which model executes tasks best from real outcomes and re-ranks the fallback chain before every task; the leaderboard is public at `/usage/models`. Routing improves with evidence; model weights are never touched.
+- **Shared catalog** — publish verified integrations to `/dashboard/catalog`; installs clone the integration per user, never the publisher's credentials.
+- **API keys** — `vry_…` programmatic credentials for MCP clients and CI (hash-stored, shown once, individually revocable).
+- **Enterprise controls** — server-side logout revocation, per-user daily token budget with a hard stop, outbound signed run webhooks, data-retention purge, audit log (API + admin UI), rate limits on every state-changing surface.
 - **Human-in-the-loop** — AgentOS never fills CAPTCHA, SMS OTP, or MFA. Complete the check, then Resume.
 - **Vault** — AES-256-GCM credentials. After save, the API returns names only.
 - **ATS resume** — scan against a job description, tailor from notes, HTML preview and download.

@@ -72,6 +72,25 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
         result["tasks"] = [self._task_row_to_dict(t) for t in task_rows]
         return result
 
+
+    async def _attach_tasks(self, runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Attach tasks to many runs with ONE query instead of one per run
+        (list_runs previously issued N+1 queries — measurable at limit=200)."""
+        if not runs:
+            return runs
+        ids = [r["run_id"] for r in runs]
+        placeholders = ",".join("?" for _ in ids)
+        rows = await self.db.fetch_all(
+            f"SELECT * FROM tasks WHERE run_id IN ({placeholders}) ORDER BY rowid",
+            tuple(ids),
+        )
+        by_run: Dict[str, List[Dict[str, Any]]] = {}
+        for row in rows:
+            by_run.setdefault(row["run_id"], []).append(self._task_row_to_dict(row))
+        for r in runs:
+            r["tasks"] = by_run.get(r["run_id"], [])
+        return runs
+
     async def list_runs(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         rows = await self.db.fetch_all(
             """
@@ -82,16 +101,7 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
             """,
             (user_id, limit, offset),
         )
-        runs = []
-        for row in rows:
-            run = dict(row)
-            task_rows = await self.db.fetch_all(
-                "SELECT * FROM tasks WHERE run_id = ? ORDER BY rowid",
-                (run["run_id"],),
-            )
-            run["tasks"] = [self._task_row_to_dict(t) for t in task_rows]
-            runs.append(run)
-        return runs
+        return await self._attach_tasks([dict(row) for row in rows])
 
     async def list_thread_runs(self, user_id: str, thread_id: str) -> List[Dict[str, Any]]:
         rows = await self.db.fetch_all(
@@ -102,16 +112,7 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
             """,
             (user_id, thread_id, thread_id, thread_id),
         )
-        runs = []
-        for row in rows:
-            run = dict(row)
-            task_rows = await self.db.fetch_all(
-                "SELECT * FROM tasks WHERE run_id = ? ORDER BY rowid",
-                (run["run_id"],),
-            )
-            run["tasks"] = [self._task_row_to_dict(t) for t in task_rows]
-            runs.append(run)
-        return runs
+        return await self._attach_tasks([dict(row) for row in rows])
 
     async def update_run_status(self, run_id: str, status: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
