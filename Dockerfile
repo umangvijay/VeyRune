@@ -3,6 +3,10 @@
 
 FROM python:3.11-slim-bookworm
 
+# Cloud Build passes its built-in COMMIT_SHA; local builds default to unknown.
+ARG COMMIT_SHA=unknown
+ENV COMMIT_SHA=${COMMIT_SHA}
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

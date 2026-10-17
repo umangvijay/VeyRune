@@ -4,13 +4,14 @@ timeout: 1800s
 options:
   logging: CLOUD_LOGGING_ONLY
 steps:
-  # Build API image (root Dockerfile)
+  # Build API image (root Dockerfile) — COMMIT_SHA is Cloud Build's built-in
+  # substitution, baked into the image so /api/v1/health can report it.
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_API_IMAGE}', '-f', 'Dockerfile', '.']
+    args: ['build', '--build-arg', 'COMMIT_SHA=${COMMIT_SHA}', '-t', '${_API_IMAGE}', '-f', 'Dockerfile', '.']
 
   # Build Worker image (Dockerfile.worker)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_WORKER_IMAGE}', '-f', 'Dockerfile.worker', '.']
+    args: ['build', '--build-arg', 'COMMIT_SHA=${COMMIT_SHA}', '-t', '${_WORKER_IMAGE}', '-f', 'Dockerfile.worker', '.']
 
 images:
   - '${_API_IMAGE}'

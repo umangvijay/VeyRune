@@ -10,6 +10,10 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.t
 
 FROM python:3.11-slim
 
+# Cloud Build passes its built-in COMMIT_SHA; local builds default to unknown.
+ARG COMMIT_SHA=unknown
+ENV COMMIT_SHA=${COMMIT_SHA}
+
 WORKDIR /app
 
 COPY --from=builder /app/wheels /wheels
