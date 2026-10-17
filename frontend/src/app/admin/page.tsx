@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
-import { listAdminUsers, adminStats, setUserActive, setUserRole, deleteAnyUser, setUserLimits } from "@/lib/api";
+import { listAdminUsers, adminStats, adminAudit, AdminAuditEvent, setUserActive, setUserRole, deleteAnyUser, setUserLimits } from "@/lib/api";
 import GlassPanel, { AmbientOrbs, springSoft } from "@/components/GlassPanel";
 
 type AdminUserRow = {
@@ -29,6 +29,7 @@ export default function StealthAdminPage() {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof adminStats>> | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [audit, setAudit] = useState<AdminAuditEvent[]>([]);
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   useEffect(() => {
@@ -37,9 +38,10 @@ export default function StealthAdminPage() {
     if (!isAdmin) { router.replace("/"); return; }   // silent redirect — no hint
     (async () => {
       try {
-        const [u, s] = await Promise.all([listAdminUsers(), adminStats()]);
+        const [u, s, a] = await Promise.all([listAdminUsers(), adminStats(), adminAudit(50)]);
         setUsers(u.users as AdminUserRow[]);
         setStats(s);
+        setAudit(a.events || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Access denied");
         router.replace("/");
@@ -189,6 +191,44 @@ export default function StealthAdminPage() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </GlassPanel>
+
+        <GlassPanel glow={0.06} style={{ padding: 0, marginTop: 24 }}>
+          <div style={{ padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Audit log</h2>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>latest {audit.length} events</span>
+          </div>
+          <div style={{ overflowX: "auto", maxHeight: 420, overflowY: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--text-tertiary)", fontSize: 11.5 }}>
+                  <th style={{ padding: "12px 18px" }}>When</th>
+                  <th style={{ padding: "12px 18px" }}>Event</th>
+                  <th style={{ padding: "12px 18px" }}>Actor</th>
+                  <th style={{ padding: "12px 18px" }}>Resource</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.map((e, i) => (
+                  <tr key={`${e.timestamp}-${i}`} style={{ borderTop: "1px solid var(--border-primary)" }}>
+                    <td style={{ padding: "9px 18px", whiteSpace: "nowrap", color: "var(--text-tertiary)" }}>
+                      {e.timestamp ? new Date(e.timestamp).toLocaleString() : "—"}
+                    </td>
+                    <td style={{ padding: "9px 18px", fontFamily: "var(--font-mono)", fontSize: 12 }}>{e.event_type}</td>
+                    <td style={{ padding: "9px 18px" }}>
+                      {e.actor_type}: <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5 }}>{e.actor_id.slice(0, 8)}</span>
+                    </td>
+                    <td style={{ padding: "9px 18px", fontFamily: "var(--font-mono)", fontSize: 11.5 }}>
+                      {e.run_id ? e.run_id.slice(0, 14) : e.resource_id?.slice(0, 14)}
+                    </td>
+                  </tr>
+                ))}
+                {audit.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: "16px 18px", color: "var(--text-tertiary)" }}>No audit events yet.</td></tr>
+                )}
               </tbody>
             </table>
           </div>

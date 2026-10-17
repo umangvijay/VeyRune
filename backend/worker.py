@@ -9,7 +9,7 @@ from backend.engine.repo_adapter import maybe_await
 
 logger = logging.getLogger(__name__)
 
-async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None):
+async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None, audit_repo=None):
     logger.info("Worker started, listening for events...")
     
     async def handle_event(event, ctx: MessageContext):
@@ -125,7 +125,7 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                         try:
                             missed_by = (now - trigger.scheduled_time).total_seconds()
                             if missed_by > 300:
-                                NotificationService(notification_repo).create(
+                                await NotificationService(notification_repo).create(
                                     user_id=schedule["user_id"],
                                     notification_type="SYSTEM",
                                     title="Schedule caught up",
@@ -157,6 +157,22 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                     await maybe_await(token_denylist_repo.purge_expired())
             except Exception:
                 logger.debug("Denylist purge failed", exc_info=True)
+            # Retention control (enterprise P2): purge old events/audit rows
+            # once per day. Workflow runs are never auto-deleted.
+            try:
+                from backend.config.settings import settings as app_settings
+                retention_days = int(getattr(app_settings, "RETENTION_DAYS", 0) or 0)
+                if retention_days > 0 and getattr(start_worker, "_last_retention_purge", None) != datetime.now(timezone.utc).date():
+                    start_worker._last_retention_purge = datetime.now(timezone.utc).date()
+                    repo = workflow_engine.repo
+                    if hasattr(repo, "purge_old_events"):
+                        removed = await maybe_await(repo.purge_old_events(retention_days))
+                        logger.info("Retention purge: %d events older than %dd removed", removed, retention_days)
+                    if audit_repo is not None and hasattr(audit_repo, "purge_older_than"):
+                        removed = await maybe_await(audit_repo.purge_older_than(retention_days))
+                        logger.info("Retention purge: %d audit rows older than %dd removed", removed, retention_days)
+            except Exception:
+                logger.debug("Retention purge failed", exc_info=True)
             await asyncio.sleep(30)
 
     from backend.workers.recovery_worker import RecoveryWorker
@@ -216,11 +232,11 @@ if __name__ == "__main__":
         workflow_engine = WorkflowEngine(
             factory.workflow_repo, factory.message_bus,
             agent_factory, factory.memory_repo, factory.settings_repo,
-            factory.notification_repo,
+            factory.notification_repo, factory.adaptive_policy_repo,
         )
 
         logger.info("Worker initialized. Listening for events...")
-        await start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo)
+        await start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo, factory.audit_repo)
 
     try:
         asyncio.run(_boot_and_run())

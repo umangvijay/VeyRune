@@ -18,6 +18,7 @@ from backend.repositories.base import (
     BaseSecretsRepository,
     BaseSettingsRepository,
     BaseTokenDenylistRepository,
+    BaseAdaptivePolicyRepository,
 )
 from backend.repositories.firestore.database import FirestoreDB
 from backend.repositories.sqlite.settings_repository import DEFAULT_SETTINGS
@@ -245,6 +246,46 @@ class FirestoreTokenDenylistRepository(BaseTokenDenylistRepository):
         return count
 
 
+class FirestoreAdaptivePolicyRepository(BaseAdaptivePolicyRepository):
+    """Per-model outcome stats for the adaptive selection policy."""
+
+    async def record_outcome(self, model: str, success: bool, latency_ms: float) -> None:
+        if not model:
+            return
+        db = await _db()
+        ref = db.collection("model_stats").document(model)
+        doc = await ref.get()
+        data = doc.to_dict() or {}
+        attempts = int(data.get("attempts") or 0) + 1
+        successes = int(data.get("successes") or 0) + (1 if success else 0)
+        failures = int(data.get("failures") or 0) + (0 if success else 1)
+        ewma = float(data.get("ewma_latency_ms") or 0.0) * 0.7 + float(latency_ms) * 0.3
+        await ref.set({
+            "model": model,
+            "attempts": attempts,
+            "successes": successes,
+            "failures": failures,
+            "ewma_latency_ms": ewma,
+            "updated_at": _now(),
+        })
+
+    async def get_stats(self) -> List[Dict[str, Any]]:
+        db = await _db()
+        rows = []
+        async for doc in db.collection("model_stats").stream():
+            rows.append(doc.to_dict() or {})
+        rows.sort(key=lambda r: int(r.get("attempts") or 0), reverse=True)
+        return rows
+
+    async def reset(self) -> int:
+        db = await _db()
+        count = 0
+        async for doc in db.collection("model_stats").stream():
+            await doc.reference.delete()
+            count += 1
+        return count
+
+
 class FirestoreNotificationRepository(BaseNotificationRepository):
     async def create_notification(self, notification_data: Dict[str, Any]) -> str:
         nid = notification_data.get("id") or str(uuid.uuid4())
@@ -313,3 +354,14 @@ class FirestoreAuditRepository(BaseAuditRepository):
         rows.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
         start = max(0, int(offset))
         return rows[start : start + max(1, min(int(limit), 500))]
+
+    async def purge_older_than(self, days: int) -> int:
+        """Retention control: delete audit rows older than N days."""
+        from datetime import datetime, timedelta, timezone as tz
+        db = await _db()
+        cutoff = (datetime.now(tz.utc) - timedelta(days=int(days))).isoformat()
+        count = 0
+        async for doc in db.collection("audit_logs").where("timestamp", "<", cutoff).stream():
+            await doc.reference.delete()
+            count += 1
+        return count

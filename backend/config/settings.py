@@ -136,6 +136,11 @@ class Settings(BaseSettings):
     # generic datacenter-UA requests; a descriptive UA raises the success rate.
     HEALTH_USER_AGENT: str = "Mozilla/5.0 (compatible; VeyruneHealth/2.0; +https://veyrune.app/bot)"
 
+    # ── Data retention (enterprise control) ──────────────────────
+    # Days to keep timeline events and audit-log rows; 0 disables purging.
+    # Workflow runs are never auto-deleted — only derived/observational data.
+    RETENTION_DAYS: int = 90
+
     @field_validator(
         "GEMINI_API_KEY",
         "GOOGLE_CLOUD_PROJECT",

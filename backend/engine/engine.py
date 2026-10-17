@@ -27,13 +27,14 @@ logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 class WorkflowEngine:
-    def __init__(self, workflow_repo: WorkflowRepository, message_bus: MessageBus, agent_factory: AgentFactory = None, memory_repo=None, settings_repo=None, notification_repo=None):
+    def __init__(self, workflow_repo: WorkflowRepository, message_bus: MessageBus, agent_factory: AgentFactory = None, memory_repo=None, settings_repo=None, notification_repo=None, adaptive_policy_repo=None):
         self.repo = workflow_repo
         self.message_bus = message_bus
         self.agent_factory = agent_factory
         self.memory_repo = memory_repo
         self.settings_repo = settings_repo
         self.notification_repo = notification_repo
+        self.adaptive_policy_repo = adaptive_policy_repo
 
     async def _call_matching_catalog_tool(self, run, catalog, tool_router, context) -> Optional[Dict[str, Any]]:
         """When the model cannot pick a tool, call the catalog tool that matches the goal."""
@@ -767,10 +768,19 @@ class WorkflowEngine:
             return ""
 
         from backend.services import gemini_client
+        from backend.services.adaptive_policy import AdaptivePolicy
+
+        # Self-evolving selection: re-order the candidate chain with the
+        # UCB1 policy learned from past task outcomes, then record what
+        # happens with whichever model actually ran.
+        adaptive = AdaptivePolicy(getattr(self, "adaptive_policy_repo", None))
+        candidate_models = await adaptive.rank(gemini_client.candidate_models())
 
         events = None
         last_err: Optional[Exception] = None
-        for model_name in gemini_client.candidate_models():
+        for model_name in candidate_models:
+            import time as _time
+            _model_started = _time.monotonic()
             try:
                 if agent_id and self.agent_factory:
                     agent = self.agent_factory.build_agent(agent_id, context=context, model=model_name)
@@ -802,12 +812,15 @@ class WorkflowEngine:
                         if getattr(part, "text", None) and not getattr(part, "thought", False):
                             await _emit_progress(part.text[:300])
                 last_err = None
+                await adaptive.record(model_name, True, (time.monotonic() - _model_started) * 1000)
                 break
             except Exception as e:
                 last_err = e
                 if gemini_client.is_retryable_model_error(e):
                     logger.warning("ADK Gemini %s unavailable (%s); trying next Flash model", model_name, e)
+                    await adaptive.record(model_name, False, (time.monotonic() - _model_started) * 1000)
                     continue
+                await adaptive.record(model_name, False, (time.monotonic() - _model_started) * 1000)
                 break
 
         if events is None:

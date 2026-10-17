@@ -349,3 +349,14 @@ class FirestoreWorkflowRepository(BaseWorkflowRepository):
 
         transaction = db.transaction()
         return await resolve_in_transaction(transaction, doc_ref)
+
+    async def purge_old_events(self, days: int) -> int:
+        """Retention control: delete timeline events older than N days (runs kept)."""
+        from datetime import datetime, timedelta, timezone as tz
+        db = await self._get_db()
+        cutoff = (datetime.now(tz.utc) - timedelta(days=int(days))).isoformat()
+        count = 0
+        async for doc in db.collection("events").where("timestamp", "<", cutoff).stream():
+            await doc.reference.delete()
+            count += 1
+        return count

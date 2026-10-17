@@ -8,7 +8,7 @@ Never logs secrets, bearer tokens, or API keys.
 import json
 import logging
 from typing import Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.repositories.base import BaseAuditRepository
 from backend.repositories.sqlite.database import DatabaseManager
@@ -90,3 +90,11 @@ class SQLiteAuditRepository(BaseAuditRepository):
             r["details"] = json.loads(r.get("details", "{}"))
             results.append(r)
         return results
+
+    async def purge_older_than(self, days: int) -> int:
+        """Retention control: delete audit rows older than N days."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days))).isoformat()
+        conn = await self.db.connection()
+        cursor = await conn.execute("DELETE FROM audit_logs WHERE timestamp < ?", (cutoff,))
+        await conn.commit()
+        return cursor.rowcount or 0

@@ -837,6 +837,24 @@ export async function adminStats() {
   return apiFetch<{ users_total: number; users_active_5h: number; runs_total: number; integrations: number; window_hours: number }>("/admin/stats");
 }
 
+export interface AdminAuditEvent {
+  id?: number;
+  event_type: string;
+  actor_id: string;
+  actor_type: string;
+  resource_id: string;
+  workflow_id?: string;
+  run_id?: string;
+  details?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export async function adminAudit(limit = 100, eventType?: string) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (eventType) params.set("event_type", eventType);
+  return apiFetch<{ events: AdminAuditEvent[]; count: number }>(`/admin/audit?${params.toString()}`);
+}
+
 export async function setUserRole(userId: string, role: string) {
   return apiFetch<{ user_id: string; role: string }>(`/admin/users/${userId}/role`, { method: "POST", body: JSON.stringify({ role }) });
 }

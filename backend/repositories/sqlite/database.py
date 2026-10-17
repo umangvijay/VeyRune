@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS token_denylist (
 
 CREATE INDEX IF NOT EXISTS idx_token_denylist_expires ON token_denylist(expires_at);
 
+-- ── Adaptive model policy (online learning from task outcomes) ───
+CREATE TABLE IF NOT EXISTS model_stats (
+    model TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    successes INTEGER NOT NULL DEFAULT 0,
+    failures INTEGER NOT NULL DEFAULT 0,
+    ewma_latency_ms REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
 -- ── Workflows ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS workflow_runs (
     run_id TEXT PRIMARY KEY,

@@ -422,3 +422,11 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
         result["original_input"] = json.loads(result["original_input"]) if result.get("original_input") else None
         result["recovery_enabled"] = bool(result.get("recovery_enabled", 0))
         return result
+
+    async def purge_old_events(self, days: int) -> int:
+        """Retention control: delete timeline events older than N days (runs kept)."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days))).isoformat()
+        conn = await self.db.connection()
+        cursor = await conn.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+        await conn.commit()
+        return cursor.rowcount or 0

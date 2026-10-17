@@ -46,6 +46,7 @@ class RepositoryFactory:
         self.idempotency_repo = None
         self.audit_repo = None
         self.plugin_repo = None
+        self.adaptive_policy_repo = None
 
         # Infrastructure
         self.message_bus = None
@@ -79,6 +80,7 @@ class RepositoryFactory:
         from backend.repositories.sqlite.schedule_repository import SQLiteScheduleRepository
         from backend.repositories.sqlite.refresh_token_repository import SQLiteRefreshTokenRepository
         from backend.repositories.sqlite.token_denylist_repository import SQLiteTokenDenylistRepository
+        from backend.repositories.sqlite.adaptive_policy_repository import SQLiteAdaptivePolicyRepository
         from backend.repositories.sqlite.notification_repository import SQLiteNotificationRepository
         from backend.repositories.sqlite.settings_repository import SQLiteSettingsRepository
         from backend.repositories.sqlite.idempotency_repository import SQLiteIdempotencyRepository
@@ -104,6 +106,7 @@ class RepositoryFactory:
         self.idempotency_repo = SQLiteIdempotencyRepository(self.db_manager)
         self.audit_repo = SQLiteAuditRepository(self.db_manager)
         self.plugin_repo = SQLitePluginRepository(self.db_manager)
+        self.adaptive_policy_repo = SQLiteAdaptivePolicyRepository(self.db_manager)
 
         # In-process message bus for local mode
         self.message_bus = InMemoryMessageBus()
@@ -143,6 +146,7 @@ class RepositoryFactory:
             FirestoreSecretsRepository,
             FirestoreSettingsRepository,
             FirestoreTokenDenylistRepository,
+            FirestoreAdaptivePolicyRepository,
         )
         self.secrets_repo = FirestoreSecretsRepository()
         self.schedule_repo = FirestoreScheduleRepository()
@@ -151,6 +155,7 @@ class RepositoryFactory:
         self.notification_repo = FirestoreNotificationRepository()
         self.settings_repo = FirestoreSettingsRepository()
         self.audit_repo = FirestoreAuditRepository()
+        self.adaptive_policy_repo = FirestoreAdaptivePolicyRepository()
 
         # Do not silently use a process-local queue in production: the API and
         # worker pool are separate processes, so that fallback strands tasks.

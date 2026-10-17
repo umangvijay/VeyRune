@@ -413,6 +413,31 @@ class BaseAuditRepository(ABC):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  ADAPTIVE POLICY REPOSITORY (online learning from task outcomes)
+# ═══════════════════════════════════════════════════════════════════
+
+class BaseAdaptivePolicyRepository(ABC):
+    """Per-model outcome statistics for the adaptive selection policy.
+    The policy reorders candidate models using UCB1-style scoring; the
+    repository is the learning system's persistent memory."""
+
+    @abstractmethod
+    async def record_outcome(self, model: str, success: bool, latency_ms: float) -> None:
+        """Update attempt counts and the EWMA latency for a model."""
+        ...
+
+    @abstractmethod
+    async def get_stats(self) -> List[Dict[str, Any]]:
+        """All model stats rows: model, attempts, successes, failures, ewma_latency_ms."""
+        ...
+
+    @abstractmethod
+    async def reset(self) -> int:
+        """Forget all learned statistics. Returns rows removed."""
+        ...
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  TOKEN DENYLIST REPOSITORY
 # ═══════════════════════════════════════════════════════════════════
 

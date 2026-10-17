@@ -157,3 +157,20 @@ async def get_operations(request: Request, user: AuthenticatedUser = Depends(get
         raise HTTPException(status_code=503, detail='Workflow storage is unavailable')
     runs = await factory.workflow_repo.list_runs(user.user_id, limit=200, offset=0)
     return summarize_runs(runs, user.user_id)
+
+@router.get("/models")
+async def get_model_leaderboard(request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """Model leaderboard from the adaptive selection policy — real per-model
+    outcomes (attempts, success rate, EWMA latency) with the current UCB1
+    ranking. This is the observable face of the self-evolving loop."""
+    from backend.services.adaptive_policy import AdaptivePolicy
+    factory = _get_factory(request)
+    repo = getattr(factory, "adaptive_policy_repo", None) if factory else None
+    policy = AdaptivePolicy(repo)
+    board = await policy.leaderboard()
+    return {
+        "policy": "UCB1 (C=1.0) + epsilon=0.10 exploration + latency tie-break",
+        "models": board,
+        "note": "Routing policy learned from real task outcomes; no weights are trained.",
+    }
+

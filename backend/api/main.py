@@ -277,7 +277,7 @@ async def startup_event():
     from backend.engine.engine import WorkflowEngine
     from backend.instrumentation.wrappers import InstrumentedWorkflowEngine
     workflow_engine = InstrumentedWorkflowEngine(
-        WorkflowEngine(factory.workflow_repo, factory.message_bus, agent_factory, factory.memory_repo, factory.settings_repo, factory.notification_repo)
+        WorkflowEngine(factory.workflow_repo, factory.message_bus, agent_factory, factory.memory_repo, factory.settings_repo, factory.notification_repo, factory.adaptive_policy_repo)
     )
     app.state.workflow_engine = workflow_engine
 
@@ -288,7 +288,7 @@ async def startup_event():
     run_worker_flag = os.environ.get("RUN_WORKER", "1" if settings.APP_ENV == "development" else "0")
     if run_worker_flag == "1":
         from backend.worker import start_worker
-        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo))
+        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo, factory.audit_repo))
         logger.info("Worker started IN-PROCESS (RUN_WORKER=1). For production, deploy a separate worker service.")
     else:
         logger.info("Worker NOT started in API process (RUN_WORKER=%s). Expecting separate worker service.", run_worker_flag)
@@ -423,7 +423,7 @@ async def process_goal(
     check_rate_limit(f"user:{user.user_id}", "workflow")
 
     # Cost guardrail: hard stop once the daily token budget is spent.
-    from backend.services.llm_context import check_user_budget
+    from backend.services.llm_context import check_user_budget, load_user_llm_keys, load_user_model
     budget = await check_user_budget(factory.settings_repo, user.user_id)
     if budget and budget.get("exceeded"):
         raise HTTPException(
@@ -441,6 +441,14 @@ async def process_goal(
 
     if not goal:
         raise HTTPException(status_code=400, detail="Goal cannot be empty")
+
+    # Per-user keys + model selection must be in context before any LLM call
+    # (usage recording keys off this too).
+    await load_user_llm_keys(factory.secrets_repo, user.user_id)
+    try:
+        selected_model = await load_user_model(factory.settings_repo, user.user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     run_id = str(uuid.uuid4())
     workflow_id = f"wf-{run_id[:8]}"
@@ -545,6 +553,7 @@ async def process_goal(
                 recovery_enabled=True,
                 status=TaskStatus.PENDING,
             )
+            task.input_data = {**task.input_data, "_model": selected_model}
             run.tasks.append(task)
 
         # Save to repository (SQLite or Firestore, based on config)
