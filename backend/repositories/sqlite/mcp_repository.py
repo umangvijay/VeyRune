@@ -29,8 +29,8 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 mcp_id, name, version, endpoint, transport, auth_json, scopes,
                 health, health_updated_at, state, spec_hash, spec_version,
                 source_uri, built_at, owner, is_enabled, created_at, updated_at,
-                description, trust_tier, source_type, spec_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                description, trust_tier, source_type, spec_json, is_public
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(mcp_id) DO UPDATE SET
                 name = excluded.name,
                 version = excluded.version,
@@ -49,6 +49,7 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 trust_tier = excluded.trust_tier,
                 source_type = excluded.source_type,
                 spec_json = excluded.spec_json,
+                is_public = excluded.is_public,
                 updated_at = excluded.updated_at
             """,
             (
@@ -74,6 +75,7 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 m.get("trust_tier", "pending_review"),
                 m.get("source_type", "openapi"),
                 m.get("spec_json"),
+                1 if m.get("is_public", False) else 0,
             ),
         )
         await self.db.commit()
@@ -119,6 +121,21 @@ class SQLiteMCPRepository(BaseMCPRepository):
             (state, datetime.now(timezone.utc).isoformat(), mcp_id),
         )
         await self.db.commit()
+
+    async def list_public_mcps(self) -> List[Dict[str, Any]]:
+        """Shared catalog: every published integration, for any authenticated user."""
+        rows = await self.db.fetch_all(
+            "SELECT * FROM mcps WHERE is_public = 1 ORDER BY updated_at DESC"
+        )
+        return [dict(r) for r in rows]
+
+    async def set_public(self, mcp_id: str, is_public: bool) -> bool:
+        cursor = await self.db.execute(
+            "UPDATE mcps SET is_public = ?, updated_at = ? WHERE mcp_id = ?",
+            (1 if is_public else 0, datetime.now(timezone.utc).isoformat(), mcp_id),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
 
     async def delete_mcp(self, mcp_id: str) -> bool:
         conn = await self.db.connection()

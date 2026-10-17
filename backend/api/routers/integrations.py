@@ -86,6 +86,18 @@ async def list_integrations(
     return {"integrations": results, "count": len(results)}
 
 
+@router.get("/catalog")
+async def list_catalog(request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """The shared integration catalog — every published integration."""
+    factory = _get_factory(request)
+    public = await factory.mcp_repo.list_public_mcps()
+    out = []
+    for mcp in public:
+        tools = await factory.mcp_repo.get_cached_tools(mcp.get("mcp_id"))
+        out.append(_catalog_entry(mcp, tools))
+    return {"integrations": out, "count": len(out)}
+
+
 @router.get("/{mcp_id}")
 async def get_integration(
     mcp_id: str, request: Request,
@@ -387,6 +399,135 @@ async def get_health(
         "health_updated_at": mcp.get("health_updated_at"),
         "circuit_breaker": circuit_breaker.get_status(mcp_id),
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  SHARED CATALOG (audit §9: "publish user-built MCPs — one ACL away")
+# ══════════════════════════════════════════════════════════════════
+
+@router.post("/{mcp_id}/publish")
+async def publish_integration(
+    mcp_id: str, request: Request,
+    user: AuthenticatedUser = Depends(require_not_viewer),
+):
+    """Publish an integration to the shared catalog.
+
+    Gate: only the owner may publish, and only *verified* integrations
+    (probe-passed OpenAPI builds) — pending-review or website browser
+    tools stay private, so nothing unreviewed is ever shared."""
+    factory = _get_factory(request)
+    mcp = await factory.mcp_repo.get_mcp(mcp_id)
+    if not mcp or mcp.get("owner") != user.user_id:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    if str(mcp.get("trust_tier")) != "verified":
+        raise HTTPException(
+            status_code=400,
+            detail="Only verified integrations (live-probe passed) can be published. "
+                   "Build from an OpenAPI URL or spec to earn the verified tier.",
+        )
+    await factory.mcp_repo.set_public(mcp_id, True)
+    await factory.audit_repo.log_event({
+        "event_type": "MCP_PUBLISHED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": mcp_id,
+        "details": {"name": mcp.get("name"), "trust_tier": mcp.get("trust_tier")},
+    })
+    return {"mcp_id": mcp_id, "is_public": True}
+
+
+@router.post("/{mcp_id}/unpublish")
+async def unpublish_integration(
+    mcp_id: str, request: Request,
+    user: AuthenticatedUser = Depends(require_not_viewer),
+):
+    """Remove an integration from the shared catalog (owner or admin)."""
+    factory = _get_factory(request)
+    mcp = await factory.mcp_repo.get_mcp(mcp_id)
+    if not mcp or (mcp.get("owner") != user.user_id and not user.is_admin()):
+        raise HTTPException(status_code=404, detail="Integration not found")
+    await factory.mcp_repo.set_public(mcp_id, False)
+    return {"mcp_id": mcp_id, "is_public": False}
+
+
+def _catalog_entry(mcp: dict, tools: list) -> dict:
+    """Catalog view: metadata + tool names only. Never spec_json, never auth
+    material, never the owner's identity."""
+    return {
+        "mcp_id": mcp.get("mcp_id"),
+        "name": mcp.get("name"),
+        "description": mcp.get("description"),
+        "source_type": mcp.get("source_type"),
+        "trust_tier": mcp.get("trust_tier"),
+        "spec_version": mcp.get("spec_version"),
+        "updated_at": mcp.get("updated_at"),
+        "tools": [{"name": t.get("tool_name"), "description": t.get("description")} for t in tools],
+        "tool_count": len(tools),
+    }
+
+
+@router.post("/{mcp_id}/install", status_code=status.HTTP_201_CREATED)
+async def install_from_catalog(
+    mcp_id: str, request: Request,
+    user: AuthenticatedUser = Depends(require_not_viewer),
+):
+    """Install a published integration into the caller's own workspace.
+
+    Clones the manifest and tool schemas with a fresh per-user id. The
+    owner's credentials are NEVER copied — the auth *placement* metadata
+    (header vs query, key name) carries over; each user attaches their
+    own secret via /integrations/{id}/credentials or the Vault."""
+    import hashlib
+    factory = _get_factory(request)
+    mcp = await factory.mcp_repo.get_mcp(mcp_id)
+    if not mcp or not mcp.get("is_public"):
+        raise HTTPException(status_code=404, detail="Integration not found in the catalog")
+
+    new_id = hashlib.sha256(f"{user.user_id}:{mcp.get('spec_hash') or mcp_id}".encode()).hexdigest()[:16]
+    existing = await factory.mcp_repo.get_mcp(new_id)
+    if existing:
+        return {"mcp_id": new_id, "installed": False, "message": "Already installed"}
+
+    auth = mcp.get("auth") or {}
+    if isinstance(auth, str):
+        try:
+            import json as _json
+            auth = _json.loads(auth)
+        except Exception:
+            auth = {}
+    auth = {k: v for k, v in dict(auth).items() if k != "credential_ref"}
+
+    clone = dict(mcp)
+    clone["mcp_id"] = new_id
+    clone["owner"] = user.user_id
+    clone["auth"] = auth
+    clone["is_public"] = False
+    clone["is_enabled"] = True
+    # Validate the manifest shape, defaulting anything a legacy row lacks.
+    from backend.models.mcp_schemas import MCPManifest
+    manifest_fields = set(MCPManifest.model_fields)
+    payload = {k: v for k, v in clone.items() if k in manifest_fields}
+    payload.setdefault("transport", "internal")
+    payload.setdefault("endpoint", f"internal://openapi/{new_id}")
+    payload.setdefault("version", str(clone.get("spec_version") or "1.0.0"))
+    MCPManifest(**payload)  # validate shape before persisting
+    await factory.mcp_repo.register_mcp(payload)
+
+    tools = await factory.mcp_repo.get_cached_tools(mcp_id)
+    rekeyed = []
+    for t in tools:
+        t = dict(t)
+        t["mcp_id"] = new_id
+        rekeyed.append(t)
+    if rekeyed:
+        await factory.mcp_repo.cache_tools(new_id, rekeyed)
+
+    await factory.audit_repo.log_event({
+        "event_type": "MCP_INSTALLED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": new_id,
+        "details": {"from_catalog": mcp_id, "name": mcp.get("name"), "tools": len(rekeyed)},
+    })
+    return {"mcp_id": new_id, "installed": True, "tools": len(rekeyed), "name": mcp.get("name")}
 
 
 @router.post("/{mcp_id}/enable")

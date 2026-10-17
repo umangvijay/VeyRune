@@ -427,6 +427,7 @@ class DatabaseManager:
             "trust_tier": "TEXT NOT NULL DEFAULT 'pending_review'",
             "source_type": "TEXT NOT NULL DEFAULT 'openapi'",
             "spec_json": "TEXT",
+            "is_public": "INTEGER NOT NULL DEFAULT 0",
         }
         for col, ddl in additions.items():
             if col not in existing:

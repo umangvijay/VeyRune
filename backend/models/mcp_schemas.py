@@ -72,6 +72,7 @@ class MCPManifest(BaseModel):
     spec_json: Optional[str] = None
     owner: str = "system"
     is_enabled: bool = True
+    is_public: bool = False   # listed in the shared catalog (verified tier only)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
