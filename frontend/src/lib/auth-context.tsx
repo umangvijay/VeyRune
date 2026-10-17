@@ -192,12 +192,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [persistAuth]);
 
   const loginAsGuest = useCallback(async (signal?: AbortSignal) => {
-    const data = await fetchJson(`${API_BASE}/auth/guest`, {
+    const attempt = () => fetchJson(`${API_BASE}/auth/guest`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       signal,
     }, 45000);
+    let data;
+    try {
+      data = await attempt();
+    } catch (err) {
+      // Guest establishment was observed flaking on cold starts (audit R10):
+      // one retry covers the transient window before surfacing an error.
+      if (signal?.aborted) throw err;
+      await new Promise((r) => setTimeout(r, 1200));
+      data = await attempt();
+    }
     persistAuth(data.user, data.access_token, data.refresh_token);
   }, [persistAuth]);
 

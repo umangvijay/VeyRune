@@ -83,3 +83,20 @@ subscription backlog.
 `RETENTION_DAYS` (default 90) purges timeline events and audit rows in
 the worker's daily pass. Workflow runs are never auto-deleted. Export
 before large deletions if compliance requires it.
+
+## Model selection (A/B guidance)
+
+The adaptive policy (`GET /api/v1/usage/models`) re-ranks the model chain
+from real task outcomes. Live A/B evidence from the audit (n=1 each,
+indicative only):
+
+- `gemini-3.8-flash` (default): planned both sites of a multi-part goal
+  and wrote the synthesis (~26s).
+- `gemini-4-argon`: ~2× faster (~12s) but dropped one site from the plan
+  and skipped the synthesis.
+
+Policy: keep `gemini-3.8-flash` as the default until a per-goal-template
+A/B (≥20 runs each) shows argon planning multi-part goals reliably. The
+bandit will surface the difference automatically in
+`failed_tasks_by_agent` and the leaderboard once production traffic
+accumulates — check it before changing defaults manually.
