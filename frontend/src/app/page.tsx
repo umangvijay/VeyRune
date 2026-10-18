@@ -176,7 +176,7 @@ export default function LandingPage() {
           padding: "20px clamp(16px, 4vw, 40px) 10px",
         }}>
           {/* ── Hero card: bracketed console frame, frosted ── */}
-          <section className="glass-card console-frame panel-3d" style={{ padding: "clamp(22px, 3vw, 40px)", maxWidth: 560, pointerEvents: "auto" }}>
+          <section className="glass-card console-frame panel-3d float-soft" style={{ padding: "clamp(22px, 3vw, 40px)", maxWidth: 560, pointerEvents: "auto" }}>
             <span className="frame-tr" /><span className="frame-bl" />
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22, gap: 12, flexWrap: "wrap" }}>
@@ -198,7 +198,7 @@ export default function LandingPage() {
 
             <h1 style={{
               fontFamily: "var(--font-serif)", fontWeight: 600,
-              fontSize: "clamp(38px, 4.6vw, 62px)", lineHeight: 1.05,
+              fontSize: "clamp(30px, 3.4vw, 46px)", lineHeight: 1.06,
               letterSpacing: "-0.015em", marginBottom: 18,
             }}>
               Say it.<br />

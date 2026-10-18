@@ -281,6 +281,101 @@ function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: Cyanot
   );
 }
 
+/** The Planet: a drafting globe — prussian seas, blueprint meridians.
+ *  It turns slowly, weaving the threads that draw every sheet. */
+function Planet({ mode, hallTime, position }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number] }) {
+  const c = PALETTE[mode];
+  const globe = useRef<THREE.Mesh>(null);
+  const graticule = useRef<THREE.LineSegments>(null);
+
+  // graticule: meridians + parallels as line segments (the drafting globe)
+  const graticuleGeometry = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const R = 1.25;
+    for (let i = 0; i < 10; i++) {
+      const lon = (i / 10) * Math.PI * 2;
+      for (let a = 0; a < 24; a++) {
+        const t1 = (a / 24) * Math.PI * 2;
+        const t2 = ((a + 1) / 24) * Math.PI * 2;
+        pts.push(new THREE.Vector3(
+          R * Math.sin(t1) * Math.cos(lon), R * Math.cos(t1), R * Math.sin(t1) * Math.sin(lon),
+        ), new THREE.Vector3(
+          R * Math.sin(t2) * Math.cos(lon), R * Math.cos(t2), R * Math.sin(t2) * Math.sin(lon),
+        ));
+      }
+    }
+    for (let i = 1; i < 6; i++) {
+      const lat = -Math.PI / 2 + (i / 6) * Math.PI;
+      const r = R * Math.cos(lat);
+      const y = R * Math.sin(lat);
+      for (let a = 0; a < 36; a++) {
+        const t1 = (a / 36) * Math.PI * 2;
+        const t2 = ((a + 1) / 36) * Math.PI * 2;
+        pts.push(new THREE.Vector3(r * Math.cos(t1), y, r * Math.sin(t1)),
+                 new THREE.Vector3(r * Math.cos(t2), y, r * Math.sin(t2)));
+      }
+    }
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }, []);
+
+  useFrame(() => {
+    const t = hallTime.current;
+    if (globe.current) globe.current.rotation.y = t * 0.05;
+    if (graticule.current) graticule.current.rotation.y = t * 0.05;
+  });
+
+  return (
+    <group position={position}>
+      <mesh ref={globe}>
+        <sphereGeometry args={[1.22, 32, 24]} />
+        <meshBasicMaterial color={mode === "dark" ? "#0a1e4d" : "#a8bfe8"} />
+      </mesh>
+      <lineSegments ref={graticule}>
+        <primitive object={graticuleGeometry} attach="geometry" />
+        <lineBasicMaterial color={c.lineBright} transparent opacity={1} />
+      </lineSegments>
+    </group>
+  );
+}
+
+/** A thread: an arc from the Planet to a sheet, drawn stitch by stitch.
+ *  The planet is threading the blueprint into existence. */
+function Thread({
+  mode, from, to, hallTime, speed = 0.14, offset = 0,
+}: {
+  mode: CyanotypeMode;
+  from: [number, number, number];
+  to: [number, number, number];
+  hallTime: React.MutableRefObject<number>;
+  speed?: number;
+  offset?: number;
+}) {
+  const c = PALETTE[mode];
+  const curve = useMemo(() => {
+    const a = new THREE.Vector3(...from);
+    const b = new THREE.Vector3(...to);
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    mid.y += 1.6;
+    return new THREE.QuadraticBezierCurve3(a, mid, b);
+  }, [from, to]);
+
+  const { line, material } = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(2));
+    const mat = new THREE.LineBasicMaterial({ color: c.lineBright, transparent: true, opacity: 0.95 });
+    return { line: new THREE.Line(geometry, mat), material: mat };
+  }, [curve, c.line]);
+
+  useFrame(() => {
+    const t = (hallTime.current * speed + offset) % 1.35;
+    const head = Math.min(1, t);
+    const pts = curve.getPoints(Math.max(2, Math.ceil(head * 60)));
+    line.geometry.setFromPoints(pts);
+    material.opacity = t > 1 ? 0.25 : 0.9;
+  });
+
+  return <primitive object={line} />;
+}
+
 /** Graphite dust — sparse drifting points (not a starfield). */
 function Dust({ mode, count = 220, hallTime }: { mode: CyanotypeMode; count?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
@@ -351,6 +446,11 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <TracingLine mode={mode} hallTime={hallTime} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
       <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
       <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
+      {/* The Planet — threading every blueprint into existence */}
+      <Planet mode={mode} hallTime={hallTime} position={[-0.4, 3.8, -8.5]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0} from={[-0.6, 3.2, -8.2]} to={[3.4, 2.5, -4.3]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.45} speed={0.12} from={[-0.9, 3.1, -8.2]} to={[-4.8, 2.2, -5.5]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.9} speed={0.1} from={[-0.2, 3.3, -8.4]} to={[1.1, 3.5, -9.7]} />
     </>
   );
 }

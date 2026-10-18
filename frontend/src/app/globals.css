@@ -322,13 +322,35 @@ body {
   background-clip: text;
 }
 
+/* Cyanotype drafting paper — the shared backdrop for every public page */
 .mesh-gradient {
   background-color: var(--bg-primary);
   background-image:
-    radial-gradient(ellipse at 16% 17%, rgba(161, 174, 134, 0.2), transparent 34%),
-    radial-gradient(ellipse at 86% 26%, rgba(210, 166, 133, 0.16), transparent 29%),
-    radial-gradient(ellipse at 54% 76%, rgba(175, 190, 176, 0.14), transparent 36%);
+    linear-gradient(rgba(62, 107, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(62, 107, 255, 0.055) 1px, transparent 1px),
+    radial-gradient(ellipse at 18% 12%, rgba(62, 107, 255, 0.12), transparent 42%),
+    radial-gradient(ellipse at 84% 88%, rgba(30, 70, 180, 0.10), transparent 46%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
 }
+
+[data-theme="dark"] .mesh-gradient {
+  background-image:
+    linear-gradient(rgba(62, 107, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(62, 107, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(ellipse at 18% 12%, rgba(62, 107, 255, 0.09), transparent 42%),
+    radial-gradient(ellipse at 84% 88%, rgba(20, 50, 140, 0.12), transparent 46%);
+}
+
+/* Gentle float for hero surfaces (Sandtable: the page breathes) */
+@keyframes sandtable-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+.float-soft {
+  animation: sandtable-float 7s ease-in-out infinite;
+  will-change: transform;
+}
+:root.reduce-data .float-soft { animation: none; }
 
 .scroll-reveal-ready [data-scroll-reveal] {
   opacity: 0;

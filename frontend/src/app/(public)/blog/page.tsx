@@ -127,7 +127,7 @@ export default function BlogPage() {
               <div className="spinner" style={{ width: 48, height: 48 }} />
             </div>
           ) : posts.length === 0 ? (
-            <div className="glass-panel" style={{ padding: 48, textAlign: "center" }}>
+            <div data-scroll-reveal className="glass-panel" style={{ padding: 48, textAlign: "center" }}>
               <h2 style={{ fontSize: 22, marginBottom: 8 }}>No posts yet</h2>
               <p style={{ color: "var(--text-secondary)" }}>Check back soon — or sign in with Google to publish the first one.</p>
             </div>
@@ -162,7 +162,7 @@ export default function BlogPage() {
           background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16
         }}>
-          <div className="glass-card animate-fade-in-up w-full max-w-2xl p-6 md:p-8 bg-[var(--bg-card)] border border-[var(--border-primary)]">
+          <div data-scroll-reveal className="glass-card animate-fade-in-up w-full max-w-2xl p-6 md:p-8 bg-[var(--bg-card)] border border-[var(--border-primary)]">
             <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Write a Post</h2>
             <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>Share your insights with the community. Abusive language is strictly prohibited.</p>
             

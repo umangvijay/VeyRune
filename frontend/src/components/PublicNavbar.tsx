@@ -55,10 +55,13 @@ export default function PublicNavbar() {
   }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { href: "/dashboard", label: "Board" },
-    { href: "/dashboard/integrations", label: "Stamps" },
-    { href: "/dashboard/workflows", label: "Builds" },
-    { href: "/dashboard/operations", label: "Sheets" },
+    { href: "/about", label: "About Us" },
+    { href: "/features", label: "Features" },
+    { href: "/dashboard/integrations", label: "Integrations" },
+    { href: "/docs", label: "Docs" },
+    { href: "/faq", label: "FAQs" },
+    { href: "/blog", label: "Blog" },
+    { href: "/contact", label: "Contact" },
   ];
 
   return (

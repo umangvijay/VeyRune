@@ -20,7 +20,7 @@ export default function AboutPage() {
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24 text-left">
-          <div className="glass-card p-8 md:p-10 border-t-4 md:border-t-0 md:border-l-4 border-t-[var(--accent-pink)] md:border-l-[var(--accent-pink)]">
+          <div data-scroll-reveal className="glass-card p-8 md:p-10 border-t-4 md:border-t-0 md:border-l-4 border-t-[var(--accent-pink)] md:border-l-[var(--accent-pink)]">
             <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
             <p className="text-[var(--text-secondary)] leading-relaxed">
               Our mission is to bridge the gap between static automation platforms and true artificial general intelligence.
@@ -28,7 +28,7 @@ export default function AboutPage() {
               searches for missing capabilities, reads documentation, and physically writes the software it needs to accomplish your goal.
             </p>
           </div>
-          <div className="glass-card p-8 md:p-10 border-t-4 md:border-t-0 md:border-l-4 border-t-[var(--accent-purple)] md:border-l-[var(--accent-purple)]">
+          <div data-scroll-reveal className="glass-card p-8 md:p-10 border-t-4 md:border-t-0 md:border-l-4 border-t-[var(--accent-purple)] md:border-l-[var(--accent-purple)]">
             <h2 className="text-2xl font-bold mb-4">The Vision</h2>
             <p className="text-[var(--text-secondary)] leading-relaxed">
               By leveraging the Google Gemini ADK and dynamic Model Context Protocol (MCP) generation, we are making the world&apos;s
@@ -56,7 +56,7 @@ export default function AboutPage() {
         </div>
 
         {/* The Journey */}
-        <div className="glass-card p-8 md:p-14 mb-20 text-center">
+        <div data-scroll-reveal className="glass-card p-8 md:p-14 mb-20 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">The Sandtable Journey</h2>
           <p className="text-lg md:text-xl text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto">
             Born out of a Google DevPost hackathon, Sandtable started as an ambitious idea to combine LangChain-style reasoning

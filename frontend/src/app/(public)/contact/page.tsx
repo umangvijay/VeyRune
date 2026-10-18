@@ -68,7 +68,7 @@ export default function ContactPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-          <div className="glass-panel glass-lift p-6 md:p-10 border-t-4 border-[var(--accent-pink)] animate-fade-in-up">
+          <div data-scroll-reveal className="glass-panel glass-lift p-6 md:p-10 border-t-4 border-[var(--accent-pink)] animate-fade-in-up">
             <h2 className="text-xl md:text-2xl font-bold mb-6">Connect with us</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
               <div>
@@ -92,7 +92,7 @@ export default function ContactPage() {
             </div>
           </div>
 
-          <div className="glass-panel glass-lift p-6 md:p-10 border-t-4 border-[var(--accent-purple)] animate-fade-in-up" style={{ animationDelay: "80ms" }}>
+          <div data-scroll-reveal className="glass-panel glass-lift p-6 md:p-10 border-t-4 border-[var(--accent-purple)] animate-fade-in-up" style={{ animationDelay: "80ms" }}>
             <h2 className="text-xl md:text-2xl font-bold mb-6">Send a Message</h2>
             {smtpReady === false && (
               <div style={{ padding: 12, marginBottom: 16, background: "var(--warning-subtle, rgba(245,158,11,0.12))", color: "var(--text-secondary)", borderRadius: 12, fontSize: 13, lineHeight: 1.5 }}>

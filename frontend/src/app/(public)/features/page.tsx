@@ -35,7 +35,7 @@ export default function FeaturesPage() {
             </ul>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
-            <div className="glass-card" style={{ padding: 12, width: "100%", height: "auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12 }}>
+            <div data-scroll-reveal className="glass-card" style={{ padding: 12, width: "100%", height: "auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12 }}>
               <Image src="/images/workflow-sketch.png" alt="Workflow Sketch" width={600} height={400} style={{ width: "100%", height: "auto", objectFit: "contain", filter: "invert(1) opacity(0.8)", borderRadius: 6 }} />
             </div>
             <div style={{ fontFamily: "var(--font-mono)", color: "var(--accent-pink)", textAlign: "center" }}>Illustrative connector build</div>
@@ -45,7 +45,7 @@ export default function FeaturesPage() {
         {/* Multi-Agent Orchestration */}
         <div className="flex flex-col-reverse md:flex-row gap-10 md:gap-16 mb-20 md:mb-24 text-left items-center">
           <div className="flex flex-col gap-4 items-center w-full md:w-1/2">
-            <div className="glass-card p-3 w-full h-auto flex items-center justify-center rounded-xl">
+            <div data-scroll-reveal className="glass-card p-3 w-full h-auto flex items-center justify-center rounded-xl">
               <Image src="/images/network-sketch.png" alt="Network Sketch" width={600} height={400} className="w-full h-auto object-contain rounded-md" style={{ filter: "invert(1) opacity(0.8)" }} />
             </div>
             <div className="font-mono text-[var(--accent-purple)] text-center text-sm md:text-base">Illustrative specialist routing</div>

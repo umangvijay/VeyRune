@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.1.0 — 2026-10-18
+
+### The Planet threads the blueprints
+- **The Planet**: a drafting globe (prussian body, blueprint graticule —
+  meridians and parallels) turning slowly in the hall, weaving **threads**
+  that arc to every sheet and draw stitch by stitch — the blueprints are
+  threaded into existence by the planet.
+- Home headline reduced so the hall reads; the hero card **floats gently**
+  up and down (7s cycle, reduce-data aware).
+- **Public nav restored**: About Us · Features · Integrations · Docs ·
+  FAQs · Blog · Contact.
+- **Docs page re-papered**: the shared backdrop is now cyanotype drafting
+  paper (blue grid on near-black / pale paper) for every public page —
+  docs, about, features, faqs, blog, contact, integrations all match.
+- **Scroll reveals** across public pages (glass panels and sections fade
+  up as you scroll).
+
 ## v3.0.0 — 2026-10-18
 
 ### The Drafting Works, faithful to the spec
