@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.6.0 — 2026-10-18
+
+### The scene IS the navigation (interactive observatory)
+- **Click-to-zoom**: clicking a blueprint sheet or wireframe structure dollies
+  the camera in and raises a focus readout — "SHEET-002 // EXECUTION PLAN ·
+  OPEN BUILDS →" — linking straight into the matching module. Click the hall
+  or press Esc to pull back. Hover highlights targets with a lens cursor;
+  the camera drifts with the pointer (observatory parallax).
+- **Observatory chrome**: film-grain overlay (SVG turbulence), frosted glass
+  panels, bracketed/chipped console frames (corner brackets in the accent
+  blue), HUD chips in mono.
+- **Palette**: light-blue accent (#8ab4ff dark / prussian light) with a
+  single warm-orange accent reserved for the human-approval surfaces
+  (FOR APPROVAL stamp, ENGINE lamp, APPROVALS chip).
+- **Home tightened**: the scene shows through (pass-through UI layer — the
+  fix that made click-to-zoom possible at all), panels concise, secondary
+  page links (About/Features/Docs/FAQs/Contact) under the module dock.
+
 ## v2.5.0 — 2026-10-18
 
 ### SANDTABLE — "The Drafting Works" (Cyanotype redesign)
