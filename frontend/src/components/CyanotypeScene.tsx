@@ -365,15 +365,49 @@ function Thread({
     return { line: new THREE.Line(geometry, mat), material: mat };
   }, [curve, c.line]);
 
+  // the weaving node: a glow sprite riding the draw head — the planet's
+  // draughtsman, stitching the thread onto the sheet
+  const node = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(190,215,255,1)");
+    g.addColorStop(0.25, "rgba(120,160,255,0.9)");
+    g.addColorStop(1, "rgba(62,107,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }));
+    sprite.scale.setScalar(0.42);
+    return sprite;
+  }, []);
+
   useFrame(() => {
     const t = (hallTime.current * speed + offset) % 1.35;
     const head = Math.min(1, t);
     const pts = curve.getPoints(Math.max(2, Math.ceil(head * 60)));
     line.geometry.setFromPoints(pts);
     material.opacity = t > 1 ? 0.25 : 0.9;
+    // the weaving node rides the draw head; hides while the thread holds
+    if (t <= 1) {
+      node.position.copy(curve.getPoint(head));
+      node.visible = true;
+    } else {
+      node.visible = false;
+    }
   });
 
-  return <primitive object={line} />;
+  return (
+    <>
+      <primitive object={line} />
+      <primitive object={node} />
+    </>
+  );
 }
 
 /** Graphite dust — sparse drifting points (not a starfield). */

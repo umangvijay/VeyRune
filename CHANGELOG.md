@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.2.0 — 2026-10-18
+
+### Fixes + the weaving node
+- **Integrations nav link** now opens the public Integrations page
+  (it previously bounced logged-out visitors to sign-in).
+- **Thread weaving nodes**: a glow sprite rides the draw head of each
+  planet-thread — the draughtsman stitching the blueprint onto the sheet
+  is now visible, then hides while the thread holds.
+- Get Started → workspace verified end-to-end in a real browser with the
+  backend running (guest creation → /dashboard); note for local runs: the
+  backend must allow the frontend origin (CORS_ALLOWED_ORIGINS).
+
 ## v3.1.0 — 2026-10-18
 
 ### The Planet threads the blueprints

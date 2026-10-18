@@ -57,7 +57,7 @@ export default function PublicNavbar() {
   const navLinks = [
     { href: "/about", label: "About Us" },
     { href: "/features", label: "Features" },
-    { href: "/dashboard/integrations", label: "Integrations" },
+    { href: "/integrations", label: "Integrations" },
     { href: "/docs", label: "Docs" },
     { href: "/faq", label: "FAQs" },
     { href: "/blog", label: "Blog" },
