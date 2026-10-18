@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { getSettings, updateSettings, UserSettings, storeCredential, validateCredential, pingGemini, listAdminUsers, setUserActive, adminStats } from "@/lib/api";
 import ApiKeyManager from "@/components/ApiKeyManager";
+import TokenStatusCard from "@/components/TokenStatusCard";
+import { applyTheme, readThemePref, type ThemePref } from "@/lib/theme";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
@@ -86,9 +88,7 @@ export default function SettingsPage() {
       }
 
       // Apply theme immediately and persist for first-paint
-      const theme = settings.theme || "light";
-      document.documentElement.setAttribute("data-theme", theme);
-      try { localStorage.setItem("agentos_theme", theme); } catch { /* ignore */ }
+      applyTheme((settings.theme as ThemePref) || "system");
 
       setMessage({ text: "Settings saved successfully", type: "success" });
     } catch (err: unknown) {
@@ -147,7 +147,7 @@ export default function SettingsPage() {
     <div className="animate-fade-in" style={{ maxWidth: 800, margin: "0 auto" }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700 }}>Settings</h1>
-        <p style={{ color: "var(--text-secondary)" }}>Manage your account and Veyrune preferences.</p>
+        <p style={{ color: "var(--text-secondary)" }}>Manage your account and Yantrika preferences.</p>
       <div style={{ marginTop: 14 }}>
         <span className="trust-badge">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" /></svg>
@@ -251,6 +251,8 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        <TokenStatusCard />
+
         <div className="glass-card" style={{ padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, borderBottom: "1px solid var(--border-primary)", paddingBottom: 12 }}>
             Model API key
@@ -293,15 +295,15 @@ export default function SettingsPage() {
                 className="input"
                 value={settings?.theme || "light"}
                 onChange={e => {
-                  const theme = e.target.value;
+                  const theme = e.target.value as ThemePref;
                   setSettings(s => s ? {...s, theme} : s);
                   // Apply instantly so the user sees the change before saving.
-                  document.documentElement.setAttribute("data-theme", theme);
-                  try { localStorage.setItem("agentos_theme", theme); } catch { /* ignore */ }
+                  applyTheme(theme);
                 }}
               >
-                <option value="light">Light Theme</option>
-                <option value="dark">Dark Theme</option>
+                <option value="system">System (auto)</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
               </select>
             </div>
             <div style={{ flex: 1 }}>

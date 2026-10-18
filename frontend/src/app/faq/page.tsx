@@ -8,7 +8,7 @@ const GROUPS = [
   {
     title: "Getting started",
     faqs: [
-      { q: "What is Veyrune?", a: "Veyrune is an autonomous workspace. You describe a goal; it plans a DAG, builds any missing HTTP tools (MCP), and executes against live systems. The UI is chat-shaped like ChatGPT, but the engine is a planner plus factory plus executor — not a canned Q&A bot." },
+      { q: "What is Yantrika?", a: "Yantrika is an autonomous workspace. You describe a goal; it plans a DAG, builds any missing HTTP tools (MCP), and executes against live systems. The UI is chat-shaped like ChatGPT, but the engine is a planner plus factory plus executor — not a canned Q&A bot." },
       { q: "How do I try it for free?", a: "Click Get started for free or Start building free. That creates a guest session and opens the dashboard. Use Back to home on Sign in if you landed on login by mistake." },
       { q: "Why did Get started used to hang?", a: "Guest provisioning now waits for auth, times out, and offers retry. If it still fails, Sign in or Create an account." },
     ],

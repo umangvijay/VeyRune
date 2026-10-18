@@ -25,7 +25,7 @@ export default function TermsPage() {
                 Acceptance of Terms
               </h2>
               <p>
-                By accessing or using the Veyrune platform, you agree to be bound by these Terms of Service. If you do not agree to all the terms and conditions, you must not use our services.
+                By accessing or using the Yantrika platform, you agree to be bound by these Terms of Service. If you do not agree to all the terms and conditions, you must not use our services.
               </p>
             </section>
 
@@ -35,7 +35,7 @@ export default function TermsPage() {
                 Description of Service
               </h2>
               <p>
-                Veyrune provides a platform for building, deploying, and managing autonomous AI agents and workflows. You understand and agree that the Service is provided &quot;AS-IS&quot; and that Veyrune assumes no responsibility for the timeliness, deletion, or failure to store any user configurations or communications.
+                Yantrika provides a platform for building, deploying, and managing autonomous AI agents and workflows. You understand and agree that the Service is provided &quot;AS-IS&quot; and that Yantrika assumes no responsibility for the timeliness, deletion, or failure to store any user configurations or communications.
               </p>
             </section>
 
@@ -55,7 +55,7 @@ export default function TermsPage() {
                 Limitation of Liability
               </h2>
               <p>
-                In no event shall Veyrune be liable for any direct, indirect, incidental, special, consequential, or exemplary damages resulting from the use or the inability to use the Service.
+                In no event shall Yantrika be liable for any direct, indirect, incidental, special, consequential, or exemplary damages resulting from the use or the inability to use the Service.
               </p>
             </section>
           </div>

@@ -26,24 +26,24 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "";
 
 export const metadata: Metadata = {
   title: {
-    default: "Veyrune — A workspace that builds its own tools",
-    template: "%s · Veyrune",
+    default: "Yantrika — A workspace that builds its own tools",
+    template: "%s · Yantrika",
   },
   description:
-    "Veyrune turns goals into reviewed, executable workflows and can build missing API tools along the way.",
+    "Yantrika turns goals into reviewed, executable workflows and can build missing API tools along the way.",
   keywords: ["AI", "autonomous", "workspace", "agents", "MCP", "integrations", "automation"],
   ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   openGraph: {
-    title: "Veyrune — A workspace that builds its own tools",
-    description: "Turn a goal into a workflow. Veyrune can build missing API tools, execute the work, and keep people in control.",
+    title: "Yantrika — A workspace that builds its own tools",
+    description: "Turn a goal into a workflow. Yantrika can build missing API tools, execute the work, and keep people in control.",
     type: "website",
-    siteName: "Veyrune",
+    siteName: "Yantrika",
     ...(SITE_URL ? { url: SITE_URL } : {}),
   },
   twitter: {
     card: "summary_large_image",
-    title: "Veyrune — A workspace that builds its own tools",
-    description: "Turn a goal into a workflow. Veyrune can build missing API tools, execute the work, and keep people in control.",
+    title: "Yantrika — A workspace that builds its own tools",
+    description: "Turn a goal into a workflow. Yantrika can build missing API tools, execute the work, and keep people in control.",
   },
 };
 
@@ -58,7 +58,7 @@ export default function RootLayout({
         {/* First-paint theme: apply before React hydrates to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('agentos_theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('agentos_theme');if(t!=='light'&&t!=='dark'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`,
           }}
         />
         <AppProviders>

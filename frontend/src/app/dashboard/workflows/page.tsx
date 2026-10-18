@@ -103,7 +103,7 @@ export default function WorkflowsPage() {
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
           <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No workflows yet</h3>
-          <p style={{ marginBottom: 24 }}>Start by giving Veyrune a goal.</p>
+          <p style={{ marginBottom: 24 }}>Start by giving Yantrika a goal.</p>
           <Link href="/dashboard" className="btn btn-primary">Create Workflow</Link>
         </div>
       )}

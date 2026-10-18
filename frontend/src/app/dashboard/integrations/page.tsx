@@ -103,7 +103,7 @@ export default function IntegrationsPage() {
             <path d="M12 4v16m8-8H4" />
           </svg>
           <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No integrations</h3>
-          <p style={{ marginBottom: 24 }}>Connect Veyrune to external services by building an MCP.</p>
+          <p style={{ marginBottom: 24 }}>Connect Yantrika to external services by building an MCP.</p>
           <Link href="/dashboard/integrations/create" className="btn btn-primary">Build Integration</Link>
         </div>
       )}

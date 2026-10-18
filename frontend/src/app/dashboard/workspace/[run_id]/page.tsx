@@ -133,7 +133,7 @@ function TurnView({ workflow }: { workflow: WorkflowRun }) {
       <UserBubble goal={workflow.goal} />
       {replies.map(({ task, text }) => (
         <div key={`${workflow.run_id}-out-${task.task_id}`} style={bubbleStyle("agent")}>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>Veyrune</div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>Yantrika</div>
           <div className="agent-markdown">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{text!}</ReactMarkdown>
           </div>
@@ -141,7 +141,7 @@ function TurnView({ workflow }: { workflow: WorkflowRun }) {
       ))}
       {failed.map((t) => (
         <div key={`${workflow.run_id}-fail-${t.task_id}`} style={bubbleStyle("agent")}>
-          <div style={{ fontSize: 11, color: "var(--error)", marginBottom: 6 }}>Veyrune</div>
+          <div style={{ fontSize: 11, color: "var(--error)", marginBottom: 6 }}>Yantrika</div>
           <div style={{ fontSize: 14, lineHeight: 1.55 }}>{t.error || "That step failed. Try again or rephrase the goal."}</div>
         </div>
       ))}
@@ -151,7 +151,7 @@ function TurnView({ workflow }: { workflow: WorkflowRun }) {
           <div style={{ fontSize: 14, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
             {typeof t.output_data?.message === "string"
               ? t.output_data.message
-              : "Complete the CAPTCHA, OTP, or MFA in the browser window, then click Resume. Veyrune will not fill those fields."}
+              : "Complete the CAPTCHA, OTP, or MFA in the browser window, then click Resume. Yantrika will not fill those fields."}
           </div>
         </div>
       ))}
@@ -165,7 +165,7 @@ function TurnView({ workflow }: { workflow: WorkflowRun }) {
       )}
       {isTerminal(workflow.status) && workflow.status === "FAILED" && replies.length === 0 && failed.length === 0 && (
         <div style={bubbleStyle("agent")}>
-          <div style={{ fontSize: 11, color: "var(--error)", marginBottom: 6 }}>Veyrune</div>
+          <div style={{ fontSize: 11, color: "var(--error)", marginBottom: 6 }}>Yantrika</div>
           <div style={{ fontSize: 14, lineHeight: 1.55 }}>That run failed before a reply was written. Try sending again.</div>
         </div>
       )}
@@ -372,7 +372,7 @@ export default function WorkspaceChatPage() {
 
       {waitingHuman && (
         <div className="glass-panel animate-fade-in" style={{ padding: 14, marginBottom: 12, border: "1px solid rgba(245,158,11,0.4)" }}>
-          Complete CAPTCHA, OTP, or MFA in the browser window Veyrune opened. It will not fill those fields. Then click Resume.
+          Complete CAPTCHA, OTP, or MFA in the browser window Yantrika opened. It will not fill those fields. Then click Resume.
         </div>
       )}
 
@@ -426,7 +426,7 @@ export default function WorkspaceChatPage() {
           </p>
         )}
         {busy && (
-          <p className="composer-hint" style={{ textAlign: "center", marginBottom: 8 }}>Veyrune is working on this. You can send the next message when it finishes.</p>
+          <p className="composer-hint" style={{ textAlign: "center", marginBottom: 8 }}>Yantrika is working on this. You can send the next message when it finishes.</p>
         )}
         <ChatComposer
           compact

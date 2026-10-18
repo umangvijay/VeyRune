@@ -18,7 +18,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     # ── Application ──────────────────────────────────────────────
     APP_ENV: str = "development"
-    APP_NAME: str = "AgentOS"
+    APP_NAME: str = "Yantrika"   # product name; repo/package identity remains AgentOS
     LOCAL_WORKER_CONCURRENCY: int = Field(default=4, ge=1, le=32)
 
     API_HOST: str = "0.0.0.0"
@@ -134,7 +134,7 @@ class Settings(BaseSettings):
 
     # User-Agent for site-health probes. Some sites (e.g. Wikipedia) reject
     # generic datacenter-UA requests; a descriptive UA raises the success rate.
-    HEALTH_USER_AGENT: str = "Mozilla/5.0 (compatible; VeyruneHealth/2.0; +https://veyrune.app/bot)"
+    HEALTH_USER_AGENT: str = "Mozilla/5.0 (compatible; YantrikaHealth/2.0; +https://yantrika.app/bot)"
 
     # ── Data retention (enterprise control) ──────────────────────
     # Days to keep timeline events and audit-log rows; 0 disables purging.

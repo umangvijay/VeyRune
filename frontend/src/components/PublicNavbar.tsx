@@ -22,24 +22,24 @@ export default function PublicNavbar() {
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      "/": "Home · Veyrune",
-      "/about": "About · Veyrune",
-      "/features": "Features · Veyrune",
-      "/integrations": "Integrations · Veyrune",
-      "/docs": "Docs · Veyrune",
-      "/faq": "FAQs · Veyrune",
-      "/blog": "Blog · Veyrune",
-      "/contact": "Contact · Veyrune",
-      "/pricing": "Pricing · Veyrune",
-      "/community": "Community · Veyrune",
-      "/privacy": "Privacy · Veyrune",
-      "/terms": "Terms · Veyrune",
-      "/get-started": "Get started · Veyrune",
-      "/login": "Sign in · Veyrune",
-      "/signup": "Sign up · Veyrune",
+      "/": "Home · Yantrika",
+      "/about": "About · Yantrika",
+      "/features": "Features · Yantrika",
+      "/integrations": "Integrations · Yantrika",
+      "/docs": "Docs · Yantrika",
+      "/faq": "FAQs · Yantrika",
+      "/blog": "Blog · Yantrika",
+      "/contact": "Contact · Yantrika",
+      "/pricing": "Pricing · Yantrika",
+      "/community": "Community · Yantrika",
+      "/privacy": "Privacy · Yantrika",
+      "/terms": "Terms · Yantrika",
+      "/get-started": "Get started · Yantrika",
+      "/login": "Sign in · Yantrika",
+      "/signup": "Sign up · Yantrika",
     };
     if (titles[pathname]) document.title = titles[pathname];
-    else if (pathname.startsWith("/docs/")) document.title = "Docs · Veyrune";
+    else if (pathname.startsWith("/docs/")) document.title = "Docs · Yantrika";
   }, [pathname]);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function PublicNavbar() {
         boxShadow: "0 8px 30px rgba(43,42,39,0.04)",
         gap: 16,
       }}>
-        <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }} aria-label="Veyrune Home">
+        <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }} aria-label="Yantrika Home">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 32, height: 32, borderRadius: "8px",
@@ -93,7 +93,7 @@ export default function PublicNavbar() {
               V
             </div>
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">
-              Veyrune
+              Yantrika
             </span>
           </div>
         </Link>

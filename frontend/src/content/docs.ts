@@ -17,7 +17,7 @@ export const DOC_PAGES: {
     sections: [
       {
         h: "What you can ask",
-        p: "Veyrune is a workspace, not a chatbot with canned replies. Every run hits live systems: HTTP APIs, site health, email, a real browser, code debug, project generation, and ATS resumes.",
+        p: "Yantrika is a workspace, not a chatbot with canned replies. Every run hits live systems: HTTP APIs, site health, email, a real browser, code debug, project generation, and ATS resumes.",
         bullets: [
           "Check whether a public site is up, how fast it is, and which security headers it is missing.",
           "Build tools for any HTTP API from OpenAPI, a docs URL, or a description — then call those tools in the same run.",
@@ -54,13 +54,13 @@ export const DOC_PAGES: {
   {
     slug: "mcp-builder",
     title: "MCP tool creation",
-    blurb: "If a tool is missing, Veyrune builds it, probes it live, registers it, then uses it.",
+    blurb: "If a tool is missing, Yantrika builds it, probes it live, registers it, then uses it.",
     diagram: ["Spec / URL / prompt", "Normalize", "Live probe", "Register MCP", "Call tool"],
     image: "/docs/mcp-builder.svg",
     sections: [
       {
         h: "Why this exists",
-        p: "Most agents are limited to a hardcoded catalog. Veyrune treats any HTTP API as a candidate. The factory is the product — Stripe or GitHub in screenshots are examples, not the ceiling.",
+        p: "Most agents are limited to a hardcoded catalog. Yantrika treats any HTTP API as a candidate. The factory is the product — Stripe or GitHub in screenshots are examples, not the ceiling.",
       },
       {
         h: "Three ways to build",
@@ -94,11 +94,11 @@ export const DOC_PAGES: {
       },
       {
         h: "Direct health runs",
-        p: "If you ask to check the health of a URL, Veyrune can skip the planner and run core.health immediately. That path still works when Gemini quota is exhausted.",
+        p: "If you ask to check the health of a URL, Yantrika can skip the planner and run core.health immediately. That path still works when Gemini quota is exhausted.",
       },
       {
         h: "Browser",
-        p: "When there is no API, Chromium follows observe → decide → act on the starting domain only. Vault secrets fill login fields. CAPTCHA, OTP, and MFA pause the run: you complete them in the agent’s browser, then Resume. Veyrune does not solve or bypass those checks.",
+        p: "When there is no API, Chromium follows observe → decide → act on the starting domain only. Vault secrets fill login fields. CAPTCHA, OTP, and MFA pause the run: you complete them in the agent’s browser, then Resume. Yantrika does not solve or bypass those checks.",
       },
       {
         h: "Schedules and approvals",
@@ -195,7 +195,7 @@ export const DOC_PAGES: {
       },
       {
         h: "Fallback",
-        p: "If no user key is stored, Veyrune uses GEMINI_API_KEY from the server environment.",
+        p: "If no user key is stored, Yantrika uses GEMINI_API_KEY from the server environment.",
       },
     ],
   },
@@ -241,7 +241,7 @@ export const DOC_PAGES: {
       },
       {
         h: "CAPTCHA, OTP, MFA",
-        p: "These are human-only. The workflow pauses (WAITING_APPROVAL). Complete the check in the open browser, then Resume. Veyrune will not fill those fields.",
+        p: "These are human-only. The workflow pauses (WAITING_APPROVAL). Complete the check in the open browser, then Resume. Yantrika will not fill those fields.",
       },
       {
         h: "Gmail and .env",
@@ -258,7 +258,7 @@ export const DOC_PAGES: {
     sections: [
       {
         h: "Credits and Vertex",
-        p: "Redeem the code on the billing account, link one project, leave GEMINI_API_KEY empty so Veyrune uses Vertex AI on that project (higher RPM/TPM, paid from the grant). Do not paste an AI Studio key on Cloud Run if you want Vertex quotas.",
+        p: "Redeem the code on the billing account, link one project, leave GEMINI_API_KEY empty so Yantrika uses Vertex AI on that project (higher RPM/TPM, paid from the grant). Do not paste an AI Studio key on Cloud Run if you want Vertex quotas.",
       },
       {
         h: "Kill switch at $100",

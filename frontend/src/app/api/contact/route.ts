@@ -37,7 +37,7 @@ export async function GET() {
       setup: data.setup || "",
     });
   } catch {
-    return NextResponse.json({ smtp_configured: false, to: TO, setup: "Start the Veyrune backend, then set CONTACT_SMTP_PASSWORD in .env." });
+    return NextResponse.json({ smtp_configured: false, to: TO, setup: "Start the Yantrika backend, then set CONTACT_SMTP_PASSWORD in .env." });
   }
 }
 

@@ -26,7 +26,16 @@
   --border-focus: rgba(98, 119, 92, 0.48);
 
   /* ── Accent colors (Dusty Pink / Coral) ─────────────────── */
-  --accent: #7187a7;
+  --accent: #56749c;
+  /* Yantrika forge identity: brass/ember on steel */
+  --ember: #b97a2e;
+  --ember-bright: #d89a45;
+  --steel: #56749c;
+  --forge-grad: linear-gradient(135deg, #56749c 0%, #6d87a8 45%, #b97a2e 100%);
+  --bevel-light: rgba(255, 255, 255, 0.85);
+  --bevel-dark: rgba(47, 57, 46, 0.22);
+  --depth-edge: 0 1px 0 rgba(255, 255, 255, 0.65) inset, 0 -2px 6px rgba(47, 57, 46, 0.10) inset;
+  --depth-float: 0 1px 0 rgba(255,255,255,.7) inset, 0 -2px 8px rgba(47,57,46,.08) inset, 0 14px 34px -14px rgba(47,57,46,.35), 0 4px 12px -6px rgba(47,57,46,.25);
   --accent-purple: #9a91ad;
   --accent-pink: #c18470;
   
@@ -76,6 +85,11 @@
   --border-focus: rgba(216, 133, 143, 0.5);
 
   --accent: #e8939d;
+  /* forge identity (dark): molten ember over graphite */
+  --ember: #e8a34b;
+  --ember-bright: #f4bc6e;
+  --steel: #7fb7d9;
+  --forge-grad: linear-gradient(135deg, #2a3140 0%, #43506b 55%, #7a4a1c 100%);
   --accent-purple: #b9a3e8;
   --accent-pink: #e8939d;
 
@@ -1690,3 +1704,179 @@ body {
 .rail-pill:hover .rail-reply { display: block; }
 .workspace-chat { position: relative; }
 .admin-tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 28px; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   YANTRIKA 3D FORGE LAYER
+   Material depth: beveled glass, metallic edges, perspective tilt.
+   Opt-in via .panel-3d / .tilt-3d; .glass-card gains thickness.
+   ════════════════════════════════════════════════════════════════ */
+
+.glass-card {
+  /* material thickness: a lit top bevel + a dark underside edge */
+  box-shadow:
+    var(--depth-edge),
+    var(--shadow-lg);
+}
+
+.glass-card:hover {
+  box-shadow:
+    var(--depth-float);
+  transform: translateY(-1px);
+}
+
+/* Perspective wrapper + tilting card: real 3D on hover, GPU-cheap */
+.tilt-scene {
+  perspective: 900px;
+}
+
+.panel-3d {
+  transform-style: preserve-3d;
+  transition: transform .5s cubic-bezier(.2,.7,.2,1), box-shadow .5s;
+  will-change: transform;
+}
+
+.panel-3d:hover {
+  transform: rotateX(2.2deg) rotateY(-2.2deg) translateZ(8px);
+}
+
+.panel-3d::after {
+  /* specular sheen that reads as a rendered surface */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,0) 34%);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .panel-3d::after {
+  background: linear-gradient(115deg, rgba(160,200,255,.10) 0%, rgba(255,255,255,0) 38%);
+}
+
+/* Metallic primary action: brushed gradient + pressed depth */
+.btn-primary {
+  background: var(--forge-grad);
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.35) inset,
+    0 -2px 6px rgba(0,0,0,.22) inset,
+    0 10px 22px -10px rgba(60,80,120,.55);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,.3) inset;
+}
+
+/* The animated forge core: a CSS-3D yantra — three counter-rotating
+   rings + a core that breathe. Pure transforms; no canvas, no libs. */
+.forge-scene {
+  perspective: 720px;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+}
+
+.forge-ring {
+  position: absolute;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--steel) 55%, transparent);
+  border-top-color: var(--ember-bright);
+  border-right-color: color-mix(in srgb, var(--ember) 65%, transparent);
+  box-shadow:
+    0 0 22px -6px color-mix(in srgb, var(--ember) 45%, transparent),
+    0 0 8px -2px color-mix(in srgb, var(--steel) 55%, transparent) inset;
+  transform: rotateX(66deg);
+  animation: forge-spin 9s linear infinite;
+}
+
+.forge-ring.r2 {
+  width: 84%;
+  transform: rotateX(66deg) rotateY(18deg);
+  animation-duration: 14s;
+  animation-direction: reverse;
+  border-top-color: color-mix(in srgb, var(--steel) 85%, white);
+}
+
+.forge-ring.r3 {
+  width: 44%;
+  transform: rotateX(66deg) rotateY(-24deg);
+  animation-duration: 6s;
+}
+
+.forge-core {
+  position: relative;
+  width: 16%;
+  aspect-ratio: 1;
+  border-radius: 26%;
+  background: var(--forge-grad);
+  transform: rotateX(58deg) rotateZ(45deg);
+  box-shadow:
+    0 0 34px -4px color-mix(in srgb, var(--ember) 65%, transparent),
+    0 1px 0 rgba(255,255,255,.5) inset;
+  animation: forge-breathe 4.5s ease-in-out infinite;
+}
+
+.forge-core::before {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: inherit;
+  background: rgba(255,255,255,.22);
+  filter: blur(2px);
+}
+
+@keyframes forge-spin {
+  from { transform: rotateX(66deg) rotateZ(0deg); }
+  to   { transform: rotateX(66deg) rotateZ(360deg); }
+}
+
+.forge-ring.r2 { animation-name: forge-spin-r2; }
+@keyframes forge-spin-r2 {
+  from { transform: rotateX(66deg) rotateY(18deg) rotateZ(0deg); }
+  to   { transform: rotateX(66deg) rotateY(18deg) rotateZ(-360deg); }
+}
+
+.forge-ring.r3 { animation-name: forge-spin-r3; }
+@keyframes forge-spin-r3 {
+  from { transform: rotateX(66deg) rotateY(-24deg) rotateZ(0deg); }
+  to   { transform: rotateX(66deg) rotateY(-24deg) rotateZ(360deg); }
+}
+
+@keyframes forge-breathe {
+  0%, 100% { transform: rotateX(58deg) rotateZ(45deg) scale(1); }
+  50%      { transform: rotateX(58deg) rotateZ(45deg) scale(1.12); }
+}
+
+:root.reduce-data .forge-ring,
+:root.reduce-data .forge-core {
+  animation-duration: 0s !important;
+}
+
+/* Brand lockup used in sidebar/auth */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark svg {
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--ember) 35%, transparent));
+}
+
+/* Hero: copy + forge core side by side on wide screens */
+@media (min-width: 900px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(240px, .65fr) !important;
+    text-align: left;
+  }
+  .hero-grid .home-command-pill,
+  .hero-grid .home-stage-ribbon { justify-content: flex-start; }
+  .hero-grid h1, .hero-grid p { margin-inline: 0; }
+}

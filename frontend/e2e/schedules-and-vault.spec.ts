@@ -94,7 +94,7 @@ test.describe('Vault (credentials) page', () => {
       if (path.endsWith('/credentials') && method === 'POST') {
         const body = route.request().postDataJSON() as { name: string };
         stored.push({ name: body.name });
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ name: body.name, stored: true }) });
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ name: body.name, fields: ['username', 'password'], stored: true }) });
         return;
       }
       if (path.endsWith('/notifications')) {
@@ -105,12 +105,16 @@ test.describe('Vault (credentials) page', () => {
     });
 
     await page.goto('/dashboard/credentials');
+    // Wait for React hydration: the submit handler only exists after it.
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('button', { name: /save/i })).toBeEnabled();
     await page.getByPlaceholder('mysite-login, github, smtp').fill('smoke-cred');
     const passwordInput = page.locator('input[type="password"]').last();
     await passwordInput.fill('S3cret!Value');
     await page.getByRole('button', { name: /save/i }).click();
 
-    await expect(page.getByText('smoke-cred')).toBeVisible();
+    await expect(page.getByText(/Stored “smoke-cred”/)).toBeVisible();
+    await expect(page.getByText('smoke-cred').first()).toBeVisible({ timeout: 5000 });
     const body = await page.locator('body').innerText();
     // Vault contract (audit): the raw value never appears in the DOM after save
     expect(body).not.toContain('S3cret!Value');

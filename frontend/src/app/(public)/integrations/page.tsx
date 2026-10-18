@@ -26,7 +26,7 @@ export default function PublicIntegrationsPage() {
             <p className="eyebrow">A connector is a result of the work</p>
             <h1>Start with the task.<br /><span className="gradient-text">Build the connection it needs.</span></h1>
             <p className="integration-lead">
-              Veyrune can build a connector from an API contract, documentation, or a clear description. It validates the tools before a workflow can use them, and asks you before sensitive actions.
+              Yantrika can build a connector from an API contract, documentation, or a clear description. It validates the tools before a workflow can use them, and asks you before sensitive actions.
             </p>
             <div className="integration-hero-actions">
               <Link href="/get-started" className="btn btn-primary btn-lg">Open workspace <span aria-hidden="true">↗</span></Link>

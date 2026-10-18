@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, ReactNode, useRef } from "react";
+import BrandMark from "@/components/BrandMark";
+import { applyTheme, watchSystemTheme, type ThemePref } from "@/lib/theme";
 import { getUnreadCount, listNotifications, markNotificationRead, markAllNotificationsRead, listWorkflows, Notification, WorkflowRun } from "@/lib/api";
 import ContextUsageButton from "@/components/ContextUsage";
 import { AmbientOrbs } from "@/components/GlassPanel";
@@ -149,14 +151,15 @@ function DashboardInner({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const { settings } = await import("@/lib/api").then((m) => m.getSettings());
-        const theme = settings?.theme || "light";
-        document.documentElement.setAttribute("data-theme", theme);
-        try { localStorage.setItem("agentos_theme", theme); } catch { /* ignore */ }
+        const theme = settings?.theme || "system";
+        applyTheme((theme as ThemePref) || "system");
       } catch {
         // Default to light if settings fail to load
       }
     })();
   }, [isAuthenticated]);
+
+  useEffect(() => watchSystemTheme(), []);
 
   useEffect(() => {
     // Route changes should close the transient mobile navigation drawer.
@@ -166,24 +169,24 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      "/dashboard": "New chat · Veyrune",
-      "/dashboard/workflows": "Runs · Veyrune",
-      "/dashboard/integrations": "Integrations · Veyrune",
-      "/dashboard/catalog": "Catalog · Veyrune",
-      "/dashboard/integrations/create": "Create MCP · Veyrune",
-      "/dashboard/agents": "Agents · Veyrune",
-      "/dashboard/studio": "Studio · Veyrune",
-      "/dashboard/resume": "Resume · Veyrune",
-      "/dashboard/credentials": "Vault · Veyrune",
-      "/dashboard/schedules": "Schedules · Veyrune",
-      "/dashboard/settings": "Settings · Veyrune",
-      "/dashboard/notifications": "Notifications · Veyrune",
+      "/dashboard": "New chat · Yantrika",
+      "/dashboard/workflows": "Runs · Yantrika",
+      "/dashboard/integrations": "Integrations · Yantrika",
+      "/dashboard/catalog": "Catalog · Yantrika",
+      "/dashboard/integrations/create": "Create MCP · Yantrika",
+      "/dashboard/agents": "Agents · Yantrika",
+      "/dashboard/studio": "Studio · Yantrika",
+      "/dashboard/resume": "Resume · Yantrika",
+      "/dashboard/credentials": "Vault · Yantrika",
+      "/dashboard/schedules": "Schedules · Yantrika",
+      "/dashboard/settings": "Settings · Yantrika",
+      "/dashboard/notifications": "Notifications · Yantrika",
     };
     if (titles[pathname]) document.title = titles[pathname];
-    else if (pathname.startsWith("/dashboard/workspace/")) document.title = "Chat · Veyrune";
-    else if (pathname.startsWith("/dashboard/workflows/")) document.title = "Run detail · Veyrune";
-    else if (pathname.startsWith("/dashboard/integrations/")) document.title = "Integration · Veyrune";
-    else if (pathname.startsWith("/dashboard")) document.title = "Dashboard · Veyrune";
+    else if (pathname.startsWith("/dashboard/workspace/")) document.title = "Chat · Yantrika";
+    else if (pathname.startsWith("/dashboard/workflows/")) document.title = "Run detail · Yantrika";
+    else if (pathname.startsWith("/dashboard/integrations/")) document.title = "Integration · Yantrika";
+    else if (pathname.startsWith("/dashboard")) document.title = "Dashboard · Yantrika";
   }, [pathname]);
 
   useEffect(() => {
@@ -340,7 +343,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
     return (
       <div className="mesh-gradient" style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div className="glass-card" style={{ textAlign: "center", maxWidth: 420, padding: 32 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Sign in to Veyrune</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Sign in to Yantrika</h1>
           <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
             The dashboard is for an authenticated session. Sign in, or Get Started as a guest.
           </p>
@@ -377,19 +380,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
             padding: "20px 16px", display: "flex", alignItems: "center",
             gap: 12, borderBottom: "1px solid var(--border-primary)",
           }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: "var(--radius-md)",
-              background: "linear-gradient(135deg, var(--accent), #8b5cf6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, fontWeight: 800, color: "white", flexShrink: 0,
-            }}>
-              V
-            </div>
-            {showLabels && (
-              <span style={{ fontSize: 18, fontWeight: 700 }} className="gradient-text">
-                Veyrune
-              </span>
-            )}
+            <BrandMark size={30} withWordmark={showLabels} />
+            {showLabels && <span style={{ display: "none" }} aria-hidden="true">Yantrika</span>}
           </div>
         </Link>
 

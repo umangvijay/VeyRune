@@ -9,10 +9,10 @@ const BAD_WORDS = [
 
 const DEFAULT_POSTS = [
   {
-    title: "Introducing Veyrune: the workspace that builds its own tools",
+    title: "Introducing Yantrika: the workspace that builds its own tools",
     date: "August 15, 2026",
     category: "Product",
-    excerpt: "Tell Veyrune a goal. It plans, builds missing app integrations, and executes with live data — not a hardcoded catalog.",
+    excerpt: "Tell Yantrika a goal. It plans, builds missing app integrations, and executes with live data — not a hardcoded catalog.",
   },
   {
     title: "How MCP creation works",
@@ -24,7 +24,7 @@ const DEFAULT_POSTS = [
     title: "Bring your own Gemini key",
     date: "August 10, 2026",
     category: "Guides",
-    excerpt: "Store a Gemini API key in Vault as `gemini` and Veyrune will use your quota for planning, generation, and MCP builds.",
+    excerpt: "Store a Gemini API key in Vault as `gemini` and Yantrika will use your quota for planning, generation, and MCP builds.",
   },
 ];
 

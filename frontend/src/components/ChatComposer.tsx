@@ -237,7 +237,7 @@ export default function ChatComposer({
           </div>
           <textarea
             className="input chat-input"
-            placeholder={disabled ? "Veyrune is working…" : "Ask anything. Veyrune will plan, build missing tools, and do the work."}
+            placeholder={disabled ? "Yantrika is working…" : "Ask anything. Yantrika will plan, build missing tools, and do the work."}
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             onKeyDown={(e) => {

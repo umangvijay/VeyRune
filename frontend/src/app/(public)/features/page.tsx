@@ -15,7 +15,7 @@ export default function FeaturesPage() {
           Features
         </h1>
         <p className="text-lg md:text-xl text-[var(--text-secondary)] leading-relaxed max-w-3xl mx-auto mb-16 md:mb-20">
-          Veyrune represents a paradigm shift from deterministic workflow engines to autonomous goal-oriented systems.
+          Yantrika represents a paradigm shift from deterministic workflow engines to autonomous goal-oriented systems.
           Explore the architecture that makes it possible.
         </p>
 
@@ -24,7 +24,7 @@ export default function FeaturesPage() {
           <div>
             <h2 className="text-3xl md:text-4xl font-extrabold mb-4">The Dynamic Builder</h2>
             <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-6">
-              Say goodbye to missing integrations. When you ask Veyrune to interact with an API it doesn&apos;t recognize, 
+              Say goodbye to missing integrations. When you ask Yantrika to interact with an API it doesn&apos;t recognize, 
               it dispatches a sub-agent to find the API documentation, understand the authentication requirements, 
               and generate validated API tool definitions that the workflow engine can call. When you need a portable deployment, export a standalone MCP server.
             </p>
@@ -53,7 +53,7 @@ export default function FeaturesPage() {
           <div className="w-full md:w-1/2">
             <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Multi-Agent Orchestration</h2>
             <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-6">
-              Veyrune doesn&apos;t rely on a single massive prompt. It utilizes a topology of specialized agents powered by Google&apos;s ADK.
+              Yantrika doesn&apos;t rely on a single massive prompt. It utilizes a topology of specialized agents powered by Google&apos;s ADK.
               The Intent Agent plans, the Orchestrator executes, the Research Agent gathers context, and the Recovery Agent handles failures.
             </p>
             <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 12, color: "var(--text-secondary)" }}>
@@ -75,9 +75,9 @@ export default function FeaturesPage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 800, color: "white"
             }}>V</div>
-            <span style={{ fontSize: 18, fontWeight: 800 }}>Veyrune</span>
+            <span style={{ fontSize: 18, fontWeight: 800 }}>Yantrika</span>
           </div>
-          <p>© 2026 Veyrune. All rights reserved.</p>
+          <p>© 2026 Yantrika. All rights reserved.</p>
         </div>
       </footer>
     </div>

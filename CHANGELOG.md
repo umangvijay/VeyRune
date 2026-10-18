@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.3.0 — 2026-10-18
+
+### Product renamed: Veyrune → **Yantrika**
+- Sanskrit *yantra* — "machine/instrument" — the workspace that builds its
+  own instruments. The historian tie: the 11th-century treatise
+  *Samarāṅgaṇa-sūtradhāra* catalogs yantra automata. All user-facing
+  surfaces renamed (117 replacements); repo/package identity stays AgentOS.
+
+### 3D forge design system
+- New design tokens: ember/steel identity, forge gradients, bevel + depth
+  shadows; glass cards gain material thickness and a lit top bevel.
+- `.panel-3d` perspective-tilt cards with specular sheen; metallic
+  primary buttons with pressed depth.
+- The **forge core**: a CSS-3D animated yantra (three counter-rotating
+  rings around a molten core) in the home hero and via the new BrandMark
+  (isometric yantra logo) in the sidebar, home footer, and auth.
+
+### Theme: light / dark / system
+- New resolver (`src/lib/theme.ts`): `system` follows the OS via
+  prefers-color-scheme with live updates; first-paint script resolves
+  before hydration; Settings gains the three-way selector.
+
+### BYOK + token information
+- New "Model & tokens" card on Settings: active provider + whose
+  credential is in use (BYOK status), 5h rolling-window usage vs your
+  daily budget with a progress bar and reset countdown.
+- 3 new unit tests (theme resolver) — **11 unit tests** total.
+
 ## v2.2.0 — 2026-10-18
 
 ### Organizations (enterprise RBAC foundation)

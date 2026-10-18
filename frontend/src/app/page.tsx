@@ -2,7 +2,9 @@ import Link from "next/link";
 import PublicNavbar from "@/components/PublicNavbar";
 import HomeWorkflowPreview from "@/components/HomeWorkflowPreview";
 
-export const metadata = { title: "Home · Veyrune" };
+import BrandMark from "@/components/BrandMark";
+
+export const metadata = { title: "Home · Yantrika" };
 
 export default function LandingPage() {
   return (
@@ -11,21 +13,22 @@ export default function LandingPage() {
         <PublicNavbar />
 
       <main className="px-4 pb-12 md:py-20 homepage-main" style={{ paddingTop: 32, textAlign: "center", position: "relative" }}>
-        <div style={{ zIndex: 10, width: "100%" }}>
+        <div style={{ zIndex: 10, width: "100%", display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 24, alignItems: "center" }} className="hero-grid">
+          <div>
           <div className="home-command-pill"><span className="home-status-dot" />OUTCOME-DRIVEN WORKSPACE <span className="home-command-divider">/</span> HUMAN-CONTROLLED</div>
           <p className="eyebrow">A workspace that grows with the work</p>
           <h1 className="mt-4 md:mt-10 apple-hero" style={{
             fontSize: "clamp(36px, 8vw, 84px)", fontWeight: 900, lineHeight: 1.05,
             letterSpacing: "-0.04em", marginBottom: 24, maxWidth: 1000, marginInline: "auto"
           }}>
-            Meet Veyrune.<br className="hidden md:block" />
+            Meet Yantrika.<br className="hidden md:block" />
             <span className="gradient-text">Workflows that make their own tools.</span>
           </h1>
           <p style={{
             fontSize: "clamp(18px, 2.5vw, 24px)", color: "var(--text-secondary)",
             marginBottom: 48, maxWidth: 700, margin: "0 auto 48px", fontWeight: 400
           }}>
-            Describe the outcome. Veyrune finds the path, creates a missing integration when it needs one, and keeps you in control of consequential actions.
+            Describe the outcome. Yantrika finds the path, creates a missing integration when it needs one, and keeps you in control of consequential actions.
           </p>
           <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
             <Link href="/get-started" className="btn btn-primary btn-lg">Start Building Free</Link>
@@ -34,6 +37,17 @@ export default function LandingPage() {
           </div>
           <div className="home-stage-ribbon" aria-label="Workflow stages">
             <span>Understand</span><i>→</i><span>Plan</span><i>→</i><span>Build what’s missing</span><i>→</i><span>Execute with review</span>
+          </div>
+          </div>
+
+          {/* The forge core: a CSS-3D yantra — three counter-rotating rings around a molten core */}
+          <div style={{ maxWidth: 360, width: "100%", margin: "0 auto", justifySelf: "center" }} aria-hidden="true">
+            <div className="forge-scene">
+              <div className="forge-ring r2" />
+              <div className="forge-ring r3" />
+              <div className="forge-ring" />
+              <div className="forge-core" />
+            </div>
           </div>
         </div>
 
@@ -121,20 +135,20 @@ export default function LandingPage() {
               Everything you need to <span className="gradient-text">automate anything.</span>
             </h2>
             <p style={{ fontSize: 20, color: "var(--text-secondary)", maxWidth: 600, margin: "0 auto" }}>
-              Veyrune combines model-guided planning with deterministic workflow execution.
+              Yantrika combines model-guided planning with deterministic workflow execution.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent-pink)]">
               <h3 className="text-xl md:text-2xl font-bold mb-4">Autonomous Planning</h3>
               <p className="text-[var(--text-secondary)] leading-relaxed">
-                Give Veyrune a high-level goal. It breaks it into tasks and routes them to the right capabilities.
+                Give Yantrika a high-level goal. It breaks it into tasks and routes them to the right capabilities.
               </p>
             </div>
             <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent-purple)]">
               <h3 className="text-xl md:text-2xl font-bold mb-4">Dynamic MCP Builder</h3>
               <p className="text-[var(--text-secondary)] leading-relaxed">
-                Missing an API connector? Veyrune can interpret an API spec, test a generated tool, and make it available to the run.
+                Missing an API connector? Yantrika can interpret an API spec, test a generated tool, and make it available to the run.
               </p>
             </div>
             <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent)]">
@@ -150,7 +164,7 @@ export default function LandingPage() {
       <section className="py-20 md:py-32 px-5 relative overflow-hidden">
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 80 }}>
-            <h2 style={{ fontSize: "clamp(32px, 5vw, 56px)", fontWeight: 800, marginBottom: 24 }}>How Veyrune Works</h2>
+            <h2 style={{ fontSize: "clamp(32px, 5vw, 56px)", fontWeight: 800, marginBottom: 24 }}>How Yantrika Works</h2>
             <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Illustrative examples · each run generates its own steps and outputs.</p>
           </div>
           <div className="flex flex-col gap-16 md:gap-24">
@@ -223,13 +237,8 @@ export default function LandingPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-10 md:gap-12" style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div className="col-span-2 lg:col-span-1 mb-2 lg:mb-0">
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              <div style={{
-                width: 24, height: 24, borderRadius: "6px",
-                background: "linear-gradient(135deg, var(--accent), var(--accent-pink))",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 800, color: "white"
-              }}>V</div>
-              <span style={{ fontSize: 18, fontWeight: 800 }}>Veyrune</span>
+              <BrandMark size={24} withWordmark={false} />
+              <span style={{ fontSize: 18, fontWeight: 800 }}>Yantrika</span>
             </div>
             <p style={{ color: "var(--text-tertiary)", fontSize: 14, lineHeight: 1.6 }}>
               The autonomous workspace that builds its own tools.
@@ -262,7 +271,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div style={{ maxWidth: 1200, margin: "48px auto 0", paddingTop: 32, borderTop: "1px solid var(--border-primary)" }}>
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>© 2026 Veyrune. All rights reserved.</p>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>© 2026 Yantrika. All rights reserved.</p>
         </div>
       </footer>
       </div>

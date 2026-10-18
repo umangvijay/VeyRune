@@ -11,7 +11,7 @@ export default function DocsIndexPage() {
       <main className="px-4 py-12 md:py-20" style={{ maxWidth: 1080, margin: "0 auto" }}>
         <p className="eyebrow">Documentation</p>
         <h1 className="gradient-text apple-hero" style={{ fontSize: "clamp(36px, 6vw, 64px)", fontWeight: 800, marginBottom: 12 }}>
-          How Veyrune works
+          How Yantrika works
         </h1>
         <p style={{ color: "var(--text-secondary)", fontSize: 18, maxWidth: 640, marginBottom: 40 }}>
           Plans, MCP creation, live execution, vaults, and your own API keys — with diagrams on every page.

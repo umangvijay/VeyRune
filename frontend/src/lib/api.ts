@@ -1,5 +1,5 @@
 /**
- * Veyrune — Typed API Client (PRODUCTION)
+ * Yantrika — Typed API Client (PRODUCTION)
  *
  * No hardcoded tokens. Uses real JWT from auth state.
  * Auto-refreshes expired tokens. All endpoints typed.
@@ -814,6 +814,8 @@ export interface ContextUsage {
   daily_limit: number;
   daily_used?: number;
   daily_remaining?: number;
+  window_hours?: number;
+  window_resets_at?: string;
   model: string;
   tool_count: number;
   categories: ContextCategory[];

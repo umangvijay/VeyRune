@@ -12,7 +12,7 @@ export default function GetStartedPage() {
   const started = useRef(false);
 
   useEffect(() => {
-    document.title = "Get started · Veyrune";
+    document.title = "Get started · Yantrika";
   }, []);
 
   useEffect(() => {
