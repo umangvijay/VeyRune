@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.8.0 — 2026-10-18
+
+### Observatory chrome + ambient hall (zoom removed by design)
+- **Click-to-zoom removed** — the scene is pure atmosphere now: pointer
+  parallax (the hall drifts as you move), sheets that breathe and
+  **unfold** (rotation oscillates open like a drawing being spread), three
+  planner light streams tracing their paths, teal wireframes, beams, dust.
+- **Axis ruler strip** under the nav (AXIS::X.DRAFT · tick marks ·
+  CALIBRATED // ISO-216-A1) and **corner coordinate marks** — the
+  reference's observatory chrome.
+- Dock links get hover lift + glow; panels tightened; the whole home is
+  one uncluttered viewport over the living hall.
+
 ## v2.7.0 — 2026-10-18
 
 ### Vivid drafting hall (matched to the reference)

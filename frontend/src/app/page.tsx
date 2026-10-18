@@ -34,16 +34,6 @@ const MORE = [
   { label: "Contact", href: "/contact" },
 ];
 
-/** Focus-target readouts: the scene is the navigation. */
-const FOCUS_INFO: Record<string, { label: string; href: string; cta: string }> = {
-  "sheet-0": { label: "SHEET-001 // PLANNED DAG", href: "/dashboard", cta: "OPEN BOARD →" },
-  "sheet-1": { label: "SHEET-002 // EXECUTION PLAN", href: "/dashboard/workflows", cta: "OPEN BUILDS →" },
-  "sheet-2": { label: "SHEET-003 // DEPENDENCY LATTICE", href: "/dashboard/operations", cta: "OPEN SHEETS →" },
-  icosa: { label: "STRUCTURE // ASSEMBLING", href: "/dashboard/workflows", cta: "OPEN BUILDS →" },
-  cone: { label: "PRIMITIVE // DRAFTED COMPONENT", href: "/dashboard/integrations", cta: "OPEN STAMPS →" },
-  torus: { label: "STRUCTURE // TOLERANCE HELD", href: "/dashboard/operations", cta: "OPEN SHEETS →" },
-};
-
 function LampToggle() {
   const [mode, setMode] = useState<"light" | "dark">("dark");
   useEffect(() => {
@@ -99,7 +89,6 @@ function useEngine() {
 
 export default function LandingPage() {
   const [mode, setMode] = useState<"light" | "dark">("dark");
-  const [focusId, setFocusId] = useState<string | null>(null);
   const engine = useEngine();
 
   useEffect(() => {
@@ -112,18 +101,36 @@ export default function LandingPage() {
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
-  const focus = focusId ? FOCUS_INFO[focusId] : null;
-
   return (
     <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
-      {/* The drafting hall — full-viewport WebGL, the scene IS the navigation */}
-      <CyanotypeScene mode={mode} onFocusChange={setFocusId} />
+      {/* The drafting hall — full-viewport WebGL atmosphere */}
+      <CyanotypeScene mode={mode} />
 
       {/* Film grain over the hall */}
       <div className="grain-overlay" />
 
+      {/* Corner coordinate marks — observatory chrome */}
+      <span aria-hidden="true" style={{ position: "absolute", top: 128, left: 14, zIndex: 10, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", opacity: 0.7 }}>+ [0,0]</span>
+      <span aria-hidden="true" style={{ position: "absolute", top: 128, right: 14, zIndex: 10, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", opacity: 0.7 }}>[1440,0] +</span>
+      <span aria-hidden="true" style={{ position: "absolute", bottom: 12, left: 14, zIndex: 10, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", opacity: 0.7 }}>+ [0,900]</span>
+      <span aria-hidden="true" style={{ position: "absolute", bottom: 12, right: 14, zIndex: 10, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)", opacity: 0.7 }}>[1440,900] +</span>
+
       <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", minHeight: "100vh", pointerEvents: "none" }}>
         <PublicNavbar />
+
+        {/* Axis ruler strip — drafting chrome */}
+        <div aria-hidden="true" style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "7px clamp(16px, 4vw, 40px)",
+          borderTop: "1px solid var(--border-primary)",
+          fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em",
+          color: "var(--text-tertiary)",
+          background: "color-mix(in srgb, var(--bg-secondary) 40%, transparent)",
+        }}>
+          <span style={{ color: "var(--accent)" }}>AXIS::X.DRAFT</span>
+          <span>+000.00&nbsp;&nbsp;·&nbsp;&nbsp;+120.40&nbsp;&nbsp;·&nbsp;&nbsp;+240.80&nbsp;&nbsp;·&nbsp;&nbsp;+480.00&nbsp;&nbsp;·&nbsp;&nbsp;+960.20&nbsp;&nbsp;·&nbsp;&nbsp;+1440.00_MAX</span>
+          <span style={{ color: "var(--accent)" }}>CALIBRATED // ISO-216-A1</span>
+        </div>
 
         <main style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
@@ -254,7 +261,7 @@ export default function LandingPage() {
               fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em",
               color: "var(--text-tertiary)", margin: 0, lineHeight: 1.7, padding: "0 4px",
             }}>
-              ↑ CLICK A SHEET OR STRUCTURE TO ZOOM · ESC TO PULL BACK
+              ↑ THE HALL IS ALIVE — SHEETS UNFOLD · CREWS TRACE · BUILDS ASSEMBLE
             </p>
           </div>
         </main>
@@ -267,7 +274,7 @@ export default function LandingPage() {
         }}>
           <div style={{ display: "flex", justifyContent: "center", gap: "clamp(12px, 3vw, 36px)", flexWrap: "wrap" }}>
             {DOCK.map(d => (
-              <Link key={d.label} href={d.href} style={{
+              <Link key={d.label} href={d.href} className="dock-link" style={{
                 fontFamily: "var(--font-mono)", fontSize: 11.5, letterSpacing: "0.14em",
                 color: "var(--text-secondary)", textDecoration: "none",
                 display: "inline-flex", alignItems: "center", gap: 7,
@@ -289,22 +296,6 @@ export default function LandingPage() {
         </nav>
       </div>
 
-      {/* Focus-target readout: the scene is the navigation */}
-      {focus && (
-        <div className="focus-readout" role="status">
-          <span style={{ color: "var(--warm)" }}>◉</span>
-          <span>{focus.label}</span>
-          <Link href={focus.href} style={{
-            color: "var(--accent)", textDecoration: "none",
-            border: "1px solid color-mix(in srgb, var(--accent) 50%, transparent)",
-            padding: "4px 10px", borderRadius: 5,
-          }}>
-            {focus.cta}
-          </Link>
-          <span style={{ color: "var(--text-tertiary)" }}>ESC · PULL BACK</span>
-        </div>
-      )}
-
       <style jsx global>{`
         .hud-chip {
           display: inline-flex; align-items: center; gap: 8px;
@@ -318,6 +309,9 @@ export default function LandingPage() {
           from { stroke-dashoffset: 340; }
           to   { stroke-dashoffset: 0; }
         }
+        .dock-link { transition: color .25s ease, transform .25s ease; }
+        .dock-link:hover { color: var(--accent); transform: translateY(-2px); }
+        .dock-link:hover span { box-shadow: 0 0 10px var(--accent); }
       `}</style>
     </div>
   );

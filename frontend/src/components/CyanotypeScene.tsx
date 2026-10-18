@@ -3,19 +3,18 @@
 /**
  * CyanotypeScene — the Drafting Works (Sandtable home backdrop).
  *
- * Vivid blueprint hall: BIG saturated sheets with rich white drafting
- * detail (grids, boxes, X-marks, reticles, the FOR APPROVAL stamp printed
- * on the sheet), teal wireframe structures assembling, diagonal light
- * beams, a glowing tracer dot on the sheet, grid floor + graphite dust.
- * No cosmos, no stars — drafting works only.
+ * Ambient + alive: pointer parallax, sheets that breathe and unfold,
+ * planner light streams tracing their paths, teal wireframes assembling,
+ * diagonal light beams, grid floor, graphite dust. No cosmos, no stars.
+ * (The click-to-zoom navigation was removed by design — the dock and
+ * panels are the navigation; the scene is the atmosphere.)
  *
- * INTERACTIVE: click a sheet or structure → click-to-zoom with a focus
- * target the parent can act on; hover highlights with a lens cursor;
- * pointer parallax on the parked camera; Esc pulls back.
+ * Theme-aware: "tungsten" (near-black #04060B + klein blue) and
+ * "north light" (pale drafting paper + prussian ink).
  */
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export type CyanotypeMode = "dark" | "light";
@@ -33,7 +32,6 @@ const PALETTE = {
     lineBright: "#cfe2ff",
     icosa: "#39d9c0",
     cone: "#3e6bff",
-    torus: "#7d9bff",
     grid: "#0e1c3f",
     dust: "#7d9bff",
     beam: "#2a52c8",
@@ -50,7 +48,6 @@ const PALETTE = {
     lineBright: "#1d3f8f",
     icosa: "#1f9e8e",
     cone: "#2e56c4",
-    torus: "#5a74c9",
     grid: "#c3d0e6",
     dust: "#8fa6cc",
     beam: "#b8ccf0",
@@ -63,32 +60,27 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   canvas.width = 640; canvas.height = 480;
   const ctx = canvas.getContext("2d")!;
 
-  // saturated blueprint base with a soft diagonal sheen
   const grad = ctx.createLinearGradient(0, 0, 640, 480);
   grad.addColorStop(0, c.sheetBase);
   grad.addColorStop(1, c.sheetBase2);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 640, 480);
 
-  // fine grid
   ctx.strokeStyle = c.inkSoft;
   ctx.lineWidth = 1;
   for (let x = 0; x <= 640; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 480); ctx.stroke(); }
   for (let y = 0; y <= 480; y += 24) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(640, y); ctx.stroke(); }
 
-  // heavy grid every 120
   ctx.strokeStyle = c.ink;
   ctx.lineWidth = 1.4;
   for (let x = 0; x <= 640; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 480); ctx.stroke(); }
   for (let y = 0; y <= 480; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(640, y); ctx.stroke(); }
 
-  // outer frame + inner margin
   ctx.lineWidth = 3;
   ctx.strokeRect(10, 10, 620, 460);
   ctx.lineWidth = 1.5;
   ctx.strokeRect(24, 24, 592, 432);
 
-  // drafting blocks: boxes, X-marked rectangles, reticles
   ctx.lineWidth = 2;
   const blocks: Array<[number, number, number, number]> = [
     [40, 60, 190, 120], [48, 76, 90, 88], [260, 48, 180, 70],
@@ -102,7 +94,6 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
     }
   });
 
-  // communication-lattice reticle (double circle + crosshair)
   ctx.lineWidth = 2.2;
   ctx.beginPath(); ctx.arc(470, 300, 52, 0, Math.PI * 2); ctx.stroke();
   ctx.beginPath(); ctx.arc(470, 300, 30, 0, Math.PI * 2); ctx.stroke();
@@ -111,7 +102,6 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   ctx.moveTo(470, 300 - 68); ctx.lineTo(470, 300 + 68);
   ctx.stroke();
 
-  // label chips
   ctx.font = "13px monospace";
   ctx.fillStyle = c.ink;
   ctx.fillText("COMMUNICATION LATTICE", 408, 226);
@@ -119,7 +109,6 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   ctx.fillText("TOR ANTENNAE", 52, 316);
   ctx.fillText("MOD PARAMETERIZE", 292, 348);
 
-  // FOR APPROVAL stamp, rotated, printed on the sheet
   if (withStamp) {
     ctx.save();
     ctx.translate(470, 400);
@@ -135,12 +124,10 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
     ctx.restore();
   }
 
-  // bottom title strip
   ctx.font = "12px monospace";
   ctx.fillStyle = c.ink;
   ctx.fillText("SANDTABLE // DRAFTING WORKS · ALL RIGHTS RESERVED", 28, 458);
 
-  // tracer glow dot on the sheet (the planner mid-trace)
   const glowX = 300 + seed * 60;
   const glowY = 150 + seed * 40;
   const radial = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 26);
@@ -162,21 +149,14 @@ type SheetSpec = {
   size: [number, number];
   seed: number;
   withStamp: boolean;
+  unfold?: boolean; // slow blueprint "unfold" — rotation.x oscillates open
 };
 
-/** Big blueprint sheet with rich detail, slow drift, click-to-zoom. */
-function Sheet({
-  spec, mode, focused, onFocus,
-}: {
-  spec: SheetSpec;
-  mode: CyanotypeMode;
-  focused: boolean;
-  onFocus: (t: { id: string; lookAt: [number, number, number]; camPos: [number, number, number] } | null) => void;
-}) {
+/** Big blueprint sheet with rich detail: breathes, drifts, optionally unfolds. */
+function Sheet({ spec, mode }: { spec: SheetSpec; mode: CyanotypeMode }) {
   const c = PALETTE[mode];
   const group = useRef<THREE.Group>(null);
-  const [hovered, setHovered] = useState(false);
-  const { position, rotation, size, seed, withStamp } = spec;
+  const { position, rotation, size, seed, withStamp, unfold } = spec;
 
   const texture = useMemo(() => makeSheetTexture(mode, seed, withStamp), [mode, seed]);
 
@@ -185,39 +165,22 @@ function Sheet({
       const t = clock.getElapsedTime();
       group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.12;
       group.current.rotation.z = rotation[2] + Math.sin(t * 0.2 + seed * 2) * 0.018;
+      if (unfold) {
+        // blueprint unfold: the sheet opens like a drawing being spread
+        group.current.rotation.x = rotation[0] + Math.sin(t * 0.14 + seed) * 0.09;
+      }
     }
   });
 
   return (
-    <group
-      ref={group}
-      position={position}
-      rotation={rotation}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (focused) { onFocus(null); return; }
-        const n = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(...rotation));
-        onFocus({
-          id: `sheet-${seed}`,
-          lookAt: position,
-          camPos: [position[0] + n.x * 2.6, position[1] + n.y * 2.6 + 0.3, position[2] + n.z * 2.6],
-        });
-      }}
-      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "zoom-in"; }}
-      onPointerOut={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-    >
+    <group ref={group} position={position} rotation={rotation}>
       <mesh>
         <planeGeometry args={[size[0], size[1]]} />
-        <meshBasicMaterial
-          map={texture}
-          transparent
-          opacity={focused || hovered ? (mode === "dark" ? 1 : 0.96) : mode === "dark" ? 0.97 : 0.94}
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial map={texture} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
       </mesh>
       <lineSegments>
         <edgesGeometry args={[new THREE.PlaneGeometry(size[0], size[1])]} />
-        <lineBasicMaterial color={hovered || focused ? c.lineBright : c.edge} transparent opacity={hovered || focused ? 1 : 0.9} />
+        <lineBasicMaterial color={c.edge} transparent opacity={0.9} />
       </lineSegments>
     </group>
   );
@@ -277,19 +240,9 @@ function LightBeams({ mode }: { mode: CyanotypeMode }) {
 }
 
 /** Wireframe drafting primitives — teal, assembling. */
-function Structure({
-  mode, position, kind, focused, onFocus, scale = 1,
-}: {
-  mode: CyanotypeMode;
-  position: [number, number, number];
-  kind: "icosa" | "cone";
-  focused: boolean;
-  onFocus: (t: { id: string; lookAt: [number, number, number]; camPos: [number, number, number] } | null) => void;
-  scale?: number;
-}) {
+function Structure({ mode, position, kind, scale = 1 }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone"; scale?: number }) {
   const c = PALETTE[mode];
   const ref = useRef<THREE.Mesh>(null);
-  const [hovered, setHovered] = useState(false);
   useFrame(({ clock }) => {
     if (ref.current) {
       const t = clock.getElapsedTime();
@@ -298,30 +251,10 @@ function Structure({
     }
   });
   return (
-    <mesh
-      ref={ref}
-      position={position}
-      scale={scale}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (focused) { onFocus(null); return; }
-        onFocus({
-          id: `${kind}-${position.join(",")}`,
-          lookAt: position,
-          camPos: [position[0] + 1.4, position[1] + 1.1, position[2] + 2.9],
-        });
-      }}
-      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "zoom-in"; }}
-      onPointerOut={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-    >
+    <mesh ref={ref} position={position} scale={scale}>
       {kind === "icosa" && <icosahedronGeometry args={[1.5, 1]} />}
       {kind === "cone" && <coneGeometry args={[1, 2.6, 7, 4, true]} />}
-      <meshBasicMaterial
-        color={hovered || focused ? c.lineBright : kind === "icosa" ? c.icosa : c.cone}
-        wireframe
-        transparent
-        opacity={hovered || focused ? 0.95 : mode === "dark" ? 0.6 : 0.45}
-      />
+      <meshBasicMaterial color={kind === "icosa" ? c.icosa : c.cone} wireframe transparent opacity={mode === "dark" ? 0.6 : 0.45} />
     </mesh>
   );
 }
@@ -362,9 +295,8 @@ function GridFloor({ mode }: { mode: CyanotypeMode }) {
   );
 }
 
-function Scene({ mode, onFocusChange }: { mode: CyanotypeMode; onFocusChange: (id: string | null) => void }) {
+function Scene({ mode }: { mode: CyanotypeMode }) {
   const c = PALETTE[mode];
-  const [focus, setFocus] = useState<{ id: string; lookAt: [number, number, number]; camPos: [number, number, number] } | null>(null);
   const pointer = useRef({ x: 0, y: 0 });
   const { camera } = useThree();
 
@@ -373,29 +305,17 @@ function Scene({ mode, onFocusChange }: { mode: CyanotypeMode; onFocusChange: (i
       pointer.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
       pointer.current.y = -(e.clientY / window.innerHeight - 0.5) * 2;
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && focus) { setFocus(null); onFocusChange(null); }
-    };
     window.addEventListener("pointermove", onPointer);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointermove", onPointer);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [focus, onFocusChange]);
+    return () => window.removeEventListener("pointermove", onPointer);
+  }, []);
 
-  // parked low-angle: floor visible, sheets above the horizon (reference framing)
+  // parked low-angle + observatory parallax
   useFrame(() => {
     const px = pointer.current.x, py = pointer.current.y;
-    if (!focus) {
-      camera.position.x += (px * 0.8 - camera.position.x) * 0.04;
-      camera.position.y += (0.9 + py * 0.3 - camera.position.y) * 0.04;
-      camera.position.z += (8.2 - camera.position.z) * 0.04;
-      camera.lookAt(0.4, 2.1, -4);
-    } else {
-      camera.position.lerp(new THREE.Vector3(...focus.camPos), 0.05);
-      camera.lookAt(new THREE.Vector3(...focus.lookAt));
-    }
+    camera.position.x += (px * 0.85 - camera.position.x) * 0.04;
+    camera.position.y += (0.9 + py * 0.32 - camera.position.y) * 0.04;
+    camera.position.z += (8.2 - camera.position.z) * 0.04;
+    camera.lookAt(0.4, 2.1, -4);
   });
 
   return (
@@ -405,47 +325,19 @@ function Scene({ mode, onFocusChange }: { mode: CyanotypeMode; onFocusChange: (i
       <GridFloor mode={mode} />
       <Dust mode={mode} />
       <LightBeams mode={mode} />
-      {/* big foreground sheet with the stamp — right, tilted like the reference */}
-      <Sheet
-        mode={mode}
-        spec={{ position: [3.6, 2.3, -4.2], rotation: [-0.03, -0.55, -0.04], size: [6.2, 4.6], seed: 0, withStamp: true }}
-        focused={focus?.id === "sheet-0"}
-        onFocus={(t) => { setFocus(t); onFocusChange(t ? "sheet-0" : null); }}
-      />
-      {/* left mid sheet */}
-      <Sheet
-        mode={mode}
-        spec={{ position: [-4.9, 2.0, -5.4], rotation: [0.05, 0.52, 0.03], size: [5.4, 4], seed: 1, withStamp: false }}
-        focused={focus?.id === "sheet-1"}
-        onFocus={(t) => { setFocus(t); onFocusChange(t ? "sheet-1" : null); }}
-      />
-      {/* back top sheet */}
-      <Sheet
-        mode={mode}
-        spec={{ position: [1.2, 3.4, -9.5], rotation: [0.08, 0.1, 0.05], size: [5, 3.8], seed: 2, withStamp: false }}
-        focused={focus?.id === "sheet-2"}
-        onFocus={(t) => { setFocus(t); onFocusChange(t ? "sheet-2" : null); }}
-      />
+      <Sheet mode={mode} spec={{ position: [3.6, 2.3, -4.2], rotation: [-0.03, -0.55, -0.04], size: [6.2, 4.6], seed: 0, withStamp: true }} />
+      <Sheet mode={mode} spec={{ position: [-4.9, 2.0, -5.4], rotation: [0.05, 0.52, 0.03], size: [5.4, 4], seed: 1, withStamp: false, unfold: true }} />
+      <Sheet mode={mode} spec={{ position: [1.2, 3.4, -9.5], rotation: [0.08, 0.1, 0.05], size: [5, 3.8], seed: 2, withStamp: false, unfold: true }} />
       <TracingLine mode={mode} offset={0} points={[[-6.5, 0.5, -2], [-4.6, 1.8, -3.6], [-1.4, 2.8, -5.8], [1.6, 1.6, -4.3], [4.6, 2.6, -6.4]]} />
       <TracingLine mode={mode} offset={0.45} speed={0.085} points={[[6.2, 0.9, -1.4], [3.8, 2.6, -4.4], [0.6, 3.4, -7.6], [-3.4, 2, -5.4]]} />
-      {/* teal icosahedron left-back, cone right-back (reference accents) */}
-      <Structure mode={mode} position={[-7.2, 0.6, -4.2]} kind="icosa"
-        focused={focus?.id.startsWith("icosa")}
-        onFocus={(t) => { setFocus(t); onFocusChange(t ? "icosa" : null); }} />
-      <Structure mode={mode} position={[7.8, 0.3, -5.6]} kind="cone"
-        focused={focus?.id.startsWith("cone")}
-        onFocus={(t) => { setFocus(t); onFocusChange(t ? "cone" : null); }} />
+      <TracingLine mode={mode} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
+      <Structure mode={mode} position={[-7.2, 0.6, -4.2]} kind="icosa" />
+      <Structure mode={mode} position={[7.8, 0.3, -5.6]} kind="cone" />
     </>
   );
 }
 
-export default function CyanotypeScene({
-  mode = "dark",
-  onFocusChange,
-}: {
-  mode?: CyanotypeMode;
-  onFocusChange?: (id: string | null) => void;
-}) {
+export default function CyanotypeScene({ mode = "dark" }: { mode?: CyanotypeMode }) {
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
       <Canvas
@@ -453,9 +345,8 @@ export default function CyanotypeScene({
         dpr={[1, 1.75]}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         style={{ position: "absolute", inset: 0 }}
-        onPointerMissed={() => onFocusChange?.(null)}
       >
-        <Scene mode={mode} onFocusChange={onFocusChange ?? (() => {})} />
+        <Scene mode={mode} />
       </Canvas>
     </div>
   );
