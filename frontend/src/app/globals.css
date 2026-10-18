@@ -354,8 +354,9 @@ body {
 
 .scroll-reveal-ready [data-scroll-reveal] {
   opacity: 0;
-  transform: translate3d(0, 22px, 0);
-  transition: opacity .65s cubic-bezier(.2,.75,.25,1), transform .65s cubic-bezier(.2,.75,.25,1);
+  transform: translate3d(0, 42px, 0) scale(0.985);
+  filter: blur(3px);
+  transition: opacity .8s cubic-bezier(.2,.75,.25,1), transform .8s cubic-bezier(.2,.75,.25,1), filter .8s cubic-bezier(.2,.75,.25,1);
   will-change: opacity, transform;
 }
 .scroll-reveal-ready [data-scroll-reveal].is-in-view { opacity: 1; transform: translate3d(0,0,0); }

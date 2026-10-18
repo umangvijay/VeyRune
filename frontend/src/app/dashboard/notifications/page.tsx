@@ -46,7 +46,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 800, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700 }}>Notifications</h1>

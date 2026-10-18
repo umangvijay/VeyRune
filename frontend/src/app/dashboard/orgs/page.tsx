@@ -137,7 +137,7 @@ export default function OrgsPage() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 1000, margin: "0 auto" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Organizations</h1>
         <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>

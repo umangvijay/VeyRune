@@ -95,7 +95,7 @@ export default function IntegrationDetailPage() {
   );
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 900, margin: "0 auto" }}>
       
       {/* Header */}
       <div className="glass-card" style={{ padding: 32, marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

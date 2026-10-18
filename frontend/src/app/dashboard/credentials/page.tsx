@@ -64,7 +64,7 @@ export default function VaultPage() {
   }
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 880, margin: "0 auto" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 880, margin: "0 auto" }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Vault</h1>
       <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>
         Encrypted with AES-256-GCM. Agents see placeholders like {"{{secret:password}}"} — never the raw value.

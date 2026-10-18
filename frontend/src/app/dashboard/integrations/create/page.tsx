@@ -101,7 +101,7 @@ export default function CreateIntegrationPage() {
   ];
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 1000, margin: "0 auto", display: "flex", gap: 32, flexWrap: "wrap" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 1000, margin: "0 auto", display: "flex", gap: 32, flexWrap: "wrap" }}>
       <div style={{ flex: "1 1 400px" }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Build New Integration</h1>
         <p style={{ color: "var(--text-secondary)", marginBottom: 32 }}>

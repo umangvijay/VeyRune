@@ -24,7 +24,7 @@ export default function WorkflowsPage() {
   }, []);
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" data-scroll-reveal>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700 }}>Workflows</h1>

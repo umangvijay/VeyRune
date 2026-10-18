@@ -144,7 +144,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="animate-fade-in" data-scroll-reveal style={{ maxWidth: 800, margin: "0 auto" }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700 }}>Settings</h1>
         <p style={{ color: "var(--text-secondary)" }}>Manage your account and Sandtable preferences.</p>

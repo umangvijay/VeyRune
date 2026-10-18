@@ -143,8 +143,8 @@ export default function LandingPage() {
             className="glass-card console-frame panel-3d float-soft"
             style={{
               padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto",
-              background: "color-mix(in srgb, var(--bg-secondary) 86%, transparent)",
-              backdropFilter: "blur(6px)",
+              background: "color-mix(in srgb, var(--bg-secondary) 52%, transparent)",
+              backdropFilter: "blur(7px)",
             }}
           >
             <span className="frame-tr" /><span className="frame-bl" />

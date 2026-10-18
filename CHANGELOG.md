@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.8.0 — 2026-10-19
+
+### The scene IS the page
+- **The planet is centered**: the graticule globe now sits in the middle
+  of the composition with **four wireframe cubes orbiting** it.
+- **More 3D objects**: a torus-knot and a dodecahedron join the hall's
+  wireframe menagerie.
+- **Blueprints reprint at random times**: every 6–13 seconds a sheet
+  flashes and its drafting blocks change — plans being redrawn in front
+  of you (pseudo-random per variant, visible brightness sweep).
+- **Hero translucent**: 52% frosted panel with light blur — the hall
+  shows through the card.
+- **Scroll animations on every page**: reveals swept onto all 11
+  dashboard pages and every public page, with a deeper entrance
+  (translate + scale + blur).
+
 ## v3.7.0 — 2026-10-18
 
 ### The knitting hall, richer

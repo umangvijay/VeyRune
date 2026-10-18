@@ -14,10 +14,20 @@
  */
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 export type CyanotypeMode = "dark" | "light";
+
+/** Central reprint scheduler: sheets redraw at random intervals. */
+const reprintWatchers: Array<(t: number) => void> = [];
+function watchSheetReprints(fn: (t: number) => void) {
+  reprintWatchers.push(fn);
+  return () => {
+    const i = reprintWatchers.indexOf(fn);
+    if (i >= 0) reprintWatchers.splice(i, 1);
+  };
+}
 
 /* ── Shared hall clock: one tempo drives every animation ── */
 const hall = { t: 0, tempo: 1, stepQueued: 0 };
@@ -105,18 +115,24 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   ctx.lineWidth = 1.5;
   ctx.strokeRect(24, 24, 592, 432);
 
+  // drafting blocks: pseudo-random per variant — patterns change over time
+  let s = (seed + 1) * 2654435761 % 4294967296;
+  const rand = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
   ctx.lineWidth = 2;
-  const blocks: Array<[number, number, number, number]> = [
-    [40, 60, 190, 120], [48, 76, 90, 88], [260, 48, 180, 70],
-    [40, 210, 150, 90], [280, 220, 120, 110], [440, 60, 150, 100],
-  ];
-  blocks.forEach(([x, y, w, h], i) => {
+  const blockCount = 5 + Math.floor(rand() * 3);
+  for (let i = 0; i < blockCount; i++) {
+    const x = 40 + rand() * 420;
+    const y = 60 + rand() * 300;
+    const w = 80 + rand() * 160;
+    const h = 60 + rand() * 110;
     ctx.strokeRect(x, y, w, h);
-    if (i % 2 === 1) {
+    if (rand() > 0.5) {
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
       ctx.moveTo(x + w, y); ctx.lineTo(x, y + h); ctx.stroke();
+    } else if (rand() > 0.6) {
+      ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2.6, 0, Math.PI * 2); ctx.stroke();
     }
-  });
+  }
 
   ctx.lineWidth = 2.2;
   ctx.beginPath(); ctx.arc(470, 300, 52, 0, Math.PI * 2); ctx.stroke();
@@ -176,13 +192,33 @@ type SheetSpec = {
   unfold?: boolean;
 };
 
-/** Blueprint sheet — HOLDS its drawn angle (no rotation drift), only breathes. */
+/** Blueprint sheet — HOLDS its drawn angle (no rotation drift), only breathes.
+ *  At random intervals the pattern REPRINTS: the sheet flashes and the
+ *  drafting blocks change — plans being redrawn in front of you. */
 function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const group = useRef<THREE.Group>(null);
   const { position, rotation, size, seed, withStamp, unfold } = spec;
 
-  const texture = useMemo(() => makeSheetTexture(mode, seed, withStamp), [mode, seed]);
+  const [variant, setVariant] = useState(seed);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const reprint = useRef({ active: false, startedAt: 0, nextAt: 5 + Math.random() * 5 });
+
+  useEffect(() => {
+    return watchSheetReprints((t) => {
+      if (t >= reprint.current.nextAt && !reprint.current.active) {
+        reprint.current.active = true;
+        reprint.current.startedAt = t;
+        setVariant(Math.floor(Math.random() * 100000));
+      }
+      if (reprint.current.active && t - reprint.current.startedAt > 0.9) {
+        reprint.current.active = false;
+        reprint.current.nextAt = t + 6 + Math.random() * 7;
+      }
+    });
+  }, []);
+
+  const texture = useMemo(() => makeSheetTexture(mode, variant, withStamp), [mode, variant, withStamp]);
 
   useFrame(() => {
     if (!group.current) return;
@@ -193,13 +229,20 @@ function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode;
       // the back sheets unfold like a drawing being spread open
       group.current.rotation.x = rotation[0] + Math.sin(t * 0.12 + seed) * 0.055;
     }
+    // reprint flash: the sheet brightens while the reprint sweep runs
+    if (materialRef.current) {
+      const r = reprint.current;
+      const phase = r.active ? Math.min(1, (t - r.startedAt) / 0.9) : -1;
+      const flash = phase >= 0 ? Math.sin(phase * Math.PI) * 0.4 : 0;
+      materialRef.current.opacity = (mode === "dark" ? 0.97 : 0.94) + flash * (mode === "dark" ? 0.03 : -0.12);
+    }
   });
 
   return (
     <group ref={group} position={position} rotation={rotation}>
       <mesh>
         <planeGeometry args={[size[0], size[1]]} />
-        <meshBasicMaterial map={texture} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
+        <meshBasicMaterial ref={materialRef} map={texture} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
       </mesh>
       <lineSegments>
         <edgesGeometry args={[new THREE.PlaneGeometry(size[0], size[1])]} />
@@ -262,7 +305,7 @@ function LightBeams({ mode, hallTime }: { mode: CyanotypeMode; hallTime: React.M
 }
 
 /** Wireframe structures assembling — piece by piece, minimal drift. */
-function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone"; scale?: number; hallTime: React.MutableRefObject<number> }) {
+function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone" | "knot" | "dodeca"; scale?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const ref = useRef<THREE.Mesh>(null);
   useFrame(() => {
@@ -276,7 +319,14 @@ function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: Cyanot
     <mesh ref={ref} position={position} scale={scale}>
       {kind === "icosa" && <icosahedronGeometry args={[1.5, 1]} />}
       {kind === "cone" && <coneGeometry args={[1, 2.6, 7, 4, true]} />}
-      <meshBasicMaterial color={kind === "icosa" ? c.icosa : c.cone} wireframe transparent opacity={mode === "dark" ? 0.6 : 0.45} />
+      {kind === "knot" && <torusKnotGeometry args={[0.8, 0.26, 90, 10]} />}
+      {kind === "dodeca" && <dodecahedronGeometry args={[1.1, 0]} />}
+      <meshBasicMaterial
+        color={kind === "icosa" ? c.icosa : kind === "knot" ? c.lineBright : c.cone}
+        wireframe
+        transparent
+        opacity={mode === "dark" ? 0.6 : 0.45}
+      />
     </mesh>
   );
 }
@@ -477,6 +527,29 @@ function Thread({
   );
 }
 
+/** Small drafting cubes orbiting the planet — satellites of the workshop. */
+function OrbitingCubes({ mode, hallTime }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
+  const c = PALETTE[mode];
+  const group = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (group.current) group.current.rotation.y = hallTime.current * 0.18;
+  });
+  const cubes = useMemo(() => [0, 1, 2, 3].map(i => {
+    const angle = (i / 4) * Math.PI * 2;
+    return { position: [Math.cos(angle) * 2.3, 0.4 + (i % 2) * 0.5, Math.sin(angle) * 2.3] as [number, number, number], rotation: [i * 0.4, i * 0.7, 0] as [number, number, number] };
+  }), []);
+  return (
+    <group ref={group} position={[0.3, 2.6, -7.3]}>
+      {cubes.map((cube, i) => (
+        <mesh key={i} position={cube.position} rotation={cube.rotation}>
+          <boxGeometry args={[0.26, 0.26, 0.26]} />
+          <meshBasicMaterial color={c.edge} wireframe transparent opacity={mode === "dark" ? 0.7 : 0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** Graphite dust — sparse drifting points (not a starfield). */
 function Dust({ mode, count = 220, hallTime }: { mode: CyanotypeMode; count?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
@@ -531,6 +604,10 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
   const c = PALETTE[mode];
   const hallTime = useHallTime();
 
+  useFrame(() => {
+    for (const fn of reprintWatchers) fn(hall.t);
+  });
+
   return (
     <>
       <color attach="background" args={[c.bg]} />
@@ -547,6 +624,9 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <TracingLine mode={mode} hallTime={hallTime} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
       <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
       <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
+      <Structure mode={mode} hallTime={hallTime} position={[6.2, 4.4, -10.5]} kind="knot" />
+      <Structure mode={mode} hallTime={hallTime} position={[-6.8, 4.2, -9.8]} kind="dodeca" />
+      <OrbitingCubes mode={mode} hallTime={hallTime} />
       {/* The Planet — knitting every blueprint into existence */}
       <Planet mode={mode} hallTime={hallTime} position={[-2.6, 4.3, -7.2]} scale={1.45} withHalo />
       {/* Three strands woven to the big stamped sheet */}
