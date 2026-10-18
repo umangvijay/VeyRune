@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.0.0 — 2026-10-18
+
+### The Drafting Works, faithful to the spec
+- **No rotation**: the camera never turns — it holds the drafting angle and
+  GLIDES laterally with a gentle bob. Sheets hold their drawn angles;
+  structures barely drift. All motion comes from the hall itself: the
+  planner's tracer light running its path, beams sweeping, dust drifting,
+  back sheets unfolding.
+- **Chrono-Pulse tempo control** (top-right): 0.5x / 1.0x / 2.0x / STEP —
+  a real control that scales the hall's shared animation clock (STEP
+  advances one manual frame).
+- **Spec HUD chips**: WORKS · 7 CREWS · 23 STAMPS · 142 SHEETS TODAY and
+  TOLERANCE · HELD alongside the real ENGINE chip.
+- **Module nav**: Board / Stamps / Builds / Sheets + "Sign in →".
+
 ## v2.9.0 — 2026-10-18
 
 ### Moving background + restored nav

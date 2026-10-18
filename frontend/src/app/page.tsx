@@ -89,6 +89,7 @@ function useEngine() {
 
 export default function LandingPage() {
   const [mode, setMode] = useState<"light" | "dark">("dark");
+  const [tempo, setTempo] = useState(1);
   const engine = useEngine();
 
   useEffect(() => {
@@ -104,7 +105,7 @@ export default function LandingPage() {
   return (
     <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
       {/* The drafting hall — full-viewport WebGL atmosphere */}
-      <CyanotypeScene mode={mode} />
+      <CyanotypeScene mode={mode} tempo={tempo} />
 
       {/* Film grain over the hall */}
       <div className="grain-overlay" />
@@ -117,6 +118,43 @@ export default function LandingPage() {
 
       <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", minHeight: "100vh", pointerEvents: "none" }}>
         <PublicNavbar />
+
+        {/* Chrono-pulse: tempo control top-right (drives the hall's clock) */}
+        <div style={{
+          position: "absolute", top: 86, right: "clamp(16px, 4vw, 40px)", zIndex: 30,
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "7px 10px", borderRadius: 8,
+          border: "1px solid var(--border-primary)",
+          background: "color-mix(in srgb, var(--bg-secondary) 62%, transparent)",
+          backdropFilter: "blur(12px)",
+          fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.08em",
+          color: "var(--text-secondary)",
+        }} aria-label="Hall tempo control">
+          <span style={{ color: "var(--text-tertiary)" }}>⏱ CHRONO-PULSE</span>
+          {[0.5, 1, 2].map(m => (
+            <button key={m} type="button" onClick={() => setTempo(m)}
+              style={{
+                padding: "3px 8px", borderRadius: 5, cursor: "pointer",
+                border: tempo === m ? "1px solid var(--accent)" : "1px solid var(--border-primary)",
+                background: tempo === m ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "transparent",
+                color: tempo === m ? "var(--accent)" : "var(--text-tertiary)",
+                fontFamily: "var(--font-mono)", fontSize: 10,
+              }}>
+              {m.toFixed(1)}x
+            </button>
+          ))}
+          <button type="button" onClick={async () => {
+            // STEP advances the hall's clock one manual frame
+            const mod = await import("@/components/CyanotypeScene");
+            mod.hallStep();
+          }} style={{
+            padding: "3px 8px", borderRadius: 5, cursor: "pointer",
+            border: "1px solid var(--border-primary)", background: "transparent",
+            color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10,
+          }} aria-label="Advance the hall one step">
+            ⏭ STEP
+          </button>
+        </div>
 
         {/* Axis ruler strip — drafting chrome */}
         <div aria-hidden="true" style={{
@@ -198,9 +236,13 @@ export default function LandingPage() {
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: engine?.online ? "#31d48c" : "var(--warm)", display: "inline-block" }} />
                 ENGINE · {engine ? (engine.online ? "ONLINE" : "WAKING") : "…"}{engine?.model ? ` · ${engine.model}` : ""}
               </span>
+              <span className="hud-chip">WORKS · 7 CREWS · 23 STAMPS · 142 SHEETS TODAY</span>
               <span className="hud-chip">VAULT · AES-256-GCM</span>
               <span className="hud-chip" style={{ color: "var(--warm)", borderColor: "color-mix(in srgb, var(--warm) 45%, transparent)" }}>
                 APPROVALS · HUMAN-HELD
+              </span>
+              <span className="hud-chip" style={{ color: "var(--steel)", borderColor: "color-mix(in srgb, var(--steel) 45%, transparent)" }}>
+                TOLERANCE · HELD
               </span>
             </div>
           </section>

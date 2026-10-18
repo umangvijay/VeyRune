@@ -3,13 +3,13 @@
 /**
  * CyanotypeScene — the Drafting Works (Sandtable home backdrop).
  *
- * Ambient + alive: pointer parallax, sheets that breathe and unfold,
- * planner light streams tracing their paths, teal wireframes assembling,
- * diagonal light beams, grid floor, graphite dust. No cosmos, no stars.
- * (The click-to-zoom navigation was removed by design — the dock and
- * panels are the navigation; the scene is the atmosphere.)
+ * MOTION CONTRACT (audit the user's note): the camera never rotates.
+ * It holds a fixed drafting angle and GLIDES laterally — all life comes
+ * from the hall itself: the planner's tracer light running its path,
+ * sheets breathing and unfolding, beams sweeping, dust drifting,
+ * wireframes assembling. A tempo control scales the whole hall's clock.
  *
- * Theme-aware: "tungsten" (near-black #04060B + klein blue) and
+ * Theme-aware: "tungsten" (near-black #04060B + klein blue #3E6BFF) and
  * "north light" (pale drafting paper + prussian ink).
  */
 
@@ -19,10 +19,34 @@ import * as THREE from "three";
 
 export type CyanotypeMode = "dark" | "light";
 
+/* ── Shared hall clock: one tempo drives every animation ── */
+const hall = { t: 0, tempo: 1, stepQueued: 0 };
+
+export function setHallTempo(multiplier: number) {
+  hall.tempo = multiplier;
+}
+
+export function hallStep() {
+  hall.stepQueued += 0.35; // manual frame advance for the STEP button
+}
+
+function useHallTime() {
+  const ref = useRef(0);
+  useFrame((_, delta) => {
+    hall.t += delta * hall.tempo;
+    if (hall.stepQueued > 0) {
+      hall.t += hall.stepQueued;
+      hall.stepQueued = 0;
+    }
+    ref.current = hall.t;
+  });
+  return ref;
+}
+
 const PALETTE = {
   dark: {
-    bg: "#02040a",
-    fog: "#02040a",
+    bg: "#04060b",
+    fog: "#04060b",
     sheetBase: "#0d3a8f",
     sheetBase2: "#1a55c4",
     ink: "rgba(220,235,255,0.92)",
@@ -149,27 +173,25 @@ type SheetSpec = {
   size: [number, number];
   seed: number;
   withStamp: boolean;
-  unfold?: boolean; // slow blueprint "unfold" — rotation.x oscillates open
+  unfold?: boolean;
 };
 
-/** Big blueprint sheet with rich detail: breathes, drifts, optionally unfolds. */
-function Sheet({ spec, mode }: { spec: SheetSpec; mode: CyanotypeMode }) {
+/** Blueprint sheet — HOLDS its drawn angle (no rotation drift), only breathes. */
+function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const group = useRef<THREE.Group>(null);
   const { position, rotation, size, seed, withStamp, unfold } = spec;
 
   const texture = useMemo(() => makeSheetTexture(mode, seed, withStamp), [mode, seed]);
 
-  useFrame(({ clock }) => {
-    if (group.current) {
-      const t = clock.getElapsedTime();
-      group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.24;
-      group.current.rotation.z = rotation[2] + Math.sin(t * 0.2 + seed * 2) * 0.035;
-      group.current.rotation.y = rotation[1] + Math.sin(t * 0.12 + seed) * 0.09;
-      if (unfold) {
-        // blueprint unfold: the sheet opens like a drawing being spread
-        group.current.rotation.x = rotation[0] + Math.sin(t * 0.14 + seed) * 0.09;
-      }
+  useFrame(() => {
+    if (!group.current) return;
+    const t = hallTime.current;
+    // breathing bob only — orientation stays exactly as drawn
+    group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.1;
+    if (unfold) {
+      // the back sheets unfold like a drawing being spread open
+      group.current.rotation.x = rotation[0] + Math.sin(t * 0.12 + seed) * 0.055;
     }
   });
 
@@ -187,8 +209,8 @@ function Sheet({ spec, mode }: { spec: SheetSpec; mode: CyanotypeMode }) {
   );
 }
 
-/** The planner: a light stream tracing a path across the hall. */
-function TracingLine({ mode, points, speed = 0.1, offset = 0 }: { mode: CyanotypeMode; points: [number, number, number][]; speed?: number; offset?: number }) {
+/** The planner's draughtsman: a light stream tracing its path. */
+function TracingLine({ mode, points, speed = 0.1, offset = 0, hallTime }: { mode: CyanotypeMode; points: [number, number, number][]; speed?: number; offset?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const full = useMemo(() => points.map(p => new THREE.Vector3(...p)), [points]);
   const { line, material } = useMemo(() => {
@@ -198,8 +220,8 @@ function TracingLine({ mode, points, speed = 0.1, offset = 0 }: { mode: Cyanotyp
   }, [full, c.lineBright]);
   const total = points.length - 1;
 
-  useFrame(({ clock }) => {
-    const t = (clock.getElapsedTime() * speed + offset) % 1;
+  useFrame(() => {
+    const t = (hallTime.current * speed + offset) % 1;
     const head = Math.max(1, Math.ceil(t * total));
     line.geometry.setFromPoints(full.slice(0, head + 1));
     material.opacity = 0.35 + 0.6 * Math.sin(t * Math.PI);
@@ -208,18 +230,17 @@ function TracingLine({ mode, points, speed = 0.1, offset = 0 }: { mode: Cyanotyp
   return <primitive object={line} />;
 }
 
-/** Diagonal light beams from the top — thin additive shafts. */
-function LightBeams({ mode }: { mode: CyanotypeMode }) {
+/** Diagonal light beams — ruler-straight, sweeping slowly. */
+function LightBeams({ mode, hallTime }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const group = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (group.current) {
-      const t = clock.getElapsedTime();
-      group.current.children.forEach((child, i) => {
-        const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.05 + 0.035 * Math.sin(t * 0.4 + i * 1.7);
-      });
-    }
+  useFrame(() => {
+    if (!group.current) return;
+    const t = hallTime.current;
+    group.current.children.forEach((child, i) => {
+      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.05 + 0.035 * Math.sin(t * 0.4 + i * 1.7);
+    });
   });
   return (
     <group ref={group}>
@@ -240,15 +261,15 @@ function LightBeams({ mode }: { mode: CyanotypeMode }) {
   );
 }
 
-/** Wireframe drafting primitives — teal, assembling. */
-function Structure({ mode, position, kind, scale = 1 }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone"; scale?: number }) {
+/** Wireframe structures assembling — piece by piece, minimal drift. */
+function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone"; scale?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (ref.current) {
-      const t = clock.getElapsedTime();
-      ref.current.rotation.y = t * 0.14;
-      ref.current.rotation.x = Math.sin(t * 0.18) * 0.12;
+      const t = hallTime.current;
+      ref.current.rotation.y = t * 0.03;      // barely turning
+      ref.current.rotation.x = Math.sin(t * 0.1) * 0.05;
     }
   });
   return (
@@ -261,7 +282,7 @@ function Structure({ mode, position, kind, scale = 1 }: { mode: CyanotypeMode; p
 }
 
 /** Graphite dust — sparse drifting points (not a starfield). */
-function Dust({ mode, count = 220 }: { mode: CyanotypeMode; count?: number }) {
+function Dust({ mode, count = 220, hallTime }: { mode: CyanotypeMode; count?: number; hallTime: React.MutableRefObject<number> }) {
   const c = PALETTE[mode];
   const ref = useRef<THREE.Points>(null);
   const positions = useMemo(() => {
@@ -273,8 +294,8 @@ function Dust({ mode, count = 220 }: { mode: CyanotypeMode; count?: number }) {
     }
     return arr;
   }, [count]);
-  useFrame(({ clock }) => {
-    if (ref.current) ref.current.position.y = Math.sin(clock.getElapsedTime() * 0.07) * 0.3;
+  useFrame(() => {
+    if (ref.current) ref.current.position.y = Math.sin(hallTime.current * 0.07) * 0.3;
   });
   return (
     <points ref={ref}>
@@ -296,76 +317,49 @@ function GridFloor({ mode }: { mode: CyanotypeMode }) {
   );
 }
 
+/** Fixed drafting angle — the camera GLIDES laterally, never rotates. */
+function CameraGlide({ hallTime }: { hallTime: React.MutableRefObject<number> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const t = hallTime.current;
+    const x = Math.sin(t * 0.1) * 0.5;      // slow lateral glide
+    const y = 0.9 + Math.sin(t * 0.13) * 0.12; // gentle bob
+    camera.position.x += (x - camera.position.x) * 0.05;
+    camera.position.y += (y - camera.position.y) * 0.05;
+    camera.lookAt(0.4, 2.1, -4);            // same bearing, always
+  });
+  return null;
+}
+
 function Scene({ mode }: { mode: CyanotypeMode }) {
   const c = PALETTE[mode];
-  const pointer = useRef({ x: 0, y: 0 });
-  // drag-to-orbit: dragging the hall swings the camera around it
-  const drag = useRef({ active: false, lastX: 0, azimuth: 0 });
-  const { camera } = useThree();
-
-  useEffect(() => {
-    const onPointer = (e: PointerEvent) => {
-      pointer.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
-      pointer.current.y = -(e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    const onDown = (e: PointerEvent) => {
-      drag.current.active = true;
-      drag.current.lastX = e.clientX;
-    };
-    const onMove = (e: PointerEvent) => {
-      onPointer(e);
-      if (drag.current.active) {
-        drag.current.azimuth += (e.clientX - drag.current.lastX) * 0.004;
-        drag.current.lastX = e.clientX;
-      }
-    };
-    const onUp = () => { drag.current.active = false; };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, []);
-
-  // CONTINUOUS ORBIT: the camera circles the hall so the scene is always
-  // moving — sheets parallax against each other as the angle changes.
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    const angle = t * 0.045 + drag.current.azimuth;
-    const radius = 8.2;
-    const px = pointer.current.x, py = pointer.current.y;
-    const targetX = Math.sin(angle) * radius + px * 0.7;
-    const targetZ = Math.cos(angle) * radius;
-    const targetY = 0.9 + py * 0.35 + Math.sin(t * 0.11) * 0.25;
-    camera.position.x += (targetX - camera.position.x) * 0.05;
-    camera.position.y += (targetY - camera.position.y) * 0.05;
-    camera.position.z += (targetZ - camera.position.z) * 0.05;
-    camera.lookAt(0.4, 2.1, -4);
-  });
+  const hallTime = useHallTime();
 
   return (
     <>
       <color attach="background" args={[c.bg]} />
       <fog attach="fog" args={[c.fog, 10, 30]} />
+      <CameraGlide hallTime={hallTime} />
       <GridFloor mode={mode} />
-      <Dust mode={mode} />
-      <LightBeams mode={mode} />
-      <Sheet mode={mode} spec={{ position: [3.6, 2.3, -4.2], rotation: [-0.03, -0.55, -0.04], size: [6.2, 4.6], seed: 0, withStamp: true }} />
-      <Sheet mode={mode} spec={{ position: [-4.9, 2.0, -5.4], rotation: [0.05, 0.52, 0.03], size: [5.4, 4], seed: 1, withStamp: false, unfold: true }} />
-      <Sheet mode={mode} spec={{ position: [1.2, 3.4, -9.5], rotation: [0.08, 0.1, 0.05], size: [5, 3.8], seed: 2, withStamp: false, unfold: true }} />
-      <TracingLine mode={mode} offset={0} points={[[-6.5, 0.5, -2], [-4.6, 1.8, -3.6], [-1.4, 2.8, -5.8], [1.6, 1.6, -4.3], [4.6, 2.6, -6.4]]} />
-      <TracingLine mode={mode} offset={0.45} speed={0.085} points={[[6.2, 0.9, -1.4], [3.8, 2.6, -4.4], [0.6, 3.4, -7.6], [-3.4, 2, -5.4]]} />
-      <TracingLine mode={mode} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
-      <Structure mode={mode} position={[-7.2, 0.6, -4.2]} kind="icosa" />
-      <Structure mode={mode} position={[7.8, 0.3, -5.6]} kind="cone" />
+      <Dust mode={mode} hallTime={hallTime} />
+      <LightBeams mode={mode} hallTime={hallTime} />
+      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [3.6, 2.3, -4.2], rotation: [-0.03, -0.55, -0.04], size: [6.2, 4.6], seed: 0, withStamp: true }} />
+      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [-4.9, 2.0, -5.4], rotation: [0.05, 0.52, 0.03], size: [5.4, 4], seed: 1, withStamp: false, unfold: true }} />
+      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [1.2, 3.4, -9.5], rotation: [0.08, 0.1, 0.05], size: [5, 3.8], seed: 2, withStamp: false, unfold: true }} />
+      <TracingLine mode={mode} hallTime={hallTime} offset={0} points={[[-6.5, 0.5, -2], [-4.6, 1.8, -3.6], [-1.4, 2.8, -5.8], [1.6, 1.6, -4.3], [4.6, 2.6, -6.4]]} />
+      <TracingLine mode={mode} hallTime={hallTime} offset={0.45} speed={0.085} points={[[6.2, 0.9, -1.4], [3.8, 2.6, -4.4], [0.6, 3.4, -7.6], [-3.4, 2, -5.4]]} />
+      <TracingLine mode={mode} hallTime={hallTime} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
+      <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
+      <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
     </>
   );
 }
 
-export default function CyanotypeScene({ mode = "dark" }: { mode?: CyanotypeMode }) {
+export default function CyanotypeScene({ mode = "dark", tempo = 1 }: { mode?: CyanotypeMode; tempo?: number }) {
+  useEffect(() => {
+    setHallTempo(tempo);
+  }, [tempo]);
+
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
       <Canvas

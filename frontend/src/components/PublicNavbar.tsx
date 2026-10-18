@@ -55,13 +55,10 @@ export default function PublicNavbar() {
   }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { href: "/about", label: "About Us" },
-    { href: "/features", label: "Features" },
-    { href: "/dashboard/integrations", label: "Integrations" },
-    { href: "/docs", label: "Docs" },
-    { href: "/faq", label: "FAQs" },
-    { href: "/blog", label: "Blog" },
-    { href: "/contact", label: "Contact" },
+    { href: "/dashboard", label: "Board" },
+    { href: "/dashboard/integrations", label: "Stamps" },
+    { href: "/dashboard/workflows", label: "Builds" },
+    { href: "/dashboard/operations", label: "Sheets" },
   ];
 
   return (
@@ -111,7 +108,7 @@ export default function PublicNavbar() {
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <Link href="/login" className="btn btn-primary whitespace-nowrap">Sign In</Link>
+          <Link href="/login" className="btn btn-primary whitespace-nowrap">Sign in →</Link>
           <Link href="/get-started" className="btn btn-secondary whitespace-nowrap public-nav-started">Get Started</Link>
           <button
             type="button"
