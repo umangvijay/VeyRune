@@ -176,10 +176,17 @@ export default function LandingPage() {
           padding: "20px clamp(16px, 4vw, 40px) 10px",
         }}>
           {/* ── Hero card: bracketed console frame, frosted ── */}
-          <section className="glass-card console-frame panel-3d float-soft" style={{ padding: "clamp(22px, 3vw, 40px)", maxWidth: 560, pointerEvents: "auto" }}>
+          <section
+            className="glass-card console-frame panel-3d float-soft frost-panel"
+            style={{
+              padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto",
+              background: "color-mix(in srgb, var(--bg-secondary) 34%, transparent)",
+              backdropFilter: "blur(14px) saturate(1.1)",
+            }}
+          >
             <span className="frame-tr" /><span className="frame-bl" />
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22, gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
               <span style={{
                 fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.14em",
                 color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 8,
@@ -198,40 +205,42 @@ export default function LandingPage() {
 
             <h1 style={{
               fontFamily: "var(--font-serif)", fontWeight: 600,
-              fontSize: "clamp(30px, 3.4vw, 46px)", lineHeight: 1.06,
-              letterSpacing: "-0.015em", marginBottom: 18,
+              fontSize: "clamp(26px, 2.8vw, 40px)", lineHeight: 1.07,
+              letterSpacing: "-0.015em", marginBottom: 14,
             }}>
               Say it.<br />
               <span style={{ color: "var(--accent)" }}>It&apos;s drawn.</span><br />
               It&apos;s built.
             </h1>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
               <span style={{ width: 24, height: 1, background: "var(--accent)", display: "inline-block" }} />
-              <p style={{ fontFamily: "var(--font-serif)", fontSize: 17, color: "var(--text-primary)", margin: 0 }}>
+              <p style={{ fontFamily: "var(--font-serif)", fontSize: 15.5, color: "var(--text-primary)", margin: 0 }}>
                 Plans printed in blue. Built exactly as drawn.
               </p>
             </div>
 
-            <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 24, maxWidth: 470 }}>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 20, maxWidth: 400 }}>
               Words go in; a blueprint comes out; the building follows the blueprint.
               A missing component is drafted mid-build — and every stamp waits for you.
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Link href="/get-started" className="btn btn-primary btn-lg" style={{
-                fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "0.1em",
+              <Link href="/get-started" className="btn btn-primary" style={{
+                fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.1em",
+                padding: "10px 16px",
               }}>
                 ⌁ START A SHEET →
               </Link>
-              <Link href="/dashboard/integrations" className="btn btn-secondary btn-lg" style={{
-                fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "0.1em",
+              <Link href="/dashboard/integrations" className="btn btn-secondary" style={{
+                fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.1em",
+                padding: "10px 16px",
               }}>
                 ✎ STAMP DRAWER
               </Link>
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 26 }}>
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 20 }}>
               <span className="hud-chip">
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: engine?.online ? "#31d48c" : "var(--warm)", display: "inline-block" }} />
                 ENGINE · {engine ? (engine.online ? "ONLINE" : "WAKING") : "…"}{engine?.model ? ` · ${engine.model}` : ""}

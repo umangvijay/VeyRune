@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.4.0 — 2026-10-18
+
+### The hall shows through
+- **Hero card resized** (max-width 440, tighter padding/type, smaller CTAs
+  and chips) and made **more transparent** (frosted 34% panel) — the
+  planet, threads, and sheets are no longer hidden behind it.
+- **Planet moved into the open gap** beside the big stamped sheet — the
+  graticule globe now reads clearly as the object weaving the threads
+  into the blueprint (thread arcs visible landing on the sheet).
+
 ## v3.3.0 — 2026-10-18
 
 ### Planet knitting + docs re-papered
