@@ -30,8 +30,8 @@ export default function TokenStatusCard() {
     })();
   }, []);
 
-  const used = usage?.daily_used ?? 0;
-  const limit = usage?.daily_limit ?? 0;
+  const used = Number(usage?.daily_used ?? 0);
+  const limit = Number(usage?.daily_limit ?? 0);
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   const resetsAt = usage?.window_resets_at ? new Date(usage.window_resets_at) : null;
   const minutesToReset = resetsAt ? Math.max(0, Math.round((resetsAt.getTime() - Date.now()) / 60000)) : null;
@@ -61,7 +61,7 @@ export default function TokenStatusCard() {
         <div style={{ padding: 14, borderRadius: "var(--radius-md)", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)" }}>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>5h rolling window</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>
-            {used.toLocaleString()} <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>/ {limit.toLocaleString()} tokens</span>
+            {Number(used || 0).toLocaleString()} <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>/ {Number(limit || 0).toLocaleString()} tokens</span>
           </div>
           <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>
             {minutesToReset !== null ? `resets in ~${minutesToReset} min` : "—"}
@@ -78,7 +78,7 @@ export default function TokenStatusCard() {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
         <span>{pct}% of your daily token budget</span>
-        <span>{usage ? `${usage.remaining_tokens.toLocaleString()} remaining` : ""}</span>
+        <span>{usage && usage.remaining_tokens != null ? `${Number(usage.remaining_tokens).toLocaleString()} remaining` : ""}</span>
       </div>
     </div>
   );

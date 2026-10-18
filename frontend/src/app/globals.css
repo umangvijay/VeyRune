@@ -2003,14 +2003,15 @@ body {
   .hide-sm { display: none !important; }
 }
 
-/* Hero card: translucent so the hall shows through; hover = readable */
+/* Hero card: readable by default; hover turns it translucent so the hall
+   shows through while the dark backdrop keeps the words readable */
 .hero-card {
-  background: color-mix(in srgb, var(--bg-secondary) 42%, transparent);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
   transition: background .5s ease, border-color .5s ease;
 }
-.hero-card:hover {
-  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-primary));
+.hero-card.hero-flip:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 38%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-primary));
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.10.0 — 2026-10-19
+
+### Composition + scrollbars + reveals finalized
+- **Planet centered** in the frame; **sheets spread** (right sheet further
+  right, left sheet toward center) so the hall fills the screen with clear
+  gaps — no more merging.
+- **No scrollbars on the home**: the wrapper is exactly 100svh with
+  overflow hidden (verified scrollHeight == clientHeight).
+- **Hero hover flipped**: readable by default (80%), hover turns it
+  translucent (38%) so the hall shows through while the dark backdrop
+  keeps the words readable.
+- **Docs card art toned down**: muted slate-navy blueprint instead of the
+  oversaturated klein blue.
+- **Hero de-smeared**: solid dark console (86% + light blur) instead of
+  the frosted panel that smeared the bright sheet behind it.
+- **Scroll reveals on every page** (public + dashboard, +15 in this round;
+  deeper translate + scale + blur entrance).
+- Theme assertions in the e2e suite updated to the cyanotype palette —
+  **16/16 e2e** passing.
+
 ## v3.9.0 — 2026-10-19
 
 ### Readability + smoothness + the theme button

@@ -644,7 +644,7 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <Structure mode={mode} hallTime={hallTime} position={[-6.8, 4.2, -9.8]} kind="dodeca" />
       <OrbitingCubes mode={mode} hallTime={hallTime} />
       {/* The Planet — knitting every blueprint into existence */}
-      <Planet mode={mode} hallTime={hallTime} position={[-2.6, 4.3, -7.2]} scale={1.45} withHalo />
+      <Planet mode={mode} hallTime={hallTime} position={[1.1, 3.0, -8.2]} scale={1.45} withHalo />
       {/* Three strands woven to the big stamped sheet */}
       <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.15}
         from={[-1.7, 3.8, -7.2]} to={[2.6, 2.6, -4.1]} landAt={[2.3, 2.5, -4.05]} />

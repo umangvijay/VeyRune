@@ -108,7 +108,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
+    <div style={{ position: "relative", height: "100svh", overflow: "hidden" }}>
       {/* The drafting hall — full-viewport WebGL atmosphere */}
       <CyanotypeScene mode={mode} />
 
@@ -146,7 +146,7 @@ export default function LandingPage() {
         }}>
           {/* ── Hero card: bracketed console frame, frosted ── */}
           <section
-            className="glass-card console-frame panel-3d float-soft hero-card"
+            className="glass-card console-frame panel-3d float-soft hero-card hero-flip"
             style={{ padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto" }}
           >
             <span className="frame-tr" /><span className="frame-bl" />

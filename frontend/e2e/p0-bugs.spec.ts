@@ -55,7 +55,7 @@ test.describe('A4 — Theme', () => {
     const bgPrimary = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()
     );
-    expect(bgPrimary).toBe('#0f0f11');
+    expect(bgPrimary).toBe('#04060b'); // Tungsten near-black hall (v3.5 cyanotype)
   });
 
   test('light theme has paper-white bg', async ({ page }) => {
@@ -66,6 +66,6 @@ test.describe('A4 — Theme', () => {
     const bgPrimary = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()
     );
-    expect(bgPrimary).toBe('#f4f2eb');
+    expect(bgPrimary).toBe('#e9eef6'); // North Light drafting paper (v3.5 cyanotype)
   });
 });
