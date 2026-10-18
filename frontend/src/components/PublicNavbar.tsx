@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+
+import BrandMark from "@/components/BrandMark";import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 export default function PublicNavbar() {
@@ -83,15 +84,7 @@ export default function PublicNavbar() {
       }}>
         <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }} aria-label="Yantrika Home">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: "8px",
-              background: "linear-gradient(135deg, var(--accent), var(--accent-pink))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, fontWeight: 800, color: "white",
-              boxShadow: "0 6px 16px rgba(79, 103, 74, 0.2)"
-            }}>
-              V
-            </div>
+            <BrandMark size={30} withWordmark={false} />
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">
               Yantrika
             </span>

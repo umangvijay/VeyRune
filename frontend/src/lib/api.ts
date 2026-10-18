@@ -1008,3 +1008,66 @@ export async function installFromCatalog(mcpId: string) {
   );
 }
 
+// ── Organizations (RBAC foundation) ───────────────────────────
+
+export interface OrgRow {
+  org_id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+  role?: string;
+}
+
+export interface OrgMember {
+  user_id: string;
+  role: string;
+  added_at?: string;
+  email?: string;
+  name?: string;
+}
+
+export interface OrgRunRow {
+  run_id: string;
+  goal: string;
+  status: string;
+  created_at: string;
+  member_email?: string;
+  user_id: string;
+  tasks: { task_id: string; title?: string; agent: string; status: string; error?: string }[];
+}
+
+export async function createOrg(name: string) {
+  return apiFetch<OrgRow & { role: string }>("/orgs", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export async function listMyOrgs() {
+  return apiFetch<{ orgs: OrgRow[]; count: number }>("/orgs");
+}
+
+export async function getOrg(orgId: string) {
+  return apiFetch<OrgRow & { members: OrgMember[] }>("/orgs/" + orgId);
+}
+
+export async function addOrgMember(orgId: string, email: string, role: string) {
+  return apiFetch<{ org_id: string; user_id: string; role: string }>(
+    `/orgs/${orgId}/members`, { method: "POST", body: JSON.stringify({ email, role }) });
+}
+
+export async function removeOrgMember(orgId: string, userId: string) {
+  return apiFetch<{ org_id: string; user_id: string; removed: boolean }>(
+    `/orgs/${orgId}/members/${encodeURIComponent(userId)}`, { method: "DELETE" });
+}
+
+export async function setOrgMemberRole(orgId: string, userId: string, role: string) {
+  return apiFetch<{ org_id: string; user_id: string; role: string }>(
+    `/orgs/${orgId}/members/${encodeURIComponent(userId)}/role`, { method: "POST", body: JSON.stringify({ role }) });
+}
+
+export async function deleteOrg(orgId: string) {
+  return apiFetch<{ org_id: string; deleted: boolean }>(`/orgs/${orgId}`, { method: "DELETE" });
+}
+
+export async function getOrgRuns(orgId: string, limit = 20) {
+  return apiFetch<{ org_id: string; runs: OrgRunRow[]; count: number }>(`/orgs/${orgId}/runs?limit=${limit}`);
+}
+

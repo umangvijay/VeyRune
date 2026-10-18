@@ -1,6 +1,14 @@
 # Changelog
 
-## v2.3.0 — 2026-10-18
+## v2.4.0 — 2026-10-18
+
+### Organizations UI
+- `/dashboard/orgs`: create orgs, add members by email, the role ladder
+  inline (owner-immutable), remove members, and **run oversight** — a
+  read-only view of member runs with scoped fields. Sidebar entry +
+  2 e2e specs (14 e2e total). Visually verified in a real browser:
+  the renamed brand, forge core, and both themes render correctly.
+
 
 ### Product renamed: Veyrune → **Yantrika**
 - Sanskrit *yantra* — "machine/instrument" — the workspace that builds its
