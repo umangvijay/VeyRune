@@ -163,8 +163,9 @@ function Sheet({ spec, mode }: { spec: SheetSpec; mode: CyanotypeMode }) {
   useFrame(({ clock }) => {
     if (group.current) {
       const t = clock.getElapsedTime();
-      group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.12;
-      group.current.rotation.z = rotation[2] + Math.sin(t * 0.2 + seed * 2) * 0.018;
+      group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.24;
+      group.current.rotation.z = rotation[2] + Math.sin(t * 0.2 + seed * 2) * 0.035;
+      group.current.rotation.y = rotation[1] + Math.sin(t * 0.12 + seed) * 0.09;
       if (unfold) {
         // blueprint unfold: the sheet opens like a drawing being spread
         group.current.rotation.x = rotation[0] + Math.sin(t * 0.14 + seed) * 0.09;
@@ -298,6 +299,8 @@ function GridFloor({ mode }: { mode: CyanotypeMode }) {
 function Scene({ mode }: { mode: CyanotypeMode }) {
   const c = PALETTE[mode];
   const pointer = useRef({ x: 0, y: 0 });
+  // drag-to-orbit: dragging the hall swings the camera around it
+  const drag = useRef({ active: false, lastX: 0, azimuth: 0 });
   const { camera } = useThree();
 
   useEffect(() => {
@@ -305,16 +308,41 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       pointer.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
       pointer.current.y = -(e.clientY / window.innerHeight - 0.5) * 2;
     };
-    window.addEventListener("pointermove", onPointer);
-    return () => window.removeEventListener("pointermove", onPointer);
+    const onDown = (e: PointerEvent) => {
+      drag.current.active = true;
+      drag.current.lastX = e.clientX;
+    };
+    const onMove = (e: PointerEvent) => {
+      onPointer(e);
+      if (drag.current.active) {
+        drag.current.azimuth += (e.clientX - drag.current.lastX) * 0.004;
+        drag.current.lastX = e.clientX;
+      }
+    };
+    const onUp = () => { drag.current.active = false; };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+    };
   }, []);
 
-  // parked low-angle + observatory parallax
-  useFrame(() => {
+  // CONTINUOUS ORBIT: the camera circles the hall so the scene is always
+  // moving — sheets parallax against each other as the angle changes.
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const angle = t * 0.045 + drag.current.azimuth;
+    const radius = 8.2;
     const px = pointer.current.x, py = pointer.current.y;
-    camera.position.x += (px * 0.85 - camera.position.x) * 0.04;
-    camera.position.y += (0.9 + py * 0.32 - camera.position.y) * 0.04;
-    camera.position.z += (8.2 - camera.position.z) * 0.04;
+    const targetX = Math.sin(angle) * radius + px * 0.7;
+    const targetZ = Math.cos(angle) * radius;
+    const targetY = 0.9 + py * 0.35 + Math.sin(t * 0.11) * 0.25;
+    camera.position.x += (targetX - camera.position.x) * 0.05;
+    camera.position.y += (targetY - camera.position.y) * 0.05;
+    camera.position.z += (targetZ - camera.position.z) * 0.05;
     camera.lookAt(0.4, 2.1, -4);
   });
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.9.0 — 2026-10-18
+
+### Moving background + restored nav
+- **The background is now moving, continuously**: the camera orbits the
+  drafting hall (slow continuous angle sweep) — sheets parallax against
+  each other as the viewpoint changes, every frame different. Drag the
+  hall to swing the orbit manually.
+- **Sheet motion amplified**: stronger vertical drift, breathing rotation
+  on Z and Y — the unfold reads clearly.
+- **Public nav restored**: About Us · Features · Integrations · Docs ·
+  FAQs · Blog · Contact (module dock stays at the bottom of the home).
+
 ## v2.8.0 — 2026-10-18
 
 ### Observatory chrome + ambient hall (zoom removed by design)
