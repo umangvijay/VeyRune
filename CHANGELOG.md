@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.3.0 — 2026-10-18
+
+### Planet knitting + docs re-papered
+- **The planet knits**: the planet moved into the visible gap (bigger,
+  1.35× scale) and its threads are now **thick glowing tubes** that draw
+  progressively, carried by a bright knitting head. Where each thread
+  lands on a sheet, a **wireframe patch materializes cell by cell** —
+  the blueprint being knitted into existence is visible.
+- **Docs card art recolored**: all 8 docs SVG flowcharts re-painted from
+  pink/cream to the cyanotype palette (blueprint base, light-blue boxes
+  and arrows, light ink) — light/dark both read correctly.
+- Docs cards gain bracketed console frames.
+
 ## v3.2.0 — 2026-10-18
 
 ### Fixes + the weaving node

@@ -283,7 +283,7 @@ function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: Cyanot
 
 /** The Planet: a drafting globe — prussian seas, blueprint meridians.
  *  It turns slowly, weaving the threads that draw every sheet. */
-function Planet({ mode, hallTime, position }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number] }) {
+function Planet({ mode, hallTime, position, scale = 1 }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number]; scale?: number }) {
   const c = PALETTE[mode];
   const globe = useRef<THREE.Mesh>(null);
   const graticule = useRef<THREE.LineSegments>(null);
@@ -325,7 +325,7 @@ function Planet({ mode, hallTime, position }: { mode: CyanotypeMode; hallTime: R
   });
 
   return (
-    <group position={position}>
+    <group position={position} scale={scale}>
       <mesh ref={globe}>
         <sphereGeometry args={[1.22, 32, 24]} />
         <meshBasicMaterial color={mode === "dark" ? "#0a1e4d" : "#a8bfe8"} />
@@ -338,14 +338,16 @@ function Planet({ mode, hallTime, position }: { mode: CyanotypeMode; hallTime: R
   );
 }
 
-/** A thread: an arc from the Planet to a sheet, drawn stitch by stitch.
- *  The planet is threading the blueprint into existence. */
+/** A thread of the planet: a THICK glowing tube arcing to a sheet, woven
+ *  stitch by stitch by a knitting head — with a wireframe patch that
+ *  materializes on the sheet where the thread lands. */
 function Thread({
-  mode, from, to, hallTime, speed = 0.14, offset = 0,
+  mode, from, to, landAt, hallTime, speed = 0.14, offset = 0,
 }: {
   mode: CyanotypeMode;
   from: [number, number, number];
   to: [number, number, number];
+  landAt?: [number, number, number];
   hallTime: React.MutableRefObject<number>;
   speed?: number;
   offset?: number;
@@ -355,25 +357,31 @@ function Thread({
     const a = new THREE.Vector3(...from);
     const b = new THREE.Vector3(...to);
     const mid = a.clone().add(b).multiplyScalar(0.5);
-    mid.y += 1.6;
+    mid.y += 1.9;
     return new THREE.QuadraticBezierCurve3(a, mid, b);
   }, [from, to]);
 
-  const { line, material } = useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(2));
-    const mat = new THREE.LineBasicMaterial({ color: c.lineBright, transparent: true, opacity: 0.95 });
-    return { line: new THREE.Line(geometry, mat), material: mat };
-  }, [curve, c.line]);
+  const tube = useMemo(
+    () => new THREE.TubeGeometry(curve, 48, 0.035, 8, false),
+    [curve],
+  );
+  const tubeMat = useMemo(
+    () => new THREE.MeshBasicMaterial({
+      color: c.lineBright, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }),
+    [c.lineBright],
+  );
+  const tubeMesh = useMemo(() => new THREE.Mesh(tube, tubeMat), [tube, tubeMat]);
 
-  // the weaving node: a glow sprite riding the draw head — the planet's
-  // draughtsman, stitching the thread onto the sheet
-  const node = useMemo(() => {
+  // the knitting head: a bright glow sprite riding the weave point
+  const headSprite = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 64;
     const ctx = canvas.getContext("2d")!;
     const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(190,215,255,1)");
-    g.addColorStop(0.25, "rgba(120,160,255,0.9)");
+    g.addColorStop(0, "rgba(210,228,255,1)");
+    g.addColorStop(0.3, "rgba(130,170,255,0.95)");
     g.addColorStop(1, "rgba(62,107,255,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 64, 64);
@@ -383,29 +391,67 @@ function Thread({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }));
-    sprite.scale.setScalar(0.42);
+    sprite.scale.setScalar(0.6);
     return sprite;
   }, []);
 
+  // the patch: a small wireframe lattice that GROWS on the sheet where the
+  // thread lands — the blueprint being knitted into existence
+  const patch = useRef<THREE.Group>(null);
+  const patchEdges = useMemo(() => {
+    const g = new THREE.Group();
+    const land = new THREE.Vector3(...(landAt || to));
+    const cell = 0.34;
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const quad = new THREE.PlaneGeometry(cell, cell);
+        const edges = new THREE.EdgesGeometry(quad);
+        const mesh = new THREE.LineSegments(
+          edges,
+          new THREE.LineBasicMaterial({ color: c.lineBright, transparent: true, opacity: 0 }),
+        );
+        mesh.position.set(land.x + i * cell, land.y + j * cell, land.z + 0.02);
+        g.add(mesh);
+      }
+    }
+    return g;
+  }, [landAt, to, c.lineBright]);
+
   useFrame(() => {
-    const t = (hallTime.current * speed + offset) % 1.35;
+    const t = (hallTime.current * speed + offset) % 1.5; // weave, hold, restart
     const head = Math.min(1, t);
-    const pts = curve.getPoints(Math.max(2, Math.ceil(head * 60)));
-    line.geometry.setFromPoints(pts);
-    material.opacity = t > 1 ? 0.25 : 0.9;
-    // the weaving node rides the draw head; hides while the thread holds
-    if (t <= 1) {
-      node.position.copy(curve.getPoint(head));
-      node.visible = true;
-    } else {
-      node.visible = false;
+
+    // draw the tube progressively (rebuild geometry is cheap at 48 segments)
+    const drawn = curve.getPoints(Math.max(2, Math.ceil(head * 48)));
+    const sub = new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(drawn), Math.max(4, Math.ceil(head * 48)), 0.035, 8, false,
+    );
+    tubeMesh.geometry.dispose();
+    tubeMesh.geometry = sub;
+
+    // knitting head rides the weave point
+    const weavePoint = curve.getPoint(head);
+    headSprite.position.copy(weavePoint);
+    headSprite.visible = t <= 1.05;
+
+    // patch cells materialize one by one once the thread lands
+    if (patch.current) {
+      patch.current.children.forEach((cellMesh, idx) => {
+        const mat = (cellMesh as THREE.LineSegments).material as THREE.LineBasicMaterial;
+        const appear = Math.min(1, Math.max(0, (head - 0.9) * 10 - idx * 0.09));
+        mat.opacity = appear * 0.9;
+      });
+      patch.current.visible = head > 0.88;
     }
   });
 
   return (
     <>
-      <primitive object={line} />
-      <primitive object={node} />
+      <primitive object={tubeMesh} />
+      <primitive object={headSprite} />
+      <group ref={patch}>{patchEdges.children.map((child, i) => (
+        <primitive object={child} key={i} />
+      ))}</group>
     </>
   );
 }
@@ -481,10 +527,13 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
       <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
       {/* The Planet — threading every blueprint into existence */}
-      <Planet mode={mode} hallTime={hallTime} position={[-0.4, 3.8, -8.5]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0} from={[-0.6, 3.2, -8.2]} to={[3.4, 2.5, -4.3]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.45} speed={0.12} from={[-0.9, 3.1, -8.2]} to={[-4.8, 2.2, -5.5]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.9} speed={0.1} from={[-0.2, 3.3, -8.4]} to={[1.1, 3.5, -9.7]} />
+      <Planet mode={mode} hallTime={hallTime} position={[-1.1, 4.0, -6.8]} scale={1.35} />
+      <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.16}
+        from={[-1.0, 3.6, -6.9]} to={[3.3, 2.4, -4.15]} landAt={[3.0, 2.2, -4.1]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.5} speed={0.13}
+        from={[-1.3, 3.4, -6.9]} to={[-4.7, 2.1, -5.4]} landAt={[-4.4, 2.0, -5.3]} />
+      <Thread mode={mode} hallTime={hallTime} offset={1.0} speed={0.11}
+        from={[-0.7, 3.8, -7.1]} to={[1.1, 3.4, -9.6]} landAt={[1.0, 3.3, -9.5]} />
     </>
   );
 }

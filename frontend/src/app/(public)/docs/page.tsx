@@ -18,7 +18,7 @@ export default function DocsIndexPage() {
         </p>
         <div className="docs-grid" data-scroll-reveal style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
           {DOC_PAGES.map((p) => (
-            <Link key={p.slug} href={`/docs/${p.slug}`} className="glass-panel docs-card" style={{ padding: 0, textDecoration: "none", overflow: "hidden" }}>
+            <Link key={p.slug} href={`/docs/${p.slug}`} className="glass-panel docs-card console-frame" style={{ padding: 0, textDecoration: "none", overflow: "hidden" }}>
               <div className="docs-card-art">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.image} alt="" width={400} height={140} />
