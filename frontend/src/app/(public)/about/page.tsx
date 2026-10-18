@@ -16,7 +16,7 @@ export default function AboutPage() {
         </h1>
         <p className="text-xl md:text-2xl text-[var(--text-secondary)] mb-16 leading-relaxed font-medium">
           We are building the future of autonomous workspaces. 
-          Yantrika was created with a singular vision: an AI assistant shouldn&apos;t be limited by the tools its developers hardcoded for it.
+          Sandtable was created with a singular vision: an AI assistant shouldn&apos;t be limited by the tools its developers hardcoded for it.
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24 text-left">
@@ -24,7 +24,7 @@ export default function AboutPage() {
             <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
             <p className="text-[var(--text-secondary)] leading-relaxed">
               Our mission is to bridge the gap between static automation platforms and true artificial general intelligence.
-              When you give a goal to Yantrika, it doesn&apos;t just execute predefined scripts. It reasons about the required steps,
+              When you give a goal to Sandtable, it doesn&apos;t just execute predefined scripts. It reasons about the required steps,
               searches for missing capabilities, reads documentation, and physically writes the software it needs to accomplish your goal.
             </p>
           </div>
@@ -57,16 +57,16 @@ export default function AboutPage() {
 
         {/* The Journey */}
         <div className="glass-card p-8 md:p-14 mb-20 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">The Yantrika Journey</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">The Sandtable Journey</h2>
           <p className="text-lg md:text-xl text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto">
-            Born out of a Google DevPost hackathon, Yantrika started as an ambitious idea to combine LangChain-style reasoning
+            Born out of a Google DevPost hackathon, Sandtable started as an ambitious idea to combine LangChain-style reasoning
             with enterprise-grade deterministic execution. Today, it stands as the most advanced autonomous workspace available,
             powered by Google Gemini.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/get-started" className="btn btn-primary btn-lg w-full sm:w-auto text-center">Try Yantrika Now</Link>
+          <Link href="/get-started" className="btn btn-primary btn-lg w-full sm:w-auto text-center">Try Sandtable Now</Link>
           <Link href="/features" className="btn btn-secondary btn-lg w-full sm:w-auto text-center">View Features</Link>
         </div>
       </main>
@@ -81,9 +81,9 @@ export default function AboutPage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 800, color: "white"
             }}>V</div>
-            <span style={{ fontSize: 18, fontWeight: 800 }}>Yantrika</span>
+            <span style={{ fontSize: 18, fontWeight: 800 }}>Sandtable</span>
           </div>
-          <p>© 2026 Yantrika. All rights reserved.</p>
+          <p>© 2026 Sandtable. All rights reserved.</p>
         </div>
       </footer>
     </div>

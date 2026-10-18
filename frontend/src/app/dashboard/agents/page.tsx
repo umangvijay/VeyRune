@@ -55,7 +55,7 @@ export default function AgentsPage() {
         name: `${name.trim()} Agent`,
         version: "1.0.0",
         description: instructions.trim().slice(0, 300),
-        author: user?.name || user?.email || "Yantrika user",
+        author: user?.name || user?.email || "Sandtable user",
         agentos_version: ">=1.0.0",
         requested_permissions: [],
         required_tools: selectedTools,

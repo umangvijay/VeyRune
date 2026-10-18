@@ -62,7 +62,7 @@ export default function ContactPage() {
             Get in Touch
           </h1>
           <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-            Have a question about Yantrika, or want to discuss enterprise deployments?
+            Have a question about Sandtable, or want to discuss enterprise deployments?
             Messages go to <a href={`mailto:${TEAM_EMAIL}`} style={{ color: "var(--accent)" }}>{TEAM_EMAIL}</a>.
           </p>
         </div>
@@ -128,7 +128,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6 }}>Message</label>
-                  <textarea className="input" placeholder="How can Yantrika help you?" value={message} onChange={(e) => setMessage(e.target.value)} required style={{ width: "100%", minHeight: 150, resize: "vertical" }} />
+                  <textarea className="input" placeholder="How can Sandtable help you?" value={message} onChange={(e) => setMessage(e.target.value)} required style={{ width: "100%", minHeight: 150, resize: "vertical" }} />
                 </div>
                 <button type="submit" className="btn btn-primary btn-lg" disabled={status === "sending"} style={{ width: "100%" }}>
                   {status === "sending"

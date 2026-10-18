@@ -1,5 +1,5 @@
 /**
- * Yantrika brand lockup — an isometric "yantra" mark (machine/instrument)
+ * Sandtable brand lockup — an isometric "yantra" mark (machine/instrument)
  * plus wordmark. Pure SVG + CSS; scales with font size.
  */
 export default function BrandMark({ size = 28, withWordmark = true }: { size?: number; withWordmark?: boolean }) {
@@ -28,7 +28,7 @@ export default function BrandMark({ size = 28, withWordmark = true }: { size?: n
           backgroundClip: "text",
           color: "transparent",
         }}>
-          Yantrika
+          Sandtable
         </span>
       )}
     </span>

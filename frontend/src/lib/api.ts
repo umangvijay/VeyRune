@@ -1,5 +1,5 @@
 /**
- * Yantrika — Typed API Client (PRODUCTION)
+ * Sandtable — Typed API Client (PRODUCTION)
  *
  * No hardcoded tokens. Uses real JWT from auth state.
  * Auto-refreshes expired tokens. All endpoints typed.

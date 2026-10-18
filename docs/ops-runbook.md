@@ -1,4 +1,4 @@
-# Yantrika — Operations Runbook
+# Sandtable — Operations Runbook
 
 Production topology on Cloud Run: `veyrune-api` (FastAPI, RUN_WORKER=0),
 `veyrune-worker` (separate consumer, Pub/Sub), `veyrune-frontend`

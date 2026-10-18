@@ -36,7 +36,7 @@ export default function HomeWorkflowPreview() {
 
   return (
     <div className="orrery-preview-wrap" style={{ marginTop: 32, zIndex: 10 }}>
-      <div className="orrery-preview" aria-label="Interactive Yantrika workspace preview">
+      <div className="orrery-preview" aria-label="Interactive Sandtable workspace preview">
         <div className="orrery-preview-topbar">
           <span className="preview-window-dots"><i /><i /><i /></span>
           <span className="preview-task-title">A workspace shaped around your goal</span>
@@ -49,7 +49,7 @@ export default function HomeWorkflowPreview() {
             <div className="preview-user-prompt">{outcome}</div>
             <div className="preview-agent-note">
               <span className="preview-orb">v</span>
-              <div><strong>Yantrika</strong><p>Describe the result you want. I’ll plan the work, check for missing tools, and show you the run as it happens.</p></div>
+              <div><strong>Sandtable</strong><p>Describe the result you want. I’ll plan the work, check for missing tools, and show you the run as it happens.</p></div>
             </div>
             <form ref={formRef} className="preview-composer" onSubmit={startWorkflow}>
               <label className="sr-only" htmlFor="homepage-goal">Describe the outcome you want</label>
@@ -68,7 +68,7 @@ export default function HomeWorkflowPreview() {
             </form>
             {error && <p className="preview-inline-error" id="homepage-goal-error" role="alert">{error}</p>}
           </section>
-          <section className="preview-run" aria-label="How your request moves through Yantrika">
+          <section className="preview-run" aria-label="How your request moves through Sandtable">
             <div className="preview-run-heading"><div><span className="preview-kicker">YOUR RUN</span><h3>{goal.trim() ? "Ready to start" : "From goal to outcome"}</h3></div><span className="preview-status">{busy ? "Starting…" : "In your control"}</span></div>
             <div className="preview-step is-done"><span className="preview-step-icon">1</span><div><strong>Understand the goal</strong><small>Scope and output shaped by your request</small></div><span className="preview-step-time">Ready</span></div>
             <div className="preview-step"><span className="preview-step-icon">2</span><div><strong>Find a path</strong><small>Use available tools or identify a gap</small></div><span className="preview-step-time">Next</span></div>

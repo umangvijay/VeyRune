@@ -1,4 +1,4 @@
-> **Deploy Yantrika:** Follow the [Google Cloud + Vertex AI deployment guide](docs/deploy-gcp.md). It covers a non-upgraded $300 trial, API, pull worker, frontend, secrets, and live verification. [Current readiness and remaining gates](docs/production-readiness.md).
+> **Deploy Sandtable:** Follow the [Google Cloud + Vertex AI deployment guide](docs/deploy-gcp.md). It covers a non-upgraded $300 trial, API, pull worker, frontend, secrets, and live verification. [Current readiness and remaining gates](docs/production-readiness.md).
 
 # AgentOS
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.5.0 — 2026-10-18
+
+### SANDTABLE — "The Drafting Works" (Cyanotype redesign)
+- **Renamed again, by design**: Sandtable (the Operations Room). A sandtable
+  is where operations are rehearsed before they are real — exactly what the
+  product does with your work.
+- **Cyanotype theme**: near-black drafting hall `#04060B`, klein-blue accent
+  `#3E6BFF`, fonts Fraunces (display) + Space Grotesk (body) + JetBrains Mono
+  (telemetry). Day = "North Light" (pale drafting paper, prussian ink);
+  night = "Tungsten". The lamp toggle in the nav.
+- **Full-viewport WebGL scene** (Three.js / React Three Fiber, dynamic
+  import): giant blueprint sheets hover and unfold; light streams trace the
+  planner's path; wireframe structures assemble; drafting primitives stand
+  in the hall; grid floor + graphite dust. No cosmos, no stars — pure
+  drafting works.
+- **Home page rebuilt clean**: one viewport — glass hero card ("Say it.
+  It's drawn. It's built."), two honest panels (The Planner, Stamp Status
+  // FOR APPROVAL), HUD chips with REAL engine state from /health, and the
+  module dock: BOARD · STAMPS · BUILDS · SHEETS.
+- Module naming across the app: Board (chat) · Stamps (integrations) ·
+  Builds (runs) · Sheets (operations/metrics).
+
 ## v2.4.0 — 2026-10-18
 
 ### Organizations UI
@@ -10,7 +32,7 @@
   the renamed brand, forge core, and both themes render correctly.
 
 
-### Product renamed: Veyrune → **Yantrika**
+### Product renamed: Veyrune → **Sandtable**
 - Sanskrit *yantra* — "machine/instrument" — the workspace that builds its
   own instruments. The historian tie: the 11th-century treatise
   *Samarāṅgaṇa-sūtradhāra* catalogs yantra automata. All user-facing

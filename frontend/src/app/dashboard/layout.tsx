@@ -12,7 +12,7 @@ import { AmbientOrbs } from "@/components/GlassPanel";
 
 // ── Navigation Items ─────────────────────────────────────────────
 const NEW_CHAT = {
-  label: "New chat",
+  label: "Board",
   href: "/dashboard",
   icon: (
     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -23,12 +23,12 @@ const NEW_CHAT = {
 
 const NAV_ITEMS = [
   {
-    label: "Operations",
+    label: "Sheets",
     href: "/dashboard/operations",
     icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 15v-4m5 4V7m5 8v-6" /></svg>,
   },
   {
-    label: "Runs",
+    label: "Builds",
     href: "/dashboard/workflows",
     icon: (
       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -37,7 +37,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    label: "Integrations",
+    label: "Stamps",
     href: "/dashboard/integrations",
     icon: (
       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -180,25 +180,25 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      "/dashboard": "New chat · Yantrika",
-      "/dashboard/workflows": "Runs · Yantrika",
-      "/dashboard/integrations": "Integrations · Yantrika",
-      "/dashboard/catalog": "Catalog · Yantrika",
-      "/dashboard/orgs": "Organizations · Yantrika",
-      "/dashboard/integrations/create": "Create MCP · Yantrika",
-      "/dashboard/agents": "Agents · Yantrika",
-      "/dashboard/studio": "Studio · Yantrika",
-      "/dashboard/resume": "Resume · Yantrika",
-      "/dashboard/credentials": "Vault · Yantrika",
-      "/dashboard/schedules": "Schedules · Yantrika",
-      "/dashboard/settings": "Settings · Yantrika",
-      "/dashboard/notifications": "Notifications · Yantrika",
+      "/dashboard": "New chat · Sandtable",
+      "/dashboard/workflows": "Runs · Sandtable",
+      "/dashboard/integrations": "Integrations · Sandtable",
+      "/dashboard/catalog": "Catalog · Sandtable",
+      "/dashboard/orgs": "Organizations · Sandtable",
+      "/dashboard/integrations/create": "Create MCP · Sandtable",
+      "/dashboard/agents": "Agents · Sandtable",
+      "/dashboard/studio": "Studio · Sandtable",
+      "/dashboard/resume": "Resume · Sandtable",
+      "/dashboard/credentials": "Vault · Sandtable",
+      "/dashboard/schedules": "Schedules · Sandtable",
+      "/dashboard/settings": "Settings · Sandtable",
+      "/dashboard/notifications": "Notifications · Sandtable",
     };
     if (titles[pathname]) document.title = titles[pathname];
-    else if (pathname.startsWith("/dashboard/workspace/")) document.title = "Chat · Yantrika";
-    else if (pathname.startsWith("/dashboard/workflows/")) document.title = "Run detail · Yantrika";
-    else if (pathname.startsWith("/dashboard/integrations/")) document.title = "Integration · Yantrika";
-    else if (pathname.startsWith("/dashboard")) document.title = "Dashboard · Yantrika";
+    else if (pathname.startsWith("/dashboard/workspace/")) document.title = "Chat · Sandtable";
+    else if (pathname.startsWith("/dashboard/workflows/")) document.title = "Run detail · Sandtable";
+    else if (pathname.startsWith("/dashboard/integrations/")) document.title = "Integration · Sandtable";
+    else if (pathname.startsWith("/dashboard")) document.title = "Dashboard · Sandtable";
   }, [pathname]);
 
   useEffect(() => {
@@ -355,7 +355,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
     return (
       <div className="mesh-gradient" style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div className="glass-card" style={{ textAlign: "center", maxWidth: 420, padding: 32 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Sign in to Yantrika</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Sign in to Sandtable</h1>
           <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
             The dashboard is for an authenticated session. Sign in, or Get Started as a guest.
           </p>
@@ -393,7 +393,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             gap: 12, borderBottom: "1px solid var(--border-primary)",
           }}>
             <BrandMark size={30} withWordmark={showLabels} />
-            {showLabels && <span style={{ display: "none" }} aria-hidden="true">Yantrika</span>}
+            {showLabels && <span style={{ display: "none" }} aria-hidden="true">Sandtable</span>}
           </div>
         </Link>
 

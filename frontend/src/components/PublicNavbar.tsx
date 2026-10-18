@@ -23,24 +23,24 @@ export default function PublicNavbar() {
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      "/": "Home · Yantrika",
-      "/about": "About · Yantrika",
-      "/features": "Features · Yantrika",
-      "/integrations": "Integrations · Yantrika",
-      "/docs": "Docs · Yantrika",
-      "/faq": "FAQs · Yantrika",
-      "/blog": "Blog · Yantrika",
-      "/contact": "Contact · Yantrika",
-      "/pricing": "Pricing · Yantrika",
-      "/community": "Community · Yantrika",
-      "/privacy": "Privacy · Yantrika",
-      "/terms": "Terms · Yantrika",
-      "/get-started": "Get started · Yantrika",
-      "/login": "Sign in · Yantrika",
-      "/signup": "Sign up · Yantrika",
+      "/": "Home · Sandtable",
+      "/about": "About · Sandtable",
+      "/features": "Features · Sandtable",
+      "/integrations": "Integrations · Sandtable",
+      "/docs": "Docs · Sandtable",
+      "/faq": "FAQs · Sandtable",
+      "/blog": "Blog · Sandtable",
+      "/contact": "Contact · Sandtable",
+      "/pricing": "Pricing · Sandtable",
+      "/community": "Community · Sandtable",
+      "/privacy": "Privacy · Sandtable",
+      "/terms": "Terms · Sandtable",
+      "/get-started": "Get started · Sandtable",
+      "/login": "Sign in · Sandtable",
+      "/signup": "Sign up · Sandtable",
     };
     if (titles[pathname]) document.title = titles[pathname];
-    else if (pathname.startsWith("/docs/")) document.title = "Docs · Yantrika";
+    else if (pathname.startsWith("/docs/")) document.title = "Docs · Sandtable";
   }, [pathname]);
 
   useEffect(() => {
@@ -55,13 +55,11 @@ export default function PublicNavbar() {
   }, [isMobileMenuOpen]);
 
   const navLinks = [
-    { href: "/about", label: "About Us" },
-    { href: "/features", label: "Features" },
-    { href: "/integrations", label: "Integrations" },
+    { href: "/dashboard", label: "Board" },
+    { href: "/dashboard/integrations", label: "Stamps" },
+    { href: "/dashboard/workflows", label: "Builds" },
+    { href: "/dashboard/operations", label: "Sheets" },
     { href: "/docs", label: "Docs" },
-    { href: "/faq", label: "FAQs" },
-    { href: "/blog", label: "Blog" },
-    { href: "/contact", label: "Contact" },
   ];
 
   return (
@@ -82,11 +80,14 @@ export default function PublicNavbar() {
         boxShadow: "0 8px 30px rgba(43,42,39,0.04)",
         gap: 16,
       }}>
-        <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }} aria-label="Yantrika Home">
+        <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }} aria-label="Sandtable Home">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BrandMark size={30} withWordmark={false} />
-            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }} className="gradient-text">
-              Yantrika
+            <span style={{
+              fontSize: 21, fontWeight: 700, letterSpacing: "0.02em",
+              fontFamily: "var(--font-serif)",
+            }} className="gradient-text">
+              SANDTABLE.
             </span>
           </div>
         </Link>

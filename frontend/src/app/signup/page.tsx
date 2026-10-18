@@ -60,7 +60,7 @@ function SignupContent() {
   const isGuest = user?.role === "guest";
 
   useEffect(() => {
-    document.title = "Sign up · Yantrika";
+    document.title = "Sign up · Sandtable";
   }, []);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ function SignupContent() {
         <Link href="/" className="btn btn-ghost" style={{ marginBottom: 16 }}>← Back to home</Link>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{ fontSize: 36, fontWeight: 800, marginBottom: 8 }}>
-            <span className="gradient-text">Yantrika</span>
+            <span className="gradient-text">Sandtable</span>
           </div>
           <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>
             Create your autonomous workspace

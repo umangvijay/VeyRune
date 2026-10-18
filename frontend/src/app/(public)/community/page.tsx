@@ -13,7 +13,7 @@ export default function CommunityPage() {
             Join the Community
           </h1>
           <p style={{ fontSize: 20, color: "var(--text-secondary)", marginBottom: 48, maxWidth: 600, margin: "0 auto 64px" }}>
-            Yantrika is open source. Issues, PRs, and discussion live on GitHub.
+            Sandtable is open source. Issues, PRs, and discussion live on GitHub.
           </p>
 
           <div className="glass-card" style={{ padding: 40, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
@@ -22,7 +22,7 @@ export default function CommunityPage() {
             </div>
             <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>GitHub</h3>
             <p style={{ color: "var(--text-secondary)", marginBottom: 24, lineHeight: 1.6 }}>
-              Contribute to the Yantrika engine, MCP factory, and Cloud Run deploy docs.
+              Contribute to the Sandtable engine, MCP factory, and Cloud Run deploy docs.
             </p>
             <a
               href="https://github.com/umangvijay/AgenticOS-Google-DEVPOST"

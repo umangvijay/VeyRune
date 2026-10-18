@@ -25,7 +25,7 @@ export default function PrivacyPage() {
                 Introduction
               </h2>
               <p>
-                At Yantrika, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our autonomous workflow engine platform.
+                At Sandtable, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our autonomous workflow engine platform.
               </p>
             </section>
 
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
                 How We Use Your Data
               </h2>
               <p>
-                We use the information we collect primarily to provide, maintain, and improve the Yantrika platform. Your workflow data is securely isolated and is never used to train generalized AI models without your explicit, opt-in consent.
+                We use the information we collect primarily to provide, maintain, and improve the Sandtable platform. Your workflow data is securely isolated and is never used to train generalized AI models without your explicit, opt-in consent.
               </p>
             </section>
 

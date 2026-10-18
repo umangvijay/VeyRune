@@ -275,7 +275,7 @@ export default function CreateIntegrationPage() {
             padding: 16, fontFamily: "var(--font-mono)", fontSize: 13,
             color: "#a0a0a0", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6
           }}>
-            <div style={{ color: "#555", marginBottom: 12 }}>Yantrika MCP Factory</div>
+            <div style={{ color: "#555", marginBottom: 12 }}>Sandtable MCP Factory</div>
             {logs.map((log, i) => (
               <div key={i} className="animate-slide-in">
                 <span style={{ color: "#27c93f", marginRight: 8 }}>➜</span>

@@ -9,7 +9,7 @@ export default function DashboardPage() {
         <div className="hero-orb" aria-hidden />
         <h1 className="workspace-title">Where should we begin?</h1>
         <p className="workspace-sub">
-          Tell Yantrika the outcome you want. It plans the work, can build missing app tools, and runs the workflow against connected services.
+          Tell Sandtable the outcome you want. It plans the work, can build missing app tools, and runs the workflow against connected services.
         </p>
       </div>
 
@@ -32,7 +32,7 @@ export default function DashboardPage() {
           </li>
         </ol>
         <p>
-          The factory can register HTTP tools from OpenAPI or a REST sketch; websites use origin-locked browser tools. CAPTCHA, OTP, and MFA pause for you — Yantrika does not bypass them.
+          The factory can register HTTP tools from OpenAPI or a REST sketch; websites use origin-locked browser tools. CAPTCHA, OTP, and MFA pause for you — Sandtable does not bypass them.
         </p>
       </div>
     </div>

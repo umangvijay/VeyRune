@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, Fraunces, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/components/AppProviders";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
+const inter = Space_Grotesk({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const playfair = Fraunces({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 
 export const viewport: Viewport = {
@@ -26,24 +26,24 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "";
 
 export const metadata: Metadata = {
   title: {
-    default: "Yantrika — A workspace that builds its own tools",
-    template: "%s · Yantrika",
+    default: "Sandtable — A workspace that builds its own tools",
+    template: "%s · Sandtable",
   },
   description:
-    "Yantrika turns goals into reviewed, executable workflows and can build missing API tools along the way.",
+    "Sandtable turns goals into reviewed, executable workflows and can build missing API tools along the way.",
   keywords: ["AI", "autonomous", "workspace", "agents", "MCP", "integrations", "automation"],
   ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   openGraph: {
-    title: "Yantrika — A workspace that builds its own tools",
-    description: "Turn a goal into a workflow. Yantrika can build missing API tools, execute the work, and keep people in control.",
+    title: "Sandtable — A workspace that builds its own tools",
+    description: "Turn a goal into a workflow. Sandtable can build missing API tools, execute the work, and keep people in control.",
     type: "website",
-    siteName: "Yantrika",
+    siteName: "Sandtable",
     ...(SITE_URL ? { url: SITE_URL } : {}),
   },
   twitter: {
     card: "summary_large_image",
-    title: "Yantrika — A workspace that builds its own tools",
-    description: "Turn a goal into a workflow. Yantrika can build missing API tools, execute the work, and keep people in control.",
+    title: "Sandtable — A workspace that builds its own tools",
+    description: "Turn a goal into a workflow. Sandtable can build missing API tools, execute the work, and keep people in control.",
   },
 };
 

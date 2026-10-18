@@ -45,7 +45,7 @@ function LoginContent() {
   const isGuest = user?.role === "guest";
 
   useEffect(() => {
-    document.title = "Sign in · Yantrika";
+    document.title = "Sign in · Sandtable";
   }, []);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ function LoginContent() {
         <Link href="/" className="btn btn-ghost" style={{ marginBottom: 16 }}>← Back to home</Link>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{ fontSize: 36, fontWeight: 800, marginBottom: 8 }}>
-            <span className="gradient-text">Yantrika</span>
+            <span className="gradient-text">Sandtable</span>
           </div>
           <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>
             {isGuest ? "Sign in to keep this guest workspace" : "Sign in to your autonomous workspace"}

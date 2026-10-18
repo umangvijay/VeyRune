@@ -88,7 +88,7 @@ test.describe('Vault (credentials) page', () => {
       const path = new URL(route.request().url()).pathname;
       const method = route.request().method();
       if (path.endsWith('/credentials') && method === 'GET') {
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ credentials: stored.map(c => ({ name: c.name })), count: stored.length }) });
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ credentials: stored.map(c => c.name), count: stored.length }) });
         return;
       }
       if (path.endsWith('/credentials') && method === 'POST') {

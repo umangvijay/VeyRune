@@ -1,5 +1,5 @@
 /**
- * Yantrika theme resolution — light / dark / system.
+ * Sandtable theme resolution — light / dark / system.
  *
  * `system` follows the OS via prefers-color-scheme and live-updates when
  * the OS flips. One resolver for the first-paint script, the settings UI,

@@ -119,7 +119,7 @@ async def check_website(url: str, timeout: float = 15.0) -> Dict[str, Any]:
     try:
         from backend.config.settings import settings as app_settings
         probe_headers = {
-            "User-Agent": getattr(app_settings, "HEALTH_USER_AGENT", None) or "YantrikaHealth/2.0",
+            "User-Agent": getattr(app_settings, "HEALTH_USER_AGENT", None) or "SandtableHealth/2.0",
             "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
         }

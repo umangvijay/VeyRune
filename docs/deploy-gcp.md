@@ -1,4 +1,4 @@
-# Deploy Yantrika to Google Cloud with Vertex AI
+# Deploy Sandtable to Google Cloud with Vertex AI
 
 This guide publishes the current application; it does not certify production readiness. See [implementation status](implementation-status.md) and [remaining release gates](production-readiness.md). Run commands in Cloud Shell, in order. No command below upgrades your billing account.
 

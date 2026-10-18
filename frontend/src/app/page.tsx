@@ -1,280 +1,280 @@
+"use client";
+
+/**
+ * Sandtable home — "The Drafting Works".
+ *
+ * One clean viewport: the CyanotypeScene WebGL drafting hall behind a glass
+ * hero card (left) and two honest product panels (right). HUD chips show
+ * real server state; the bottom dock is the module map. No fake telemetry.
+ */
+
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import PublicNavbar from "@/components/PublicNavbar";
-import HomeWorkflowPreview from "@/components/HomeWorkflowPreview";
+import { applyTheme, readThemePref, resolveTheme, watchSystemTheme, type ThemePref } from "@/lib/theme";
 
-import BrandMark from "@/components/BrandMark";
+const CyanotypeScene = dynamic(() => import("@/components/CyanotypeScene"), {
+  ssr: false,
+  loading: () => <div style={{ position: "absolute", inset: 0, background: "#04060b" }} />,
+});
 
-export const metadata = { title: "Home · Yantrika" };
+const DOCK = [
+  { label: "BOARD", href: "/dashboard", hint: "The drawing board — where goals become sheets" },
+  { label: "STAMPS", href: "/dashboard/integrations", hint: "The stamp drawer — MCP registry" },
+  { label: "BUILDS", href: "/dashboard/workflows", hint: "The builds — every run, kept" },
+  { label: "SHEETS", href: "/dashboard/operations", hint: "The sheets — model board & metrics" },
+];
+
+function LampToggle() {
+  const [mode, setMode] = useState<"light" | "dark">("dark");
+  useEffect(() => {
+    setMode(resolveTheme(readThemePref()));
+    return watchSystemTheme();
+  }, []);
+  const toggle = useCallback(() => {
+    const next: ThemePref = mode === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setMode(next);
+  }, [mode]);
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`Switch to ${mode === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        padding: "8px 14px", borderRadius: "var(--radius-md)",
+        border: "1px solid var(--border-primary)",
+        background: "var(--bg-glass)", color: "var(--text-secondary)",
+        fontFamily: "var(--font-mono)", fontSize: 11.5, letterSpacing: "0.08em",
+        cursor: "pointer",
+      }}
+    >
+      <span style={{
+        width: 7, height: 7, borderRadius: "50%",
+        background: mode === "dark" ? "var(--accent)" : "#e8c15a",
+        boxShadow: "0 0 8px currentColor",
+        color: mode === "dark" ? "var(--accent)" : "#e8c15a",
+      }} />
+      {mode === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}
+    </button>
+  );
+}
+
+/** Real engine state from the public health endpoint — no invented telemetry. */
+function useEngine() {
+  const [engine, setEngine] = useState<{ online: boolean; model: string; storage: string } | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/health");
+        const h = await res.json();
+        setEngine({
+          online: Boolean(h.factory_initialized),
+          model: String(h.model || "unset").toUpperCase(),
+          storage: String(h.storage || "").toUpperCase(),
+        });
+      } catch {
+        setEngine({ online: false, model: "", storage: "" });
+      }
+    })();
+  }, []);
+  return engine;
+}
 
 export default function LandingPage() {
+  const [mode, setMode] = useState<"light" | "dark">("dark");
+  const engine = useEngine();
+
+  useEffect(() => {
+    setMode(resolveTheme(readThemePref()));
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      if (readThemePref() === "system") setMode(mq.matches ? "dark" : "light");
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
   return (
-    <div className="mesh-gradient" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+    <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
+      {/* The drafting hall — full-viewport WebGL */}
+      <CyanotypeScene mode={mode} />
+
+      <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
         <PublicNavbar />
 
-      <main className="px-4 pb-12 md:py-20 homepage-main" style={{ paddingTop: 32, textAlign: "center", position: "relative" }}>
-        <div style={{ zIndex: 10, width: "100%", display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 24, alignItems: "center" }} className="hero-grid">
-          <div>
-          <div className="home-command-pill"><span className="home-status-dot" />OUTCOME-DRIVEN WORKSPACE <span className="home-command-divider">/</span> HUMAN-CONTROLLED</div>
-          <p className="eyebrow">A workspace that grows with the work</p>
-          <h1 className="mt-4 md:mt-10 apple-hero" style={{
-            fontSize: "clamp(36px, 8vw, 84px)", fontWeight: 900, lineHeight: 1.05,
-            letterSpacing: "-0.04em", marginBottom: 24, maxWidth: 1000, marginInline: "auto"
+        <main style={{
+          flex: 1, display: "grid", alignItems: "center", gap: 20,
+          gridTemplateColumns: "minmax(0, 1fr)", maxWidth: 1360, width: "100%",
+          margin: "0 auto", padding: "24px clamp(16px, 4vw, 40px) 12px",
+          gridTemplateRows: "1fr auto",
+        }}>
+          <div style={{ display: "grid", gap: 20, alignItems: "center", gridTemplateColumns: "minmax(0,1fr)" }} className="hero-grid">
+            {/* ── Hero card ── */}
+            <section
+              className="glass-card panel-3d"
+              style={{ padding: "clamp(24px, 3.4vw, 44px)", maxWidth: 640 }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 26, gap: 12, flexWrap: "wrap" }}>
+                <span style={{
+                  fontFamily: "var(--font-mono)", fontSize: 11.5, letterSpacing: "0.14em",
+                  color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 8,
+                }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 8px var(--accent)" }} />
+                  SANDTABLE · THE DRAFTING WORKS
+                </span>
+                <span style={{
+                  fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.1em",
+                  color: "var(--text-tertiary)", border: "1px solid var(--border-primary)",
+                  padding: "4px 10px", borderRadius: 6,
+                }}>
+                  MCP TOOL ENGINE // v2.4
+                </span>
+              </div>
+
+              <h1 style={{
+                fontFamily: "var(--font-serif)", fontWeight: 600,
+                fontSize: "clamp(40px, 5.2vw, 68px)", lineHeight: 1.04,
+                letterSpacing: "-0.015em", marginBottom: 22,
+              }}>
+                Say it.<br />
+                <span style={{ color: "var(--accent)" }}>It&apos;s drawn.</span><br />
+                It&apos;s built.
+              </h1>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+                <span style={{ width: 28, height: 1, background: "var(--accent)", display: "inline-block" }} />
+                <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(17px, 1.6vw, 20px)", color: "var(--text-primary)", margin: 0 }}>
+                  Plans printed in blue. Built exactly as drawn.
+                </p>
+              </div>
+
+              <p style={{ fontSize: 15.5, color: "var(--text-secondary)", lineHeight: 1.65, marginBottom: 30, maxWidth: 520 }}>
+                Describe the outcome. The planner prints the blueprint, light crews build exactly
+                what&apos;s drawn, and a missing component is drafted and fabricated mid-build —
+                every stamp waits for you.
+              </p>
+
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <Link href="/get-started" className="btn btn-primary btn-lg" style={{
+                  fontFamily: "var(--font-mono)", fontSize: 13, letterSpacing: "0.1em",
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                }}>
+                  ⌁ START A SHEET →
+                </Link>
+                <Link href="/dashboard/integrations" className="btn btn-secondary btn-lg" style={{
+                  fontFamily: "var(--font-mono)", fontSize: 13, letterSpacing: "0.1em",
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                }}>
+                  ✎ OPEN THE STAMP DRAWER
+                </Link>
+              </div>
+
+              {/* HUD chips — real engine state */}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 34 }}>
+                <span className="hud-chip">
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: engine?.online ? "#31d48c" : "#e8c15a", display: "inline-block" }} />
+                  ENGINE · {engine ? (engine.online ? "ONLINE" : "WAKING") : "…"}{engine?.model ? ` · ${engine.model}` : ""}
+                </span>
+                <span className="hud-chip">VAULT · AES-256-GCM</span>
+                <span className="hud-chip">APPROVALS · HUMAN-HELD</span>
+              </div>
+            </section>
+
+            {/* ── Right rail: honest product panels ── */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <section className="glass-card" style={{ padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.12em", color: "var(--steel)" }}>
+                    ⌁ THE PLANNER // LIGHT CREWS
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-tertiary)" }}>// SHEET_01</span>
+                </div>
+                <svg viewBox="0 0 300 80" style={{ width: "100%", height: 72 }} aria-hidden="true">
+                  <polyline
+                    points="6,66 60,30 120,52 180,14 236,40 294,20"
+                    fill="none" stroke="var(--accent)" strokeWidth="1.6"
+                    strokeDasharray="340" strokeDashoffset="120"
+                    style={{ animation: "cyan-trace 3.2s ease-in-out infinite alternate" }}
+                  />
+                  {[[6, 66], [60, 30], [120, 52], [180, 14], [236, 40], [294, 20]].map(([x, y]) => (
+                    <circle key={`${x}-${y}`} cx={x} cy={y} r="2.6" fill="var(--accent)" />
+                  ))}
+                  <polyline
+                    points="6,70 90,58 160,64 240,50 294,58"
+                    fill="none" stroke="var(--text-tertiary)" strokeWidth="1"
+                    strokeDasharray="3 5" opacity="0.6"
+                  />
+                </svg>
+                <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "10px 0 0", lineHeight: 1.55 }}>
+                  A goal becomes a sheet: the planner traces the DAG, dependencies lock,
+                  and every step is drafted before it is built.
+                </p>
+              </section>
+
+              <section className="glass-card" style={{ padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.12em", color: "var(--steel)" }}>
+                    ⌾ STAMP STATUS // GATE-04
+                  </span>
+                  <span style={{
+                    fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em",
+                    border: "1px solid var(--accent)", color: "var(--accent)",
+                    padding: "3px 8px", borderRadius: 4,
+                  }}>
+                    FOR APPROVAL
+                  </span>
+                </div>
+                <p style={{ fontSize: 13.5, color: "var(--text-primary)", margin: "0 0 8px", fontWeight: 600 }}>
+                  WritePermission_PostgresSchema
+                </p>
+                <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: 0, lineHeight: 1.55 }}>
+                  A missing component was drafted mid-build. Consequential stamps pause
+                  here — approve, revise, or reject. Nothing fires without you.
+                </p>
+                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                  <span className="hud-chip" style={{ color: "var(--accent)", borderColor: "var(--accent)" }}>✓ STAMP (APPROVE)</span>
+                  <span className="hud-chip">✕ REVISE</span>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          {/* ── Bottom dock: the module map ── */}
+          <nav aria-label="Modules" style={{
+            display: "flex", justifyContent: "center", gap: "clamp(12px, 3vw, 36px)",
+            flexWrap: "wrap", padding: "10px 0 18px",
           }}>
-            Meet Yantrika.<br className="hidden md:block" />
-            <span className="gradient-text">Workflows that make their own tools.</span>
-          </h1>
-          <p style={{
-            fontSize: "clamp(18px, 2.5vw, 24px)", color: "var(--text-secondary)",
-            marginBottom: 48, maxWidth: 700, margin: "0 auto 48px", fontWeight: 400
-          }}>
-            Describe the outcome. Yantrika finds the path, creates a missing integration when it needs one, and keeps you in control of consequential actions.
-          </p>
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
-            <Link href="/get-started" className="btn btn-primary btn-lg">Start Building Free</Link>
-            <Link href="/login" className="btn btn-secondary btn-lg">Sign In</Link>
-            <Link href="/docs" className="btn btn-ghost btn-lg">Read the docs</Link>
-          </div>
-          <div className="home-stage-ribbon" aria-label="Workflow stages">
-            <span>Understand</span><i>→</i><span>Plan</span><i>→</i><span>Build what’s missing</span><i>→</i><span>Execute with review</span>
-          </div>
-          </div>
-
-          {/* The forge core: a CSS-3D yantra — three counter-rotating rings around a molten core */}
-          <div style={{ maxWidth: 360, width: "100%", margin: "0 auto", justifySelf: "center" }} aria-hidden="true">
-            <div className="forge-scene">
-              <div className="forge-ring r2" />
-              <div className="forge-ring r3" />
-              <div className="forge-ring" />
-              <div className="forge-core" />
-            </div>
-          </div>
-        </div>
-
-        <HomeWorkflowPreview />
-      </main>
-
-      <section data-scroll-reveal className="py-20 md:py-28 px-5">
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <p className="eyebrow" style={{ textAlign: "center" }}>Why we exist</p>
-          <h2 style={{ textAlign: "center", fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, marginBottom: 48, letterSpacing: "-0.03em" }}>
-            Vision and mission
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="glass-panel p-8 md:p-10">
-                <h3 style={{ fontSize: 28, fontFamily: "var(--font-serif)", marginBottom: 16 }}>Vision</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: 18, lineHeight: 1.7 }}>
-                A workspace where you describe the outcome — and the system grows the tools it needs.
-                No frozen integration catalog. No waiting for a vendor plugin. Any app with an API, or a site you can log into, becomes usable the moment you ask.
-              </p>
-            </div>
-            <div className="glass-panel p-8 md:p-10">
-              <h3 style={{ fontSize: 28, fontFamily: "var(--font-serif)", marginBottom: 16 }}>Mission</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: 18, lineHeight: 1.7 }}>
-                Give people an autonomous agent that plans, builds missing MCP tools, and executes in real time —
-                with encrypted vaults, human approvals, and the option to bring your own Gemini key.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section data-scroll-reveal style={{ padding: "60px 0", background: "var(--bg-primary)", position: "relative", overflow: "hidden" }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: 2, textTransform: "uppercase" }}>
-            Connects with any HTTP API
-          </p>
-        </div>
-        <div className="marquee-container animate-fade-in-up">
-          <div className="marquee-content" style={{ display: "flex", gap: 64, alignItems: "center" }}>
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} style={{ display: "flex", gap: 64, alignItems: "center" }}>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Stripe</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Slack</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Notion</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>GitHub</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Gmail</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Discord</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Jira</span>
-                <span style={{ fontSize: 32, fontWeight: 700, color: "var(--text-secondary)" }}>Salesforce</span>
-              </div>
+            {DOCK.map(d => (
+              <Link key={d.label} href={d.href} title={d.hint} style={{
+                fontFamily: "var(--font-mono)", fontSize: 11.5, letterSpacing: "0.14em",
+                color: "var(--text-secondary)", textDecoration: "none",
+                display: "inline-flex", alignItems: "center", gap: 7,
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+                {d.label}
+              </Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-scroll-reveal className="py-20 md:py-28 px-5">
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <p className="eyebrow" style={{ textAlign: "center" }}>Automation pipeline</p>
-          <h2 className="apple-hero" style={{ textAlign: "center", fontSize: "clamp(32px, 5vw, 48px)", marginBottom: 40 }}>
-            AI that executes work, not just chat.
-          </h2>
-          <div className="pipeline-steps">
-            {[
-              ["01", "Intent", "Parse the goal, the target app, and constraints from plain language."],
-              ["02", "Plan", "Break the goal into a DAG of tasks the engine can run."],
-              ["03", "Build tools", "If an API is missing, the MCP factory writes and probes it live."],
-              ["04", "Execute", "HTTP, health, email, browser, and generated tools run in order."],
-              ["05", "Recover", "Retries, circuit breakers, and human approvals when risk is high."],
-              ["06", "Report", "The workspace thread shows events and real task output."],
-            ].map(([n, t, d]) => (
-              <div key={n} className="glass-panel pipeline-step">
-                <div className="gradient-text" style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>{n}</div>
-                <h3 style={{ fontSize: 20, margin: "0 0 8px" }}>{t}</h3>
-                <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.6 }}>{d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section data-scroll-reveal className="py-20 md:py-32 px-5 relative" style={{ background: "var(--bg-primary)" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 80 }}>
-            <h2 className="animate-fade-in-up" style={{ fontSize: "clamp(32px, 5vw, 56px)", fontWeight: 800, marginBottom: 24 }}>
-              Everything you need to <span className="gradient-text">automate anything.</span>
-            </h2>
-            <p style={{ fontSize: 20, color: "var(--text-secondary)", maxWidth: 600, margin: "0 auto" }}>
-              Yantrika combines model-guided planning with deterministic workflow execution.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent-pink)]">
-              <h3 className="text-xl md:text-2xl font-bold mb-4">Autonomous Planning</h3>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
-                Give Yantrika a high-level goal. It breaks it into tasks and routes them to the right capabilities.
-              </p>
-            </div>
-            <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent-purple)]">
-              <h3 className="text-xl md:text-2xl font-bold mb-4">Dynamic MCP Builder</h3>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
-                Missing an API connector? Yantrika can interpret an API spec, test a generated tool, and make it available to the run.
-              </p>
-            </div>
-            <div className="glass-panel animate-fade-in-up p-6 md:p-8 border-t-2 border-[var(--accent)]">
-              <h3 className="text-xl md:text-2xl font-bold mb-4">Your keys, your quota</h3>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
-                Bring a Gemini API key in Settings. It is encrypted in the vault and used for your runs.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 md:py-32 px-5 relative overflow-hidden">
-        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 80 }}>
-            <h2 style={{ fontSize: "clamp(32px, 5vw, 56px)", fontWeight: 800, marginBottom: 24 }}>How Yantrika Works</h2>
-            <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Illustrative examples · each run generates its own steps and outputs.</p>
-          </div>
-          <div className="flex flex-col gap-16 md:gap-24">
-            <div className="flex flex-col lg:flex-row gap-10 items-center">
-              <div className="flex-1 w-full">
-                <div className="gradient-text" style={{ fontSize: 80, fontWeight: 900, lineHeight: 1, marginBottom: 24, opacity: 0.8 }}>01</div>
-                <h3 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Define your intent</h3>
-                <p style={{ fontSize: 18, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                  Type what you want. The intent agent maps it onto the tools you already have — or the ones it will build.
-                </p>
-              </div>
-              <div className="glass-panel flex-1 w-full p-8" style={{ background: "rgba(43,42,39,0.92)", color: "white" }}>
-                <div style={{ fontFamily: "var(--font-mono)", color: "var(--success)" }}>
-                  &gt; Goal: Check health of https://example.com and report the status code.
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col lg:flex-row-reverse gap-10 items-center">
-              <div className="flex-1 w-full">
-                <div className="gradient-text" style={{ fontSize: 80, fontWeight: 900, lineHeight: 1, marginBottom: 24, opacity: 0.8 }}>02</div>
-                <h3 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Build missing tools</h3>
-                <p style={{ fontSize: 18, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                  From OpenAPI, a docs URL, or a description, the MCP factory probes live and registers tools.
-                </p>
-              </div>
-              <div className="glass-panel flex-1 w-full p-8">
-                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                  <span className="preview-file-icon">✓</span>
-                  <span style={{ color: "var(--accent)", fontFamily: "var(--font-mono)" }}>Example · tool tested, ready for review</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col lg:flex-row gap-10 items-center">
-              <div className="flex-1 w-full">
-                <div className="gradient-text" style={{ fontSize: 80, fontWeight: 900, lineHeight: 1, marginBottom: 24, opacity: 0.8 }}>03</div>
-                <h3 style={{ fontSize: 32, fontWeight: 700, marginBottom: 16 }}>Execute and watch</h3>
-                <p style={{ fontSize: 18, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                  The orchestrator runs the DAG with retries, circuit breakers, and approvals. You see it as a chat.
-                </p>
-              </div>
-              <div className="glass-panel flex-1 w-full p-8" style={{ fontFamily: "var(--font-mono)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: 8, marginBottom: 8 }}>
-                  <span>Example · site health</span> <span style={{ color: "var(--success)" }}>Complete</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Example · report</span> <span style={{ color: "var(--success)" }}>Ready</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section data-scroll-reveal className="py-20 md:py-32 px-5 text-center relative" style={{ background: "var(--bg-secondary)" }}>
-        <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <h2 style={{ fontSize: "clamp(36px, 6vw, 64px)", fontWeight: 900, marginBottom: 32, letterSpacing: "-0.03em" }}>
-            Ready to try it?
-          </h2>
-          <p style={{ fontSize: "clamp(18px, 4vw, 24px)", color: "var(--text-secondary)", marginBottom: 48 }}>
-            Open a free guest workspace. No credit card. Bring your own API key whenever you want.
-          </p>
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/login" className="btn btn-primary btn-lg">Sign In</Link>
-            <Link href="/get-started" className="btn btn-secondary btn-lg">Get Started for Free</Link>
-          </div>
-        </div>
-      </section>
-
-      <footer className="pt-16 pb-8 px-5" style={{ borderTop: "1px solid var(--border-primary)", background: "var(--bg-primary)" }}>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-10 md:gap-12" style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div className="col-span-2 lg:col-span-1 mb-2 lg:mb-0">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              <BrandMark size={24} withWordmark={false} />
-              <span style={{ fontSize: 18, fontWeight: 800 }}>Yantrika</span>
-            </div>
-            <p style={{ color: "var(--text-tertiary)", fontSize: 14, lineHeight: 1.6 }}>
-              The autonomous workspace that builds its own tools.
-            </p>
-          </div>
-          <div>
-            <h2 style={{ fontWeight: 600, marginBottom: 16, fontSize: 15 }}>Product</h2>
-            <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 12, color: "var(--text-secondary)", fontSize: 14 }}>
-              <li><Link href="/features">Features</Link></li>
-              <li><Link href="/integrations">Integrations</Link></li>
-              <li><Link href="/pricing">Pricing</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h2 style={{ fontWeight: 600, marginBottom: 16, fontSize: 15 }}>Resources</h2>
-            <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 12, color: "var(--text-secondary)", fontSize: 14 }}>
-              <li><Link href="/docs">Documentation</Link></li>
-              <li><Link href="/faq">FAQs</Link></li>
-              <li><Link href="/blog">Blog</Link></li>
-              <li><Link href="/community">Community</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h2 style={{ fontWeight: 600, marginBottom: 16, fontSize: 15 }}>Legal</h2>
-            <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: 12, color: "var(--text-secondary)", fontSize: 14 }}>
-              <li><Link href="/privacy">Privacy Policy</Link></li>
-              <li><Link href="/terms">Terms of Service</Link></li>
-              <li><Link href="/contact">Contact</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div style={{ maxWidth: 1200, margin: "48px auto 0", paddingTop: 32, borderTop: "1px solid var(--border-primary)" }}>
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>© 2026 Yantrika. All rights reserved.</p>
-        </div>
-      </footer>
+          </nav>
+        </main>
       </div>
+
+      <style jsx global>{`
+        .hud-chip {
+          display: inline-flex; align-items: center; gap: 8px;
+          font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em;
+          color: var(--text-secondary);
+          border: 1px solid var(--border-primary);
+          background: var(--bg-glass);
+          padding: 6px 12px; border-radius: 6px;
+        }
+        @keyframes cyan-trace {
+          from { stroke-dashoffset: 340; }
+          to   { stroke-dashoffset: 0; }
+        }
+      `}</style>
     </div>
   );
 }

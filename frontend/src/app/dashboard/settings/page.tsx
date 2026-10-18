@@ -147,7 +147,7 @@ export default function SettingsPage() {
     <div className="animate-fade-in" style={{ maxWidth: 800, margin: "0 auto" }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700 }}>Settings</h1>
-        <p style={{ color: "var(--text-secondary)" }}>Manage your account and Yantrika preferences.</p>
+        <p style={{ color: "var(--text-secondary)" }}>Manage your account and Sandtable preferences.</p>
       <div style={{ marginTop: 14 }}>
         <span className="trust-badge">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" /></svg>
