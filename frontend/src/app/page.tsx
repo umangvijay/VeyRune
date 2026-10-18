@@ -177,11 +177,11 @@ export default function LandingPage() {
         }}>
           {/* ── Hero card: bracketed console frame, frosted ── */}
           <section
-            className="glass-card console-frame panel-3d float-soft frost-panel"
+            className="glass-card console-frame panel-3d float-soft"
             style={{
               padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto",
-              background: "color-mix(in srgb, var(--bg-secondary) 34%, transparent)",
-              backdropFilter: "blur(14px) saturate(1.1)",
+              background: "color-mix(in srgb, var(--bg-secondary) 86%, transparent)",
+              backdropFilter: "blur(6px)",
             }}
           >
             <span className="frame-tr" /><span className="frame-bl" />
@@ -258,7 +258,7 @@ export default function LandingPage() {
 
           {/* ── Right rail: concise, frosted ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 340, width: "100%", pointerEvents: "auto" }}>
-            <section className="glass-card frost-panel console-frame" style={{ padding: 16 }}>
+            <section className="glass-card console-frame" style={{ padding: 16 }}>
               <span className="frame-tr" />
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.12em", color: "var(--steel)" }}>
@@ -282,7 +282,7 @@ export default function LandingPage() {
               </p>
             </section>
 
-            <section className="glass-card frost-panel console-frame" style={{ padding: 16 }}>
+            <section className="glass-card console-frame" style={{ padding: 16 }}>
               <span className="frame-tr" />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.12em", color: "var(--steel)" }}>

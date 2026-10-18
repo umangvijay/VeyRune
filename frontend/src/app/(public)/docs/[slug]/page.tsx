@@ -24,7 +24,7 @@ export default async function DocArticle({ params }: { params: Promise<{ slug: s
       <PublicNavbar />
       <div className="docs-layout">
         <DocsToc currentSlug={slug} />
-        <article className="docs-article">
+        <article data-scroll-reveal className="docs-article">
           <Link href="/docs" style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none" }}>← All docs</Link>
           <h1 className="apple-hero" style={{ fontSize: "clamp(28px, 5vw, 44px)", margin: "12px 0 16px" }}>{page.title}</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 18, lineHeight: 1.6, marginBottom: 28 }}>{page.blurb}</p>
@@ -47,7 +47,7 @@ export default async function DocArticle({ params }: { params: Promise<{ slug: s
           </div>
 
           {page.sections.map((s) => (
-            <section key={s.h} className="docs-section">
+            <section data-scroll-reveal key={s.h} className="docs-section">
               <h2>{s.h}</h2>
               <p>{s.p}</p>
               {s.bullets && (

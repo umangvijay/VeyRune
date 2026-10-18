@@ -18,7 +18,7 @@ export default function TermsPage() {
             </p>
           </div>
 
-          <div className="glass-card" style={{ padding: "48px 40px", display: "flex", flexDirection: "column", gap: 48, color: "var(--text-secondary)", lineHeight: 1.8, fontSize: 18 }}>
+          <div data-scroll-reveal className="glass-card" style={{ padding: "48px 40px", display: "flex", flexDirection: "column", gap: 48, color: "var(--text-secondary)", lineHeight: 1.8, fontSize: 18 }}>
             <section>
               <h2 style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ color: "var(--accent-pink)", fontSize: 16, fontFamily: "var(--font-mono)", background: "rgba(236,72,153,0.1)", padding: "4px 12px", borderRadius: 20 }}>01</span>

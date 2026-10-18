@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.5.0 — 2026-10-18
+
+### Palette discipline + planet separation + reveals everywhere
+- **Docs cards toned down**: the klein-blue card art was oversaturated —
+  re-painted to a muted slate-navy blueprint with softer ink (8 SVGs).
+- **Hero de-smeared**: the frosted 34% panel + heavy blur smeared the
+  bright sheet behind it into a blue blob. The hero is now a solid dark
+  console panel (86% + light blur) — crisp text, and the scene stays
+  visible around it.
+- **Planet separated**: pulled left and back so the graticule globe no
+  longer merges with the sheet's edge; threads arc across the clear gap.
+- **Scroll reveals on every public page** (privacy, terms, docs/[slug],
+  community, get-started added; +15 reveals) — all pages animate on
+  scroll now.
+
 ## v3.4.0 — 2026-10-18
 
 ### The hall shows through

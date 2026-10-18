@@ -527,13 +527,13 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
       <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
       {/* The Planet — threading every blueprint into existence */}
-      <Planet mode={mode} hallTime={hallTime} position={[0.5, 3.9, -6.6]} scale={1.3} />
+      <Planet mode={mode} hallTime={hallTime} position={[-2.4, 4.1, -7.6]} scale={1.15} />
       <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.16}
-        from={[0.3, 3.5, -6.7]} to={[3.3, 2.4, -4.15]} landAt={[3.0, 2.2, -4.1]} />
+        from={[-1.6, 3.7, -7.3]} to={[3.3, 2.4, -4.15]} landAt={[3.0, 2.2, -4.1]} />
       <Thread mode={mode} hallTime={hallTime} offset={0.5} speed={0.13}
-        from={[0.1, 3.3, -6.7]} to={[-4.7, 2.1, -5.4]} landAt={[-4.4, 2.0, -5.3]} />
+        from={[-1.8, 3.5, -7.3]} to={[-4.7, 2.1, -5.4]} landAt={[-4.4, 2.0, -5.3]} />
       <Thread mode={mode} hallTime={hallTime} offset={1.0} speed={0.11}
-        from={[0.7, 3.7, -6.9]} to={[1.1, 3.4, -9.6]} landAt={[1.0, 3.3, -9.5]} />
+        from={[-1.2, 3.9, -7.5]} to={[1.1, 3.4, -9.6]} landAt={[1.0, 3.3, -9.5]} />
     </>
   );
 }

@@ -16,7 +16,7 @@ export default function CommunityPage() {
             Sandtable is open source. Issues, PRs, and discussion live on GitHub.
           </p>
 
-          <div className="glass-card" style={{ padding: 40, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+          <div data-scroll-reveal className="glass-card" style={{ padding: 40, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#333", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, fontSize: 24, color: "white", fontWeight: "bold" }}>
               G
             </div>

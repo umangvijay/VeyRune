@@ -44,7 +44,7 @@ export default function GetStartedPage() {
 
   return (
     <div className="mesh-gradient" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div className="glass-panel animate-fade-in-up" style={{ textAlign: "center", maxWidth: 440, padding: 40 }}>
+      <div data-scroll-reveal className="glass-panel animate-fade-in-up" style={{ textAlign: "center", maxWidth: 440, padding: 40 }}>
         {error ? (
           <div>
             <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Could not open workspace</h2>
