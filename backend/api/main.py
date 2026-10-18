@@ -115,9 +115,11 @@ from backend.api.routers.capabilities import router as capabilities_router
 from backend.api.routers.usage import router as usage_router
 from backend.api.routers.agents import router as agents_router
 from backend.api.routers.contact import router as contact_router  # public contact inbox + email delivery
+from backend.api.routers.orgs import router as orgs_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(contact_router, prefix="/api/v1")
+app.include_router(orgs_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

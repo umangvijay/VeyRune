@@ -20,6 +20,7 @@ from backend.repositories.base import (
     BaseTokenDenylistRepository,
     BaseAdaptivePolicyRepository,
     BaseApiKeysRepository,
+    BaseOrgRepository,
 )
 from backend.repositories.firestore.database import FirestoreDB
 from backend.repositories.sqlite.settings_repository import DEFAULT_SETTINGS
@@ -376,6 +377,97 @@ class FirestoreNotificationRepository(BaseNotificationRepository):
 
     async def get_unread_count(self, user_id: str) -> int:
         return len(await self.list_notifications(user_id, unread_only=True, limit=500))
+
+
+class FirestoreOrgRepository(BaseOrgRepository):
+    """Orgs and membership. orgs/{org_id} + org_members/{org_id}_{user_id}."""
+
+    async def create_org(self, name: str, owner_id: str) -> Dict[str, Any]:
+        import uuid
+        db = await _db()
+        org_id = str(uuid.uuid4())
+        now = _now()
+        await db.collection("orgs").document(org_id).set(
+            {"org_id": org_id, "name": name, "owner_id": owner_id, "created_at": now}
+        )
+        await db.collection("org_members").document(f"{org_id}_{owner_id}").set(
+            {"org_id": org_id, "user_id": owner_id, "role": "owner", "added_at": now, "added_by": owner_id}
+        )
+        return {"org_id": org_id, "name": name, "owner_id": owner_id, "created_at": now}
+
+    async def get_org(self, org_id: str) -> Optional[Dict[str, Any]]:
+        db = await _db()
+        doc = await db.collection("orgs").document(org_id).get()
+        return doc.to_dict() if doc.exists else None
+
+    async def list_orgs_for_user(self, user_id: str) -> List[Dict[str, Any]]:
+        db = await _db()
+        out = []
+        async for doc in db.collection("org_members").where("user_id", "==", user_id).stream():
+            m = doc.to_dict() or {}
+            org = await self.get_org(m.get("org_id") or "")
+            if org:
+                out.append({**org, "role": m.get("role")})
+        out.sort(key=lambda o: o.get("created_at") or "", reverse=True)
+        return out
+
+    async def get_member_role(self, org_id: str, user_id: str) -> Optional[str]:
+        db = await _db()
+        doc = await db.collection("org_members").document(f"{org_id}_{user_id}").get()
+        return (doc.to_dict() or {}).get("role") if doc.exists else None
+
+    async def list_members(self, org_id: str) -> List[Dict[str, Any]]:
+        db = await _db()
+        out = []
+        async for doc in db.collection("org_members").where("org_id", "==", org_id).stream():
+            m = dict(doc.to_dict() or {})
+            user = await db.collection("users").document(m.get("user_id") or "").get()
+            if user.exists:
+                u = user.to_dict() or {}
+                m["email"] = u.get("email")
+                m["name"] = u.get("name")
+            out.append(m)
+        return out
+
+    async def add_member(self, org_id: str, user_id: str, role: str, added_by: str) -> bool:
+        if await self.get_org(org_id) is None:
+            return False
+        db = await _db()
+        await db.collection("org_members").document(f"{org_id}_{user_id}").set(
+            {"org_id": org_id, "user_id": user_id, "role": role, "added_at": _now(), "added_by": added_by}
+        )
+        return True
+
+    async def set_member_role(self, org_id: str, user_id: str, role: str) -> bool:
+        db = await _db()
+        ref = db.collection("org_members").document(f"{org_id}_{user_id}")
+        doc = await ref.get()
+        data = doc.to_dict() or {}
+        if not doc.exists or data.get("role") == "owner":
+            return False
+        await ref.set({**data, "role": role})
+        return True
+
+    async def remove_member(self, org_id: str, user_id: str) -> bool:
+        db = await _db()
+        ref = db.collection("org_members").document(f"{org_id}_{user_id}")
+        doc = await ref.get()
+        data = doc.to_dict() or {}
+        if not doc.exists or data.get("role") == "owner":
+            return False
+        await ref.delete()
+        return True
+
+    async def delete_org(self, org_id: str) -> bool:
+        db = await _db()
+        ref = db.collection("orgs").document(org_id)
+        doc = await ref.get()
+        if not doc.exists:
+            return False
+        async for m in db.collection("org_members").where("org_id", "==", org_id).stream():
+            await m.reference.delete()
+        await ref.delete()
+        return True
 
 
 class FirestoreAuditRepository(BaseAuditRepository):

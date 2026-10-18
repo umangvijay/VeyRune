@@ -467,6 +467,59 @@ class BaseApiKeysRepository(ABC):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  ORGANIZATION REPOSITORY (enterprise RBAC foundation)
+# ═══════════════════════════════════════════════════════════════════
+
+class BaseOrgRepository(ABC):
+    """Orgs and membership. Roles: owner > admin > member > viewer.
+    The owner cannot be removed or demoted — transfer is a delete-and-
+    recreate concern, keeping the accountability chain intact."""
+
+    @abstractmethod
+    async def create_org(self, name: str, owner_id: str) -> Dict[str, Any]:
+        """Create an org with the creator as owner member. Returns the org row."""
+        ...
+
+    @abstractmethod
+    async def get_org(self, org_id: str) -> Optional[Dict[str, Any]]:
+        ...
+
+    @abstractmethod
+    async def list_orgs_for_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Orgs the user belongs to, each with their role."""
+        ...
+
+    @abstractmethod
+    async def get_member_role(self, org_id: str, user_id: str) -> Optional[str]:
+        """The user's role in the org, or None if not a member."""
+        ...
+
+    @abstractmethod
+    async def list_members(self, org_id: str) -> List[Dict[str, Any]]:
+        ...
+
+    @abstractmethod
+    async def add_member(self, org_id: str, user_id: str, role: str, added_by: str) -> bool:
+        """Add (or re-add) a member. Returns False if the org is missing."""
+        ...
+
+    @abstractmethod
+    async def set_member_role(self, org_id: str, user_id: str, role: str) -> bool:
+        """Set a member's role. Fails for the owner (role is immutable)."""
+        ...
+
+    @abstractmethod
+    async def remove_member(self, org_id: str, user_id: str) -> bool:
+        """Remove a member. Fails for the owner."""
+        ...
+
+    @abstractmethod
+    async def delete_org(self, org_id: str) -> bool:
+        """Delete an org and (via cascade) its members."""
+        ...
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  TOKEN DENYLIST REPOSITORY
 # ═══════════════════════════════════════════════════════════════════
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.2.0 — 2026-10-18
+
+### Organizations (enterprise RBAC foundation)
+- **Orgs + membership with a role ladder**: owner > admin > member > viewer.
+  Create orgs, add members by email (anti-enumeration preserved — a missing
+  email 404s without revealing account existence), change roles (owner only),
+  remove members (owner-protected; admins manage members/viewers only).
+- **Run oversight**: org admins/owners get a read-only view of member runs
+  with scoped task fields (id, title, agent, status, error) — never full
+  input/output payloads.
+- Every membership change is audited (`ORG_*` events). Shared vaults and
+  org-scoped workspaces remain the documented next steps.
+- 9 new RBAC tests (201 backend total); full lifecycle verified live.
+
+### v2.1.1
+- Session-expiry regression tests (the deployed build's mid-action logout
+  bug), guest-creation retry, model A/B ops guidance.
+
 ## v2.1.0 — 2026-10-17
 
 Eight remediation-and-hardening rounds against the external audit

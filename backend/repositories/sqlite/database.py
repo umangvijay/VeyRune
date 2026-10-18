@@ -84,6 +84,27 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 
+-- ── Orgs / teams (enterprise RBAC foundation) ────────────────────
+CREATE TABLE IF NOT EXISTS orgs (
+    org_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner_id);
+
+CREATE TABLE IF NOT EXISTS org_members (
+    org_id TEXT NOT NULL REFERENCES orgs(org_id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member',
+    added_at TEXT NOT NULL,
+    added_by TEXT,
+    PRIMARY KEY (org_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_members_user ON org_members(user_id);
+
 -- ── Adaptive model policy (online learning from task outcomes) ───
 CREATE TABLE IF NOT EXISTS model_stats (
     model TEXT PRIMARY KEY,

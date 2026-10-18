@@ -48,6 +48,7 @@ class RepositoryFactory:
         self.plugin_repo = None
         self.adaptive_policy_repo = None
         self.api_keys_repo = None
+        self.org_repo = None
 
         # Infrastructure
         self.message_bus = None
@@ -83,6 +84,7 @@ class RepositoryFactory:
         from backend.repositories.sqlite.token_denylist_repository import SQLiteTokenDenylistRepository
         from backend.repositories.sqlite.adaptive_policy_repository import SQLiteAdaptivePolicyRepository
         from backend.repositories.sqlite.api_keys_repository import SQLiteApiKeysRepository
+        from backend.repositories.sqlite.org_repository import SQLiteOrgRepository
         from backend.repositories.sqlite.notification_repository import SQLiteNotificationRepository
         from backend.repositories.sqlite.settings_repository import SQLiteSettingsRepository
         from backend.repositories.sqlite.idempotency_repository import SQLiteIdempotencyRepository
@@ -110,6 +112,7 @@ class RepositoryFactory:
         self.plugin_repo = SQLitePluginRepository(self.db_manager)
         self.adaptive_policy_repo = SQLiteAdaptivePolicyRepository(self.db_manager)
         self.api_keys_repo = SQLiteApiKeysRepository(self.db_manager)
+        self.org_repo = SQLiteOrgRepository(self.db_manager)
 
         # In-process message bus for local mode
         self.message_bus = InMemoryMessageBus()
@@ -151,6 +154,7 @@ class RepositoryFactory:
             FirestoreTokenDenylistRepository,
             FirestoreAdaptivePolicyRepository,
             FirestoreApiKeysRepository,
+            FirestoreOrgRepository,
         )
         self.secrets_repo = FirestoreSecretsRepository()
         self.schedule_repo = FirestoreScheduleRepository()
@@ -161,6 +165,7 @@ class RepositoryFactory:
         self.audit_repo = FirestoreAuditRepository()
         self.adaptive_policy_repo = FirestoreAdaptivePolicyRepository()
         self.api_keys_repo = FirestoreApiKeysRepository()
+        self.org_repo = FirestoreOrgRepository()
 
         # Do not silently use a process-local queue in production: the API and
         # worker pool are separate processes, so that fallback strands tasks.
