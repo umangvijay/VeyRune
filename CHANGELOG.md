@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.6.0 — 2026-10-18
+
+### Responsive home + tempo control removed
+- **Chrono-Pulse tempo control removed** from the home page (the hall
+  runs at its own pace; the scene keeps the mechanism internally).
+- **Fits every screen**: the home stacks on phones (hero above panels),
+  the axis ticks hide on small screens, the navbar keeps Sign in only
+  under 480px, and the dock/secondary links wrap. Verified at 390px,
+  768px, and 1280px.
+
 ## v3.5.0 — 2026-10-18
 
 ### Palette discipline + planet separation + reveals everywhere

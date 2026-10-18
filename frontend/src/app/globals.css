@@ -1990,3 +1990,8 @@ body {
 /* Pass-through UI layer: the canvas receives clicks; chrome stays solid */
 .navbar-public { pointer-events: auto; }
 .focus-readout { pointer-events: auto; }
+
+/* Small screens: the navbar keeps Sign in only (Get Started lives in the drawer) */
+@media (max-width: 480px) {
+  .hide-sm { display: none !important; }
+}

@@ -112,7 +112,7 @@ export default function PublicNavbar() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <Link href="/login" className="btn btn-primary whitespace-nowrap">Sign in →</Link>
-          <Link href="/get-started" className="btn btn-secondary whitespace-nowrap public-nav-started">Get Started</Link>
+          <Link href="/get-started" className="btn btn-secondary whitespace-nowrap public-nav-started hide-sm">Get Started</Link>
           <button
             type="button"
             className="public-nav-hamburger"
