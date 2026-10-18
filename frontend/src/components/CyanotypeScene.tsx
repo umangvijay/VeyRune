@@ -200,25 +200,28 @@ function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode;
   const group = useRef<THREE.Group>(null);
   const { position, rotation, size, seed, withStamp, unfold } = spec;
 
-  const [variant, setVariant] = useState(seed);
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
-  const reprint = useRef({ active: false, startedAt: 0, nextAt: 5 + Math.random() * 5 });
+  // reprint state: the pattern flips at random intervals; a SMOOTH CROSSFADE
+  // eases the new pattern in over the old one (no hard swaps)
+  const [variants, setVariants] = useState<{ prev: number; curr: number }>({ prev: seed, curr: seed });
+  const crossfade = useRef({ active: false, startedAt: 0, nextAt: 5 + Math.random() * 5 });
+  const fadeMats = useRef<{ back: THREE.MeshBasicMaterial | null; front: THREE.MeshBasicMaterial | null }>({ back: null, front: null });
 
   useEffect(() => {
     return watchSheetReprints((t) => {
-      if (t >= reprint.current.nextAt && !reprint.current.active) {
-        reprint.current.active = true;
-        reprint.current.startedAt = t;
-        setVariant(Math.floor(Math.random() * 100000));
+      if (t >= crossfade.current.nextAt && !crossfade.current.active) {
+        crossfade.current.active = true;
+        crossfade.current.startedAt = t;
+        setVariants((v) => ({ prev: v.curr, curr: Math.floor(Math.random() * 100000) }));
       }
-      if (reprint.current.active && t - reprint.current.startedAt > 0.9) {
-        reprint.current.active = false;
-        reprint.current.nextAt = t + 6 + Math.random() * 7;
+      if (crossfade.current.active && t - crossfade.current.startedAt > 1.7) {
+        crossfade.current.active = false;
+        crossfade.current.nextAt = t + 6 + Math.random() * 7;
       }
     });
   }, []);
 
-  const texture = useMemo(() => makeSheetTexture(mode, variant, withStamp), [mode, variant, withStamp]);
+  const prevTex = useMemo(() => makeSheetTexture(mode, variants.prev, withStamp), [mode, variants.prev, withStamp]);
+  const currTex = useMemo(() => makeSheetTexture(mode, variants.curr, withStamp), [mode, variants.curr, withStamp]);
 
   useFrame(() => {
     if (!group.current) return;
@@ -229,20 +232,33 @@ function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode;
       // the back sheets unfold like a drawing being spread open
       group.current.rotation.x = rotation[0] + Math.sin(t * 0.12 + seed) * 0.055;
     }
-    // reprint flash: the sheet brightens while the reprint sweep runs
-    if (materialRef.current) {
-      const r = reprint.current;
-      const phase = r.active ? Math.min(1, (t - r.startedAt) / 0.9) : -1;
-      const flash = phase >= 0 ? Math.sin(phase * Math.PI) * 0.4 : 0;
-      materialRef.current.opacity = (mode === "dark" ? 0.97 : 0.94) + flash * (mode === "dark" ? 0.03 : -0.12);
+    // smooth crossfade: cubic ease-out over 1.4s while a reprint runs
+    const base = mode === "dark" ? 0.97 : 0.94;
+    if (fadeMats.current.back && fadeMats.current.front) {
+      const r = crossfade.current;
+      if (r.active) {
+        const raw = Math.min(1, (t - r.startedAt) / 1.4);
+        const eased = 1 - Math.pow(1 - raw, 3);
+        fadeMats.current.front.opacity = base * eased;
+        fadeMats.current.back.opacity = base * (1 - eased * 0.999);
+      } else {
+        fadeMats.current.front.opacity = base;
+        fadeMats.current.back.opacity = 0;
+      }
     }
   });
 
   return (
     <group ref={group} position={position} rotation={rotation}>
+      {/* back mesh: the previous pattern (fades out during a reprint) */}
       <mesh>
         <planeGeometry args={[size[0], size[1]]} />
-        <meshBasicMaterial ref={materialRef} map={texture} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
+        <meshBasicMaterial ref={(m) => { fadeMats.current.back = m; }} map={prevTex} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
+      </mesh>
+      {/* front mesh: the current pattern (fades in during a reprint) */}
+      <mesh position={[0, 0, 0.005]}>
+        <planeGeometry args={[size[0], size[1]]} />
+        <meshBasicMaterial ref={(m) => { fadeMats.current.front = m; }} map={currTex} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <lineSegments>
         <edgesGeometry args={[new THREE.PlaneGeometry(size[0], size[1])]} />

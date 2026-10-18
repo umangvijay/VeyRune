@@ -98,7 +98,13 @@ export default function LandingPage() {
       if (readThemePref() === "system") setMode(mq.matches ? "dark" : "light");
     };
     mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
+    // the navbar's Draughting Lamp dispatches this on toggle
+    const onTheme = (e: Event) => setMode((e as CustomEvent<"light" | "dark">).detail);
+    window.addEventListener("sandtable-theme", onTheme);
+    return () => {
+      mq.removeEventListener?.("change", onChange);
+      window.removeEventListener("sandtable-theme", onTheme);
+    };
   }, []);
 
   return (
@@ -140,12 +146,8 @@ export default function LandingPage() {
         }}>
           {/* ── Hero card: bracketed console frame, frosted ── */}
           <section
-            className="glass-card console-frame panel-3d float-soft"
-            style={{
-              padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto",
-              background: "color-mix(in srgb, var(--bg-secondary) 52%, transparent)",
-              backdropFilter: "blur(7px)",
-            }}
+            className="glass-card console-frame panel-3d float-soft hero-card"
+            style={{ padding: "clamp(16px, 2vw, 26px)", maxWidth: 440, pointerEvents: "auto" }}
           >
             <span className="frame-tr" /><span className="frame-bl" />
 

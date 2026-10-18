@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 
-import BrandMark from "@/components/BrandMark";import { useState, useEffect } from "react";
+import BrandMark from "@/components/BrandMark";import { useState, useEffect, useCallback } from "react";
+import { applyTheme, readThemePref, resolveTheme, type ThemePref } from "@/lib/theme";
+
+/** Sandtable theme event — pages with a 3D scene listen and re-skin. */
+export function dispatchThemeEvent(resolved: "light" | "dark") {
+  window.dispatchEvent(new CustomEvent("sandtable-theme", { detail: resolved }));
+}
 import { usePathname } from "next/navigation";
 
 export default function PublicNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lampMode, setLampMode] = useState<"light" | "dark">("dark");
   const [hidden, setHidden] = useState(false);
   const pathname = usePathname();
 
@@ -20,6 +27,17 @@ export default function PublicNavbar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setLampMode(resolveTheme(readThemePref()));
+  }, []);
+
+  const toggleLamp = useCallback(() => {
+    const pref: ThemePref = lampMode === "dark" ? "light" : "dark";
+    const resolved = applyTheme(pref);
+    setLampMode(resolved);
+    dispatchThemeEvent(resolved);
+  }, [lampMode]);
 
   useEffect(() => {
     const titles: Record<string, string> = {
@@ -93,6 +111,29 @@ export default function PublicNavbar() {
             </span>
           </div>
         </Link>
+
+        <button
+          type="button"
+          onClick={toggleLamp}
+          aria-label={`Switch to ${lampMode === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
+          title="Draughting Lamp"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "8px 13px", borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border-primary)",
+            background: "var(--bg-glass)", color: "var(--text-secondary)",
+            fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.08em",
+            cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: lampMode === "dark" ? "var(--warm)" : "#e8c15a",
+            boxShadow: "0 0 8px currentColor",
+            color: lampMode === "dark" ? "var(--warm)" : "#e8c15a",
+          }} />
+          {lampMode === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}
+        </button>
 
         <nav
           className="public-nav-links"

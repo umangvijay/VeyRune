@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.9.0 — 2026-10-19
+
+### Readability + smoothness + the theme button
+- **Draughting Lamp in the navbar** (every page): TUNGSTEN ↔ NORTH LIGHT
+  toggle next to the brand, dispatching a theme event the home scene
+  listens to — the 3D hall re-skins instantly.
+- **Hero hover-to-read**: the hero card is translucent (42%) by default so
+  the hall shows through; hovering raises it to 88% opacity so the words
+  are easy to read. Verified both states in the browser.
+- **Smooth blueprint reprints**: reprints now CROSSFADE — two stacked
+  meshes (previous pattern fading out, new pattern fading in with a cubic
+  ease-out over 1.4s) instead of a hard texture swap. No more rough jumps.
+- **Apple-style reveals**: the scroll-reveal curve is now
+  cubic-bezier(.16,1,.3,1) over 1s — the smooth, decisive ease.
+
 ## v3.8.0 — 2026-10-19
 
 ### The scene IS the page
