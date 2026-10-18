@@ -1177,6 +1177,12 @@ body {
   font-size: 14px;
   white-space: normal;
 }
+
+[data-theme="dark"] .flow-node {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
 .flow-index {
   display: block;
   font-family: var(--font-mono);

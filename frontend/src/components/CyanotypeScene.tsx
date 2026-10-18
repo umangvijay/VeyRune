@@ -283,7 +283,7 @@ function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: Cyanot
 
 /** The Planet: a drafting globe — prussian seas, blueprint meridians.
  *  It turns slowly, weaving the threads that draw every sheet. */
-function Planet({ mode, hallTime, position, scale = 1 }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number]; scale?: number }) {
+function Planet({ mode, hallTime, position, scale = 1, withHalo = false }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number]; scale?: number; withHalo?: boolean }) {
   const c = PALETTE[mode];
   const globe = useRef<THREE.Mesh>(null);
   const graticule = useRef<THREE.LineSegments>(null);
@@ -324,15 +324,36 @@ function Planet({ mode, hallTime, position, scale = 1 }: { mode: CyanotypeMode; 
     if (graticule.current) graticule.current.rotation.y = t * 0.05;
   });
 
+  const halo = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
+    const g = ctx.createRadialGradient(64, 64, 30, 64, 64, 64);
+    g.addColorStop(0, "rgba(90,140,255,0.4)");
+    g.addColorStop(0.7, "rgba(62,107,255,0.12)");
+    g.addColorStop(1, "rgba(62,107,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }));
+    sprite.scale.setScalar(4.6 * scale);
+    return sprite;
+  }, []);
+
   return (
     <group position={position} scale={scale}>
+      <primitive object={halo} />
       <mesh ref={globe}>
         <sphereGeometry args={[1.22, 32, 24]} />
         <meshBasicMaterial color={mode === "dark" ? "#0a1e4d" : "#a8bfe8"} />
       </mesh>
       <lineSegments ref={graticule}>
         <primitive object={graticuleGeometry} attach="geometry" />
-        <lineBasicMaterial color={c.lineBright} transparent opacity={1} />
+        <lineBasicMaterial color={c.edge} transparent opacity={mode === "dark" ? 0.95 : 0.8} />
       </lineSegments>
     </group>
   );
@@ -526,14 +547,23 @@ function Scene({ mode }: { mode: CyanotypeMode }) {
       <TracingLine mode={mode} hallTime={hallTime} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
       <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
       <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
-      {/* The Planet — threading every blueprint into existence */}
-      <Planet mode={mode} hallTime={hallTime} position={[-2.4, 4.1, -7.6]} scale={1.15} />
-      <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.16}
-        from={[-1.6, 3.7, -7.3]} to={[3.3, 2.4, -4.15]} landAt={[3.0, 2.2, -4.1]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.5} speed={0.13}
-        from={[-1.8, 3.5, -7.3]} to={[-4.7, 2.1, -5.4]} landAt={[-4.4, 2.0, -5.3]} />
-      <Thread mode={mode} hallTime={hallTime} offset={1.0} speed={0.11}
-        from={[-1.2, 3.9, -7.5]} to={[1.1, 3.4, -9.6]} landAt={[1.0, 3.3, -9.5]} />
+      {/* The Planet — knitting every blueprint into existence */}
+      <Planet mode={mode} hallTime={hallTime} position={[-2.6, 4.3, -7.2]} scale={1.45} withHalo />
+      {/* Three strands woven to the big stamped sheet */}
+      <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.15}
+        from={[-1.7, 3.8, -7.2]} to={[2.6, 2.6, -4.1]} landAt={[2.3, 2.5, -4.05]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.18} speed={0.15}
+        from={[-1.9, 3.6, -7.3]} to={[3.6, 2.2, -4.2]} landAt={[3.3, 2.0, -4.15]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.36} speed={0.15}
+        from={[-2.1, 3.4, -7.4]} to={[4.2, 2.6, -4.3]} landAt={[3.9, 2.4, -4.25]} />
+      {/* Two strands to the left sheet */}
+      <Thread mode={mode} hallTime={hallTime} offset={0.55} speed={0.13}
+        from={[-2.0, 3.5, -7.3]} to={[-4.6, 2.2, -5.4]} landAt={[-4.3, 2.1, -5.3]} />
+      <Thread mode={mode} hallTime={hallTime} offset={0.7} speed={0.13}
+        from={[-2.3, 3.3, -7.4]} to={[-5.2, 2.6, -5.5]} landAt={[-4.9, 2.5, -5.4]} />
+      {/* One strand to the back sheet */}
+      <Thread mode={mode} hallTime={hallTime} offset={0.9} speed={0.11}
+        from={[-1.4, 3.9, -7.5]} to={[1.0, 3.3, -9.6]} landAt={[0.9, 3.2, -9.5]} />
     </>
   );
 }

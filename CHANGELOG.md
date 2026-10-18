@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.7.0 — 2026-10-18
+
+### The knitting hall, richer
+- **Planet halo**: a blue atmosphere glow around the drafting globe — it
+  reads as the lit center of the hall.
+- **Multi-strand weaving**: six threads now run from the planet — three
+  strands woven to the big stamped sheet (landing on separate cells), two
+  to the left sheet, one to the back sheet.
+- **Docs flow chips tinted** for the dark theme (blueprint glass instead
+  of gray); docs [slug] pages verified matching the theme.
+
 ## v3.6.0 — 2026-10-18
 
 ### Responsive home + tempo control removed
