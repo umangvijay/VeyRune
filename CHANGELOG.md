@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.7.0 — 2026-10-18
+
+### Vivid drafting hall (matched to the reference)
+- **Big saturated sheets**: blueprint planes reworked — deep blue base with a
+  diagonal sheen, fine + heavy white grids, drafting blocks (X-marked
+  rectangles, reticles, "COMMUNICATION LATTICE" / "FIELD MODULES" / "TOR
+  ANTENNAE" labels), bottom title strip, and the **FOR APPROVAL stamp
+  printed on the sheet** (rotated, validated line).
+- Sheets repositioned large and tilted like the reference: foreground
+  stamped sheet right, mid sheet left, back sheet top.
+- **Diagonal light beams** from the top (additive shafts, breathing).
+- **Teal icosahedron** + cone wireframes (the reference's mixed accents);
+  tracer glow dot printed on each sheet.
+- Low-angle parked camera (floor visible, sheets above the horizon).
+- Click-to-zoom verified on the new sheets (readout + camera dolly).
+
 ## v2.6.0 — 2026-10-18
 
 ### The scene IS the navigation (interactive observatory)
