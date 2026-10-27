@@ -200,6 +200,17 @@ p { text-wrap: pretty; }
 .is-inspecting .hero-card:hover,.is-inspecting .hero-card:focus-within { opacity:1; }
 .draft-stage { gap:clamp(20px,4vw,64px); }
 .draft-ruler { background:color-mix(in srgb,var(--bg-primary) 42%,transparent); }
+
+/* ── Sheet headers: public pages in the home page's drafting language ── */
+.sheet-head { position:relative; max-width:920px; margin:clamp(36px,6vh,76px) auto 0; padding:clamp(26px,4vw,44px) clamp(18px,3.5vw,44px); text-align:center; }
+.sheet-head .frame-tr,.sheet-head .frame-bl { border-color:color-mix(in srgb,var(--accent) 62%,transparent); opacity:.7; }
+.sheet-eyebrow-row { justify-content:center; }
+.sheet-head-index { margin-left:10px; color:var(--text-tertiary); letter-spacing:.1em; }
+.sheet-title { font-family:var(--font-serif); font-weight:500; font-size:clamp(40px,7vw,72px); line-height:1.04; letter-spacing:-.04em; margin:20px 0 14px; color:var(--text-primary); }
+.sheet-title em { color:var(--accent); font-weight:400; font-style:italic; }
+.sheet-deck { font-size:clamp(15px,2.2vw,19px); line-height:1.62; color:var(--text-secondary); max-width:58ch; margin:0 auto; }
+.sheet-rule { display:block; width:64px; height:1px; background:var(--accent); opacity:.55; margin:24px auto 0; }
+.sheet-mono-label { font:9px var(--font-mono); letter-spacing:.15em; color:var(--accent); display:flex; align-items:center; gap:9px; text-transform:uppercase; }
 .draft-footer { backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); padding-bottom:max(16px,env(safe-area-inset-bottom)); }
 :where(.glass-dynamic,.glass-card,.glass-panel) { border-color:var(--glass-border); }
 :where(.glass-dynamic) { background:linear-gradient(135deg,var(--glass-hi),var(--glass-lo)); box-shadow:0 14px 48px #02081818,inset 0 1px 0 #b5d5ff10; }
@@ -219,6 +230,11 @@ p { text-wrap: pretty; }
   .loom-hud { align-self:stretch; width:100%; padding:12px 14px; }
   .hud-title { font-size:17px; margin:8px 0 4px; }
   .hud-instruction { margin-bottom:8px; }
+  /* The zoom slider is a desktop precision tool; on touch the pinch
+     gesture on the canvas already dollies the camera. Scoped to .loom-hud
+     to out-rank the base .camera-zoom rule, which lands later in the
+     bundled cascade (equal specificity would lose to it). */
+  .loom-hud .camera-zoom { display:none; }
   .hud-readings { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:10px 0; padding-top:10px; }
   .hud-readings small { display:block; margin-top:3px; }
   .hud-views button { flex:1; min-height:32px; }

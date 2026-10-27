@@ -190,18 +190,75 @@ function Loom({ mode, tempo, pointer, focus, onFocus, onWeave }: { mode: Cyanoty
   </group>;
 }
 
+const PLANET_VERT = `varying vec3 vNormal; varying vec3 vView; varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vView = -mv.xyz;
+    gl_Position = projectionMatrix * mv;
+  }`;
+
+/** Half-lambert shading + fresnel cyan rim + faint latitude wash — a
+    drafting ink globe instead of a plain metallic sphere. */
+const PLANET_FRAG = `uniform vec3 base; uniform vec3 ink; uniform float time;
+  varying vec3 vNormal; varying vec3 vView; varying vec2 vUv;
+  void main() {
+    vec3 n = normalize(vNormal);
+    vec3 v = normalize(vView);
+    vec3 lightDir = normalize(vec3(.55, .75, .62));
+    float diff = dot(n, lightDir) * .5 + .5;
+    float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 2.6);
+    vec3 halfV = normalize(lightDir + v);
+    float spec = pow(max(dot(n, halfV), 0.0), 28.0) * .38;
+    float bands = sin(vUv.y * 18.9 + sin(vUv.x * 6.28 + time * .12) * .35) * .5 + .5;
+    vec3 col = mix(base * .52, base * 1.3, diff);
+    col = mix(col, base * 1.45, bands * .10 * diff);
+    col += ink * fres * .85;
+    col += ink * spec;
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
+/** Limb glow: fresnel on a backside shell hugs the silhouette. */
+const ATMO_FRAG = `uniform vec3 glow; varying vec3 vNormal; varying vec3 vView;
+  void main() {
+    float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 3.2);
+    gl_FragColor = vec4(glow, fres * .55);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
 function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: string; mode: CyanotypeMode }) {
   const globe = useRef<THREE.Group>(null);
-  useFrame(() => { if (globe.current) globe.current.rotation.y = time.current * .12; });
+  const ringsRef = useRef<THREE.Group>(null);
+  const base = mode === "dark" ? "#0a2350" : "#8fb4e4";
+  const glow = mode === "dark" ? "#5f9bff" : "#3e6bff";
+  const surfaceUniforms = useMemo(() => ({ base: { value: new THREE.Color(base) }, ink: { value: new THREE.Color(ink) }, time: { value: 0 } }), [base, ink]);
+  const atmoUniforms = useMemo(() => ({ glow: { value: new THREE.Color(glow) } }), [glow]);
+  useFrame(() => {
+    if (globe.current) globe.current.rotation.y = time.current * .12;
+    if (ringsRef.current) ringsRef.current.rotation.z = Math.sin(time.current * .1) * .04;
+    surfaceUniforms.time.value = time.current;
+  });
   return <group position={ORIGIN}>
     <group ref={globe} rotation={[.12, 0, -.28]}>
-      <mesh><sphereGeometry args={[1.2, 48, 32]} /><meshStandardMaterial color={mode === "dark" ? "#071d40" : "#9fbde8"} roughness={.42} metalness={.65} /></mesh>
-      <mesh scale={1.006}><sphereGeometry args={[1.2, 28, 18]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.4} /></mesh>
-      {[0, 1, 2].map(i => <mesh key={i} rotation={[Math.PI / 2 + i * .35, i * .6, .2]}>
-        <torusGeometry args={[1.34 + i * .08, .008, 6, 100]} /><meshBasicMaterial color={ink} transparent opacity={.7} />
-      </mesh>)}
+      <mesh>
+        <sphereGeometry args={[1.2, 64, 48]} />
+        <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={PLANET_FRAG} uniforms={surfaceUniforms} />
+      </mesh>
+      <mesh scale={1.004}><sphereGeometry args={[1.2, 36, 24]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.32} depthWrite={false} /></mesh>
+      <group ref={ringsRef}>
+        {[0, 1, 2].map(i => <mesh key={i} rotation={[Math.PI / 2 + i * .35, i * .6, .2]}>
+          <torusGeometry args={[1.34 + i * .08, .008, 6, 120]} /><meshBasicMaterial color={ink} transparent opacity={.62 - i * .12} />
+        </mesh>)}
+      </group>
     </group>
-    <mesh scale={1.12}><sphereGeometry args={[1.2, 32, 24]} /><meshBasicMaterial color="#3e6bff" transparent opacity={.07} side={THREE.BackSide} depthWrite={false} /></mesh>
+    <mesh scale={1.16}>
+      <sphereGeometry args={[1.2, 48, 32]} />
+      <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={ATMO_FRAG} uniforms={atmoUniforms} side={THREE.BackSide} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+    </mesh>
   </group>;
 }
 

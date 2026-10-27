@@ -354,11 +354,14 @@ body {
 }
 :root.reduce-data .float-soft { animation: none; }
 
+/* Reveal: quick rise, barely-there blur. The old 1s/3px treatment kept
+   headings half-transparent for a full second while scrolling — on mobile
+   that reads as text colour shifting. */
 .scroll-reveal-ready [data-scroll-reveal] {
   opacity: 0;
-  transform: translate3d(0, 42px, 0) scale(0.985);
-  filter: blur(3px);
-  transition: opacity 1s cubic-bezier(.16,1,.3,1), transform 1s cubic-bezier(.16,1,.3,1), filter 1s cubic-bezier(.16,1,.3,1);
+  transform: translate3d(0, 22px, 0);
+  filter: blur(2px);
+  transition: opacity .65s cubic-bezier(.22,1,.36,1), transform .65s cubic-bezier(.22,1,.36,1), filter .65s cubic-bezier(.22,1,.36,1);
   /* Optional per-element stagger: set --reveal-delay inline (e.g. card grids). */
   transition-delay: var(--reveal-delay, 0ms);
   will-change: opacity, transform;
@@ -1641,15 +1644,16 @@ body {
   pointer-events: none;
 }
 .btn:hover::after { transform: translateX(120%); }
+/* Static duotone: the old 4s hue-shift animation made headings read as
+   colour-changing text (worst on mobile). Ink stays put; the accent span
+   carries the colour. */
 .gradient-text {
-  background: linear-gradient(90deg, var(--accent), var(--accent-purple), var(--accent-pink));
-  background-size: 200% auto;
+  background: linear-gradient(100deg, var(--text-primary) 20%, var(--accent) 75%, var(--accent-purple));
+  background-size: 100% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: gradShift 4s linear infinite;
 }
-@keyframes gradShift { to { background-position: 200% center; } }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }

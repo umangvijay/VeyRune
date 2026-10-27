@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useEffect } from "react";
 import PublicNavbar from "@/components/PublicNavbar";
+import SheetHeader from "@/components/SheetHeader";
 
 const TEAM_EMAIL = "godumang35@gmail.com";
 
@@ -56,16 +57,13 @@ export default function ContactPage() {
       <PublicNavbar />
 
       <main className="px-4 py-12 md:py-20 max-w-5xl mx-auto w-full flex-1">
-        <div className="text-center mb-16 animate-fade-in-up">
-          <p className="eyebrow">Contact</p>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 gradient-text">
-            Get in Touch
-          </h1>
-          <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-            Have a question about Sandtable, or want to discuss enterprise deployments?
-            Messages go to <a href={`mailto:${TEAM_EMAIL}`} style={{ color: "var(--accent)" }}>{TEAM_EMAIL}</a>.
-          </p>
-        </div>
+        <SheetHeader
+          eyebrow="CORRESPONDENCE"
+          index="05"
+          title={<>Get in <em>touch.</em></>}
+          deck={<>Have a question about Sandtable, or want to discuss enterprise deployments?
+            Messages go to <a href={`mailto:${TEAM_EMAIL}`} style={{ color: "var(--accent)" }}>{TEAM_EMAIL}</a>.</>}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           <div data-scroll-reveal className="glass-panel glass-lift p-6 md:p-10 border-t-4 border-[var(--accent-pink)] animate-fade-in-up">

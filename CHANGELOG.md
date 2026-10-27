@@ -1,5 +1,34 @@
 # Changelog
 
+## v4.6.0 — 2026-10-28
+
+### Public pages in the home page's language; a better planet
+
+**Public pages now speak the drafting dialect.** New shared `SheetHeader`
+component: bracketed console frame, glowing mono eyebrow with volume
+index, serif display title with klein-blue italic accent, quiet deck and
+rule. Applied to About, Features, Pricing, Contact, Docs, Community and
+FAQs; Blog got the serif treatment in place. Section headings carry mono
+labels (MISSION / VISION / FIG. 01…), matching the home page's eyebrow
+system.
+
+- **The colour-shifting headings are gone.** A second `.gradient-text`
+  rule ran a 4s infinite hue-shift (blue→purple→pink); on mobile that
+  read as text changing colour while scrolling. Headings are now a static
+  ink→klein-blue duotone.
+- **Reveals no longer look like colour shifts.** Scroll-reveal tightened
+  from 1s/42px/blur-3 to 0.65s/22px/blur-2 — elements arrive crisply
+  instead of lingering half-transparent.
+- **Camera zoom hidden on mobile** (pinch already dollies the canvas);
+  needed a specificity bump because the base rule lands later in the
+  bundled cascade.
+- **The planet got a proper surface**: half-lambert shading, fresnel
+  cyan rim, faint latitude wash, finer graticule, drifting rings, and an
+  additive atmosphere shell hugging the limb — verified in both themes.
+- TiltCard now forwards arbitrary props (data-scroll-reveal works on
+  pricing cards) and its hover shadow joined the klein-blue family.
+- 205 backend + 17 unit + 16 e2e tests green.
+
 ## v4.5.0 — 2026-10-28
 
 ### NORTH LIGHT retold, pages polished, subagents verified live

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import PublicNavbar from "@/components/PublicNavbar";
+import SheetHeader from "@/components/SheetHeader";
 
 const GROUPS = [
   {
@@ -45,13 +46,12 @@ export default function FAQPage() {
     <div className="mesh-gradient" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <PublicNavbar />
       <main className="flex-1 py-12 px-4 md:py-20" style={{ maxWidth: 860, margin: "0 auto", width: "100%" }}>
-        <p className="eyebrow" style={{ textAlign: "center" }}>FAQs</p>
-        <h1 className="apple-hero" style={{ fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 900, marginBottom: 12, textAlign: "center" }}>
-          Answers, not a wall of text.
-        </h1>
-        <p style={{ textAlign: "center", color: "var(--text-secondary)", fontSize: 18, marginBottom: 48 }}>
-          Workspace, MCP factory, vault, and quota. Deeper diagrams live in <Link href="/docs" style={{ color: "var(--accent)" }}>Docs</Link>.
-        </p>
+        <SheetHeader
+          eyebrow="ANSWERS"
+          index="07"
+          title={<>Answers, not a <em>wall of text.</em></>}
+          deck={<>Workspace, MCP factory, vault, and quota. Deeper diagrams live in <Link href="/docs" style={{ color: "var(--accent)" }}>Docs</Link>.</>}
+        />
         {GROUPS.map((group, gi) => (
           <section data-scroll-reveal key={group.title} style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: 14, letterSpacing: 0.12, textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>{group.title}</h2>
