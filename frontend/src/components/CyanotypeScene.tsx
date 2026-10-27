@@ -134,7 +134,9 @@ function CameraRig({ focus, reducedMotion, zoom }: { focus: SceneFocus; reducedM
   const destination = useMemo(() => {
     const target = focus === "planet" ? ORIGIN.clone() : focus === "sheet"
       ? new THREE.Vector3(...SHEETS[0].position) : new THREE.Vector3(0, 1.2, 0);
-    return { target, eye: target.clone().add(new THREE.Vector3(0, 0, (focus === "overview" ? 11 : 5.8) / zoom)) };
+    const baseDist = focus === "overview" ? 11 : 5.8;
+    const dist = baseDist / zoom;
+    return { target, eye: target.clone().add(new THREE.Vector3(0, dist * .12, dist)) };
   }, [focus, zoom]);
   useEffect(() => invalidate(), [destination, invalidate, reducedMotion]);
   useFrame(({ camera, size }, delta) => {
@@ -318,9 +320,9 @@ class SceneBoundary extends Component<{ children: ReactNode; onStatus: (status: 
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "overview", onFocus, reducedMotion = false, onStatus, onWeave, status, zoom = 1 }: {
+export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "overview", onFocus, reducedMotion = false, onStatus, onWeave, status, zoom = 1, onZoom }: {
   mode?: CyanotypeMode; tempo?: number; focus?: SceneFocus; onFocus: (focus: SceneFocus) => void; reducedMotion?: boolean;
-  onStatus: (status: SceneStatus) => void; onWeave: (progress: number) => void; status: SceneStatus; zoom?: number;
+  onStatus: (status: SceneStatus) => void; onWeave: (progress: number) => void; status: SceneStatus; zoom?: number; onZoom?: (zoom: number) => void;
 }) {
   const pointer = useRef({ x: 0, y: 0 });
   const [visible, setVisible] = useState(true);
@@ -332,6 +334,48 @@ export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "over
     document.addEventListener("visibilitychange", visibility);
     return () => { window.removeEventListener("pointermove", move); document.removeEventListener("visibilitychange", visibility); };
   }, [reducedMotion]);
+  useEffect(() => {
+    if (!onZoom) return;
+    const el = document.querySelector(".loom-scene");
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const next = Math.max(0.4, Math.min(2.8, zoom - e.deltaY * 0.0015));
+      onZoom(Number(next.toFixed(2)));
+    };
+    let pinchStart = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchStart = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStart > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        const next = Math.max(0.4, Math.min(2.8, zoom * (pinchStart / dist)));
+        onZoom(Number(next.toFixed(2)));
+      }
+    };
+    const onTouchEnd = () => { pinchStart = 0; };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [zoom, onZoom]);
+
   return <div className="loom-scene" data-state={status} aria-hidden="true">
     <div className="scene-fallback" /><SceneIllustration />
     {!lost && <SceneBoundary onStatus={onStatus}><Canvas camera={{ position: [0, 1.2, 11], fov: 48 }} dpr={[1, 1.5]} frameloop={!visible ? "never" : tempo > 0 ? "always" : "demand"}

@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.3.0 — 2026-10-19
+
+### Zoom that actually zooms
+- **Range widened 0.4–2.8** (was 0.8–1.6): the camera now dollies from a
+  wide establishing shot to a close-up on the planet — a 7× distance range.
+- **Finer steps**: 0.05 instead of 0.1 — smooth, not chunky.
+- **Full 3D dolly**: the zoom scales the entire eye offset vector (not
+  just Z), so the camera moves properly in 3D space.
+- **Scroll-wheel zoom** on the canvas: scroll up to zoom in, down to zoom
+  out — the expected interaction for any 3D scene.
+- **Pinch-to-zoom** on touch devices.
+- Verified: the zoom slider + scroll-wheel both drive the camera to 280%
+  with the planet filling the frame.
+
 ## v4.2.0 — 2026-10-19
 
 ### Regression analytics + perf + security

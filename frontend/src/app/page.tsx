@@ -51,7 +51,7 @@ export default function LandingPage() {
   }, []);
 
   return <div className={`drafting-home${focus !== "overview" ? " is-inspecting" : ""}`}>
-    <CyanotypeScene key={sceneAttempt} zoom={zoom} status={sceneStatus} onStatus={updateSceneStatus} onWeave={setWeave} mode={mode} tempo={tempo} focus={focus} onFocus={setFocus} reducedMotion={reducedMotion} />
+    <CyanotypeScene key={sceneAttempt} zoom={zoom} onZoom={setZoom} status={sceneStatus} onStatus={updateSceneStatus} onWeave={setWeave} mode={mode} tempo={tempo} focus={focus} onFocus={setFocus} reducedMotion={reducedMotion} />
     <div className="home-vignette" aria-hidden="true" />
     <div className="home-chrome">
       <a className="skip-link" href="#main-content">Skip to content</a>
@@ -81,7 +81,7 @@ export default function LandingPage() {
           </div>
           <label className="camera-zoom" htmlFor="camera-zoom">
             <span>CAMERA ZOOM</span><output>{Math.round(zoom * 100)}%</output>
-            <input id="camera-zoom" type="range" min="0.8" max="1.6" step="0.1" value={zoom} disabled={sceneStatus !== "ready"} onChange={event => setZoom(Number(event.target.value))} aria-valuetext={`${Math.round(zoom * 100)} percent`} />
+            <input id="camera-zoom" type="range" min="0.4" max="2.8" step="0.05" value={zoom} disabled={sceneStatus !== "ready"} onChange={event => setZoom(Number(event.target.value))} aria-valuetext={`${Math.round(zoom * 100)} percent`} />
           </label>
           <dl className="hud-readings">
             <div><dt>THREADS</dt><dd>09 <small>/ CONNECTED</small></dd></div>
