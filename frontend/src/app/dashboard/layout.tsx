@@ -569,7 +569,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 boxShadow: "0 0 8px currentColor",
                 color: lamp === "dark" ? "var(--warm)" : "#e8c15a",
               }} />
-              {lamp === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}
+              <span className="lamp-label">{lamp === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}</span>
             </button>
             <ContextUsageButton />
             {/* Notification bell */}

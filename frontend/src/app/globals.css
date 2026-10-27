@@ -2015,3 +2015,9 @@ body {
   background: color-mix(in srgb, var(--bg-secondary) 38%, transparent);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--border-primary));
 }
+
+/* Small screens: lamp chip collapses to icon-only */
+@media (max-width: 640px) {
+  .topbar .lamp-label { display: none !important; }
+  .topbar h1 { font-size: 14px !important; }
+}
