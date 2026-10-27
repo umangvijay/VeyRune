@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.6.1 — 2026-10-28
+
+### The stragglers join the drafting board
+
+Every remaining frontend page now carries the home page's identity:
+
+- **Integrations**: serif display heading with klein-blue italic accent
+  over the connector workbench.
+- **Privacy / Terms**: mono "SANDTABLE LEGAL" eyebrow + serif titles.
+- **Login / Signup**: serif "Sandtable" wordmark (static duotone — the
+  hue-shift is gone here too).
+- **Get-started**: bracketed console frame around the workspace loader.
+- 205 backend + 17 unit + 16 e2e tests green.
+
 ## v4.6.0 — 2026-10-28
 
 ### Public pages in the home page's language; a better planet

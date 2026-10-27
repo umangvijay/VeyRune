@@ -71,7 +71,7 @@ function LoginContent() {
       <div className="animate-fade-in-up" style={{ width: "100%", maxWidth: 440, padding: "0 20px" }}>
         <Link href="/" className="btn btn-ghost" style={{ marginBottom: 16 }}>← Back to home</Link>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 36, fontWeight: 800, marginBottom: 8 }}>
+          <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 36, letterSpacing: "-.035em", marginBottom: 8 }}>
             <span className="gradient-text">Sandtable</span>
           </div>
           <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>

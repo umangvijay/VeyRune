@@ -10,9 +10,10 @@ export default function PrivacyPage() {
       <main className="px-4 py-12 md:py-24 flex-1 flex flex-col items-center">
         <div style={{ maxWidth: 800, width: "100%", textAlign: "left" }}>
           <div style={{ marginBottom: 64 }}>
-            <h1 style={{ fontSize: "clamp(40px, 5vw, 56px)", fontWeight: 900, marginBottom: 16, letterSpacing: "-0.02em" }} className="gradient-text">
-              Privacy Policy
-            </h1>
+            <div className="sheet-mono-label mb-3"><span className="draft-dot" aria-hidden /> SANDTABLE LEGAL</div>
+              <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: "clamp(38px, 5vw, 56px)", marginBottom: 12, letterSpacing: "-.035em" }}>
+                Privacy Policy
+              </h1>
             <p style={{ color: "var(--text-tertiary)", fontSize: 16, fontFamily: "var(--font-mono)" }}>
               Last Updated: August 29, 2026
             </p>
