@@ -388,6 +388,18 @@ async def create_workflow(
         logger.exception("Workflow creation failed for run %s", run_id)
         await _persist_failed_attempt(factory, run_id, workflow_id, user.user_id, goal, thread_id, body.parent_run_id)
         msg = str(e)
+        _low = msg.lower()
+        if "default credentials" in _low or "adc" in _low or "no api key" in _low or "api_key" in _low and "invalid" not in _low or "gemini api key" in _low:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No model API key is configured, so this goal can't be planned. "
+                    "Add a key in Settings (Gemini, Groq, xAI, or Hugging Face), or try "
+                    "a live action that doesn't need the planner: check the health of "
+                    "https://example.com, GET a public HTTPS URL, or build an MCP from "
+                    "an OpenAPI spec."
+                ),
+            )
         if "RESOURCE_EXHAUSTED" in msg or "429" in msg or "quota exhausted" in msg.lower() or "UNAUTHENTICATED" in msg or "API_KEY_INVALID" in msg:
             raise HTTPException(
                 status_code=429,
@@ -398,7 +410,8 @@ async def create_workflow(
                     "or build an MCP from an OpenAPI spec."
                 ),
             )
-        raise HTTPException(status_code=500, detail=msg)
+        # Never leak raw provider/internal errors to clients
+        raise HTTPException(status_code=500, detail="Workflow creation failed. Check the run details, or try a live action that does not need the planner.")
 
 
 # ══════════════════════════════════════════════════════════════════

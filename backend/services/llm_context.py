@@ -216,7 +216,7 @@ async def check_user_budget(settings_repo, user_id: str) -> Optional[Dict[str, A
         daily_limit = None
         if settings_repo:
             saved = await settings_repo.get_settings(user_id) or {}
-            if saved.get("daily_token_limit"):
+            if saved.get("daily_token_limit") is not None:
                 daily_limit = int(saved["daily_token_limit"])
         return context_manager.check_budget(user_id, daily_limit=daily_limit)
     except Exception:

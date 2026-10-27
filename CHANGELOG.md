@@ -40,6 +40,19 @@ spec: a dark drafting hall where a **planetary loom** knits blueprints.
 - Verified at 1440×900 and 390×844; the loom visibly animates between
   frames (planet turns, weave meter advances 50%→63%).
 
+## v3.11.0 — 2026-10-19
+
+### Fresh deep-audit fixes (Round 38)
+- **Budget hard-stop bug**: `check_budget` treated a 0 daily limit as
+  missing (`0 or default` → 1M) — the enforcement never fired at 0. Fixed
+  in both layers; verified live (429 at limit 0, 201 after restore).
+- **Credential-error leak**: LLM-dependent goals without any API key
+  returned HTTP 500 with the raw Google ADC error. Now classified to an
+  honest 503 with guidance (both /workflows and /intent handlers,
+  case-insensitive), and the generic 500 never leaks provider errors.
+- **TokenStatusCard guards**: partial /usage payloads crashed the settings
+  page (toLocaleString on undefined) — all fields guarded.
+
 ## v3.10.0 — 2026-10-19
 
 ### Composition + scrollbars + reveals finalized

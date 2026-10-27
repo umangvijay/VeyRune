@@ -602,9 +602,20 @@ async def process_goal(
         traceback.print_exc()
         logger.error(f"Execution failed: {e}")
         msg = str(e)
+        _low = msg.lower()
+        if "default credentials" in _low or "adc" in _low or "no api key" in _low or "api_key" in _low and "invalid" not in _low or "gemini api key" in _low:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No model API key is configured, so this goal can't be planned. "
+                    "Add a key in Settings, or try a live action that doesn't need "
+                    "the planner."
+                ),
+            )
         if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
             raise HTTPException(status_code=429, detail="The Gemini quota is exhausted. Retry after the quota resets.")
-        raise HTTPException(status_code=500, detail=msg)
+        # Never leak raw provider/internal errors to clients
+        raise HTTPException(status_code=500, detail="Workflow creation failed. Check the run details, or try a live action that does not need the planner.")
 
 
 # ══════════════════════════════════════════════════════════════════
