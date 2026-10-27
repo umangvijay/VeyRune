@@ -24,6 +24,29 @@ function loadRootEnv() {
 }
 loadRootEnv();
 
+// The CSP must follow the API URL, not a second hardcoded copy of it —
+// a mismatched port here makes the browser block every API fetch with an
+// opaque "Failed to fetch" while the server logs nothing.
+function apiOriginsForCsp(): string[] {
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  try {
+    const u = new URL(apiBase);
+    const origins = [u.origin];
+    // localhost and 127.0.0.1 are distinct origins; allow both spellings so
+    // the page works no matter which host the dev server was opened through.
+    if (u.hostname === "localhost") {
+      origins.push(`http://127.0.0.1${u.port ? ":" + u.port : ""}`);
+    } else if (u.hostname === "127.0.0.1") {
+      origins.push(`http://localhost${u.port ? ":" + u.port : ""}`);
+    }
+    return origins;
+  } catch {
+    return ["http://localhost:8000", "http://127.0.0.1:8000"];
+  }
+}
+const API_ORIGINS = apiOriginsForCsp();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   compress: true,
@@ -67,9 +90,10 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              // localhost:8000 matches the API's own dev CSP exception — the
-              // CSRF bootstrap needs it in dev/e2e; unreachable in production.
-              "connect-src 'self' https://*.run.app https://accounts.google.com http://localhost:8000 http://127.0.0.1:8000",
+              // API origins come from NEXT_PUBLIC_API_URL so the CSP can never
+              // drift from the URL the client actually calls; *.run.app and
+              // accounts.google.com cover the Cloud Run deploy and Google OAuth.
+              `connect-src 'self' ${API_ORIGINS.join(" ")} https://*.run.app https://accounts.google.com`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

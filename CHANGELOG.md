@@ -1,5 +1,29 @@
 # Changelog
 
+## v4.4.1 — 2026-10-27
+
+### Dashboard sweep: two real bugs found and fixed
+Swept all 14 `/dashboard/*` routes at 1280×800 and 390×844 with a live
+backend. Two genuine defects surfaced; both fixed and verified.
+
+- **CSP blocked the API when the URL differs from the default.**
+  `connect-src` in `next.config.ts` was a second, hardcoded copy of the
+  API URL (`localhost:8000` + `127.0.0.1:8000` only). Point
+  `NEXT_PUBLIC_API_URL` anywhere else and the browser silently blocks
+  every fetch with an opaque "Failed to fetch" while the server logs
+  nothing. The CSP now derives its origins from `NEXT_PUBLIC_API_URL`
+  itself (plus the localhost/127.0.0.1 sibling spelling), so it can never
+  drift from the URL the client actually calls.
+- **Workspace hero hid under the header on short viewports.**
+  `.workspace-home` used `justify-content: center`; when its content grew
+  past the pane (mobile height, or desktop with the MCP how-to panel), the
+  overflow escaped *upward*, pushing "Where should we begin?" behind the
+  sticky header where it could never be scrolled to. Replaced with the
+  auto-margin centering pattern (centers when it fits, top-aligns when it
+  overflows) and made the pane scroll its own overflow.
+- Verified: full dashboard sweep clean at both viewports; 205 backend +
+  17 unit + 16 e2e tests green.
+
 ## v4.4.0 — 2026-10-19
 
 ### Draughting Lamp labels restored

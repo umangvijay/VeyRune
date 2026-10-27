@@ -970,10 +970,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Auto margins center the stack when it fits and collapse to 0 when it
+     overflows, so the top (hero heading) never escapes above the scroll
+     origin the way `justify-content: center` does on short viewports. */
   padding: 48px 20px 32px;
   min-height: 0;
+  /* The workspace pane's parent clips (overflow: hidden), so this container
+     must scroll its own overflow to keep the hero reachable on short screens. */
+  overflow-y: auto;
 }
+.workspace-home > :first-child { margin-top: auto; }
+.workspace-home > :last-child { margin-bottom: auto; }
 .workspace-hero { text-align: center; margin-bottom: 28px; }
 .workspace-title {
   font-family: var(--font-serif);
