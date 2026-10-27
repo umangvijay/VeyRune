@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Pause, Play, Layers, Workflow, Grid2X2, Stamp, Focus, RotateCcw, Globe2 } from "lucide-react";
+import { ArrowUpRight, Pause, Play, Layers, Workflow, Grid2X2, Stamp } from "lucide-react";
 import type { SceneFocus, SceneStatus } from "@/components/CyanotypeScene";
 import PublicNavbar from "@/components/PublicNavbar";
 import { readThemePref, resolveTheme } from "@/lib/theme";
@@ -70,37 +70,12 @@ export default function LandingPage() {
           </div>
           <div className="hero-footnote"><span>GOAL → BLUEPRINT → BUILD</span><span>HUMAN APPROVED</span></div>
         </section>
-        <aside className="loom-hud" aria-label="Planetary loom controls">
-          <div className="hud-heading"><span className="draft-dot" /> PLANETARY LOOM <span>{focus === "overview" ? "01" : focus === "planet" ? "02" : "03"} / 03</span></div>
-          <p className="hud-title">A world taking shape.</p>
-          <p className="hud-instruction">Select the planet or blueprint to get closer.</p>
-          <div className="hud-views" role="group" aria-label="Camera view">
-            <button disabled={sceneStatus !== "ready"} onClick={() => setFocus("planet")} aria-pressed={focus === "planet"}><Globe2 size={15} /> Planet</button>
-            <button disabled={sceneStatus !== "ready"} onClick={() => setFocus("sheet")} aria-pressed={focus === "sheet"}><Focus size={15} /> Blueprint</button>
-            <button disabled={sceneStatus !== "ready"} onClick={() => { setFocus("overview"); setZoom(1); }} aria-label="Reset camera" title="Reset camera (Escape)"><RotateCcw size={15} /></button>
-          </div>
-          <label className="camera-zoom" htmlFor="camera-zoom">
-            <span>CAMERA ZOOM</span><output>{Math.round(zoom * 100)}%</output>
-            <input id="camera-zoom" type="range" min="0.4" max="2.8" step="0.05" value={zoom} disabled={sceneStatus !== "ready"} onChange={event => setZoom(Number(event.target.value))} aria-valuetext={`${Math.round(zoom * 100)} percent`} />
-          </label>
-          <dl className="hud-readings">
-            <div><dt>THREADS</dt><dd>09 <small>/ CONNECTED</small></dd></div>
-            <div><dt>BLUEPRINTS</dt><dd>03 <small>/ {sceneStatus !== "ready" ? "STATIC" : tempo === 0 ? "STILL" : "MORPHING"}</small></dd></div>
-            <div><dt>SCENE</dt><dd>{sceneStatus === "fallback" ? "STATIC" : sceneStatus === "loading" ? "LOADING" : tempo === 0 ? "PAUSED" : `${tempo.toFixed(1)}× TEMPO`}</dd></div>
-            <div><dt>LIGHT</dt><dd>{mode === "dark" ? "NIGHT" : "DAY"}</dd></div>
-          </dl>
-          {sceneStatus === "ready" && <div className="weave-meter">
-            <div><span>FOREGROUND WEAVE</span><span>{weave}%</span></div>
-            <meter min={0} max={100} value={weave} aria-label="Foreground blueprint weave" />
-          </div>}
-          {sceneStatus !== "ready" && <div className="scene-notice" role="status">
-            <p>{sceneStatus === "loading" ? "Preparing your 3D world…" : "Showing the still illustration. Your workspace is ready to use."}</p>
-            {sceneStatus === "fallback" && <button type="button" className="btn btn-secondary" onClick={retryScene}>Retry 3D scene</button>}
-          </div>}
-          <div className="hud-status" role="status">{sceneStatus !== "ready" ? "Planetary loom · illustration" : focus === "overview" ? "Overview · select an object to explore" : `${focus === "planet" ? "Planet" : "Blueprint"} view · Esc to return`}</div>
-        </aside>
       </main>
       <footer className="draft-footer">
+        {sceneStatus !== "ready" && <div className="scene-notice" role="status">
+          <p>{sceneStatus === "loading" ? "Preparing your 3D world…" : "Showing the still illustration. Your workspace is ready to use."}</p>
+          {sceneStatus === "fallback" && <button type="button" className="btn btn-secondary" onClick={retryScene}>Retry 3D scene</button>}
+        </div>}
         <div className="scene-controls" role="group" aria-label="Scene animation controls">
           <button type="button" disabled={sceneStatus !== "ready"} onClick={() => { if (tempo > 0) lastTempo.current = tempo; setTempo(tempo === 0 ? lastTempo.current : 0); }} aria-pressed={tempo === 0} aria-label={tempo === 0 ? "Play scene" : "Pause scene"}>{tempo === 0 ? <Play size={14} /> : <Pause size={14} />}</button>
           <span> TEMPO </span>

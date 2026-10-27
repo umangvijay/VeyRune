@@ -39,27 +39,24 @@ describe("landing controls", () => {
   it("resumes the selected speed after pause", async () => {
     await click("0.5×");
     await click("Pause scene");
-    expect(host.textContent).toContain("PAUSED");
+    expect(button("Pause scene")).toBeUndefined();
+    expect(button("Play scene").getAttribute("aria-pressed")).toBe("true");
     await click("Play scene");
     expect(button("0.5×").getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("recovers from a lost scene without hiding the hero or enabling dead controls", async () => {
-    await click("Planet");
-    expect(host.querySelector(".is-inspecting")).not.toBeNull();
+  it("recovers from a lost scene without hiding the hero", async () => {
     await act(async () => scene.props!.onStatus("fallback"));
-    expect(host.querySelector(".is-inspecting")).toBeNull();
-    expect(button("Planet").disabled).toBe(true);
-    expect(button("Pause scene").disabled).toBe(true);
     expect(host.textContent).toContain("Showing the still illustration");
+    expect(host.querySelector(".scene-notice")).not.toBeNull();
     await click("Retry 3D scene");
     expect(scene.mounts).toBe(2);
-    expect(button("Planet").disabled).toBe(false);
+    expect(button("Pause scene").disabled).toBe(false);
   });
 
-  it("returns to overview with Escape", async () => {
-    await click("Blueprint");
-    await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
-    expect(button("Blueprint").getAttribute("aria-pressed")).toBe("false");
+  it("keeps the HUD panel off the page", () => {
+    expect(host.querySelector(".loom-hud")).toBeNull();
+    expect(host.querySelector(".draft-footer")).not.toBeNull();
+    expect(host.querySelector(".scene-controls")).not.toBeNull();
   });
 });

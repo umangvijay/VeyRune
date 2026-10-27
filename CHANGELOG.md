@@ -1,5 +1,22 @@
 # Changelog
 
+## v4.7.0 — 2026-10-28
+
+### The canvas is the interface: HUD panel removed
+
+The Planetary Loom control panel ("A world taking shape" card) is gone
+from the home page. The scene itself carries every interaction now:
+
+- **Focus**: click the planet or a blueprint sheet on the canvas; Escape
+  returns to overview (unchanged).
+- **Zoom**: scroll-wheel / pinch on the canvas (unchanged).
+- **Tempo**: the play/pause + 0.5×/1×/2× dock in the footer (unchanged).
+- **Scene fallback**: the "Preparing your 3D world…" / "Retry 3D scene"
+  note moved into the footer, so the WebGL-recovery path survives the
+  removal.
+- Landing unit tests rewritten for the HUD-free layout (17 unit, 205
+  backend, 16 e2e green).
+
 ## v4.6.1 — 2026-10-28
 
 ### The stragglers join the drafting board
