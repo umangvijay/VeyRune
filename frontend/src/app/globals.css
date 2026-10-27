@@ -1644,9 +1644,8 @@ body {
   pointer-events: none;
 }
 .btn:hover::after { transform: translateX(120%); }
-/* Static duotone: the old 4s hue-shift animation made headings read as
-   colour-changing text (worst on mobile). Ink stays put; the accent span
-   carries the colour. */
+/* Static duotone base; drafting.css extends the accent words with the
+   ink-flow animation (loaded later, so it wins the cascade). */
 .gradient-text {
   background: linear-gradient(100deg, var(--text-primary) 20%, var(--accent) 75%, var(--accent-purple));
   background-size: 100% auto;

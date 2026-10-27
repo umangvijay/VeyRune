@@ -1,5 +1,28 @@
 # Changelog
 
+## v4.8.0 — 2026-10-28
+
+### The loom sews, the ink flows
+
+**Threading made visible.** Each of the nine planet-to-sheet threads now
+carries a travelling pulse of light (custom line shader, additive
+blending) — the sewing current that shows the planet stitching the
+blueprints. Needle heads glow and throb; a dashed stitch row trails the
+weave needle on every sheet; the sheets gained a sewn hem (dashed stitch
+border) in their texture. The planet bobs gently and precesses on its
+axis, so limb highlights drift.
+
+**Ink flow on every page.** The accent words — "It's *drawn.*" on the
+home hero, the italic accent in every public-page SheetHeader, the
+Sandtable wordmark on login/signup — now animate a slow (7s) gradient
+drift through the blue family (accent → purple → steel). No pink, no hue
+chaos; disabled under prefers-reduced-motion and the reduce-data switch.
+The animation lives at the end of drafting.css so it wins the cascade;
+inline em colours removed from Integrations/Blog so the effect reaches
+them too.
+
+- 205 backend + 17 unit + 16 e2e tests green.
+
 ## v4.7.0 — 2026-10-28
 
 ### The canvas is the interface: HUD panel removed

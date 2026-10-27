@@ -86,7 +86,7 @@ export default function BlogPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 mt-4">
             <div className="text-left">
               <h1 className="text-4xl md:text-5xl font-extrabold mb-4" style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-.03em" }}>
-                From the <em style={{ color: "var(--accent)", fontWeight: 400 }}>drafting board.</em>
+                From the <em>drafting board.</em>
               </h1>
               <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl">
                 The latest news, engineering insights, and updates from the Sandtable team and community.

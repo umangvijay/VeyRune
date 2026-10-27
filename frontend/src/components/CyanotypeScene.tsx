@@ -40,6 +40,11 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   ctx.strokeRect(10, 10, 620, 460);
   ctx.lineWidth = 1.5;
   ctx.strokeRect(24, 24, 592, 432);
+  // Sewn hem: dashed stitch line just inside the frame.
+  ctx.setLineDash([10, 7]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeRect(34, 34, 572, 412);
+  ctx.setLineDash([]);
 
   // drafting blocks: pseudo-random per variant — patterns change over time
   let s = (seed + 1) * 2654435761 % 4294967296;
@@ -232,33 +237,41 @@ const ATMO_FRAG = `uniform vec3 glow; varying vec3 vNormal; varying vec3 vView;
 
 function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: string; mode: CyanotypeMode }) {
   const globe = useRef<THREE.Group>(null);
+  const holder = useRef<THREE.Group>(null);
   const ringsRef = useRef<THREE.Group>(null);
   const base = mode === "dark" ? "#0a2350" : "#8fb4e4";
   const glow = mode === "dark" ? "#5f9bff" : "#3e6bff";
   const surfaceUniforms = useMemo(() => ({ base: { value: new THREE.Color(base) }, ink: { value: new THREE.Color(ink) }, time: { value: 0 } }), [base, ink]);
   const atmoUniforms = useMemo(() => ({ glow: { value: new THREE.Color(glow) } }), [glow]);
   useFrame(() => {
-    if (globe.current) globe.current.rotation.y = time.current * .12;
+    if (globe.current) {
+      globe.current.rotation.y = time.current * .12;
+      // Gentle axial precession keeps the limb highlights drifting.
+      globe.current.rotation.x = .12 + Math.sin(time.current * .09) * .05;
+    }
+    if (holder.current) holder.current.position.y = Math.sin(time.current * .5) * .06;
     if (ringsRef.current) ringsRef.current.rotation.z = Math.sin(time.current * .1) * .04;
     surfaceUniforms.time.value = time.current;
   });
   return <group position={ORIGIN}>
-    <group ref={globe} rotation={[.12, 0, -.28]}>
-      <mesh>
-        <sphereGeometry args={[1.2, 64, 48]} />
-        <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={PLANET_FRAG} uniforms={surfaceUniforms} />
-      </mesh>
-      <mesh scale={1.004}><sphereGeometry args={[1.2, 36, 24]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.32} depthWrite={false} /></mesh>
-      <group ref={ringsRef}>
-        {[0, 1, 2].map(i => <mesh key={i} rotation={[Math.PI / 2 + i * .35, i * .6, .2]}>
-          <torusGeometry args={[1.34 + i * .08, .008, 6, 120]} /><meshBasicMaterial color={ink} transparent opacity={.62 - i * .12} />
-        </mesh>)}
+    <group ref={holder}>
+      <group ref={globe} rotation={[.12, 0, -.28]}>
+        <mesh>
+          <sphereGeometry args={[1.2, 64, 48]} />
+          <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={PLANET_FRAG} uniforms={surfaceUniforms} />
+        </mesh>
+        <mesh scale={1.004}><sphereGeometry args={[1.2, 36, 24]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.32} depthWrite={false} /></mesh>
+        <group ref={ringsRef}>
+          {[0, 1, 2].map(i => <mesh key={i} rotation={[Math.PI / 2 + i * .35, i * .6, .2]}>
+            <torusGeometry args={[1.34 + i * .08, .008, 6, 120]} /><meshBasicMaterial color={ink} transparent opacity={.62 - i * .12} />
+          </mesh>)}
+        </group>
       </group>
+      <mesh scale={1.16}>
+        <sphereGeometry args={[1.2, 48, 32]} />
+        <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={ATMO_FRAG} uniforms={atmoUniforms} side={THREE.BackSide} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
     </group>
-    <mesh scale={1.16}>
-      <sphereGeometry args={[1.2, 48, 32]} />
-      <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={ATMO_FRAG} uniforms={atmoUniforms} side={THREE.BackSide} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
-    </mesh>
   </group>;
 }
 
@@ -277,7 +290,11 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
         vec4 paper = texture2D(map, vUv);
         float woven = 1.0 - smoothstep(progress - .015, progress + .015, vUv.y);
         float needle = 1.0 - smoothstep(.0, .012, abs(vUv.y - progress));
-        gl_FragColor = vec4(paper.rgb + needle * .35, .12 + woven * .76);
+        // Stitch dashes trail just behind the needle: the sheet is being sewn.
+        float row = smoothstep(.028, .0, abs(vUv.y - progress + .035));
+        float dash = step(.55, fract(vUv.x * 34.0));
+        float stitches = row * dash * .5;
+        gl_FragColor = vec4(paper.rgb + needle * .35 + stitches * paper.rgb * 1.6, .12 + woven * .76 + needle * .1 + stitches * .2);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -312,17 +329,43 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
   </group>;
 }
 
+const THREAD_VERT = `attribute float aU; varying float vU;
+  void main() { vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+/** A pulse of light travels root→needle along each thread: the "sewing
+    current" that makes the planet visibly thread the sheets. */
+const THREAD_FRAG = `uniform vec3 uInk; uniform float uTime; uniform float uOffset; varying float vU;
+  void main() {
+    float pulse = fract(uTime * .16 + uOffset);
+    float glow = exp(-abs(vU - pulse) * 22.0);
+    float shimmer = .5 + .5 * sin(vU * 40.0 - uTime * 2.2);
+    float alpha = .38 + shimmer * .14 + glow * .85;
+    gl_FragColor = vec4(uInk + glow * .35, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }`;
+
 function Thread({ target, index, strand, time, ink }: { target: readonly number[]; index: number; strand: number; time: React.RefObject<number>; ink: string }) {
   const head = useRef<THREE.Mesh>(null);
-  const thread = useRef<THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>>(null);
+  const thread = useRef<THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>>(null);
+  const uniforms = useMemo(() => ({
+    uInk: { value: new THREE.Color(ink) },
+    uTime: { value: 0 },
+    uOffset: { value: index / 3 + strand / 9 },
+  }), [ink, index, strand]);
   const line = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(81 * 3), 3));
-    return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: .65 }));
-  }, [ink]);
-  useEffect(() => () => { line.geometry.dispose(); line.material.dispose(); }, [line]);
+    geometry.setAttribute("aU", new THREE.BufferAttribute(new Float32Array(Array.from({ length: 81 }, (_, i) => i / 80)), 1));
+    return new THREE.Line(geometry, new THREE.ShaderMaterial({
+      vertexShader: THREAD_VERT, fragmentShader: THREAD_FRAG, uniforms,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+  }, [uniforms]);
+  useEffect(() => () => { line.geometry.dispose(); (line.material as THREE.ShaderMaterial).dispose(); }, [line]);
   useFrame(() => {
     const t = time.current;
+    uniforms.uTime.value = t;
     const phase = t * .7 + index * 2 + strand * .5;
     const start = ORIGIN.clone().add(new THREE.Vector3(Math.cos(phase), Math.sin(phase) * .55, Math.sin(phase) * .7).normalize().multiplyScalar(1.23));
     const x = Math.sin(t * 2.4 + strand * 2.1) * SHEETS[index].size[0] * .46;
@@ -345,9 +388,11 @@ function Thread({ target, index, strand, time, ink }: { target: readonly number[
       const u = (t * .3 + strand / 3) % 1;
       head.current.position.copy(curve.getPoint(u));
       head.current.position.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
+      const pulse = .75 + .45 * Math.sin(t * 5 + strand * 2.1);
+      head.current.scale.setScalar(pulse);
     }
   });
-  return <><primitive ref={thread} object={line} /><mesh ref={head}><sphereGeometry args={[.045, 8, 8]} /><meshBasicMaterial color={ink} /></mesh></>;
+  return <><primitive ref={thread} object={line} /><mesh ref={head}><sphereGeometry args={[.05, 10, 10]} /><meshBasicMaterial color={ink} transparent opacity={.9} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh></>;
 }
 
 function SceneIllustration() {

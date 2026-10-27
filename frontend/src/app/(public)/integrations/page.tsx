@@ -24,7 +24,7 @@ export default function PublicIntegrationsPage() {
         <section className="integration-hero" data-scroll-reveal>
           <div className="integration-hero-copy">
             <p className="eyebrow">A connector is a result of the work</p>
-            <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-.035em" }}>Start with the task.<br /><em style={{ color: "var(--accent)", fontWeight: 400 }}>Build the connection it needs.</em></h1>
+            <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-.035em" }}>Start with the task.<br /><em>Build the connection it needs.</em></h1>
             <p className="integration-lead">
               Sandtable can build a connector from an API contract, documentation, or a clear description. It validates the tools before a workflow can use them, and asks you before sensitive actions.
             </p>

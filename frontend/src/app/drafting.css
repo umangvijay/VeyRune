@@ -292,3 +292,19 @@ p { text-wrap: pretty; }
 }
 .docs-toc-link { white-space:normal; overflow-wrap:break-word; }
 .docs-search { flex-shrink:0; }
+
+/* ── Ink flow: accent words breathe through the blue family ────────── */
+@keyframes ink-flow { to { background-position: 200% center; } }
+.sheet-title em, .hero-card h1 em, .gradient-text {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-purple) 30%, var(--steel) 55%, var(--accent) 85%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: ink-flow 7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-title em, .hero-card h1 em, .gradient-text { animation: none; }
+}
+:root.reduce-data .sheet-title em, :root.reduce-data .hero-card h1 em, :root.reduce-data .gradient-text { animation: none; }
