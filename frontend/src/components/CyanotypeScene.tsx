@@ -14,7 +14,7 @@ const PALETTE = {
   light: { sheetBase: "#b6d0f3", sheetBase2: "#dce9fb", ink: "rgba(15,56,120,.9)", inkSoft: "rgba(25,70,140,.45)" },
 };
 
-function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean): THREE.CanvasTexture {
+function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean, revision = 0): THREE.CanvasTexture {
   const c = PALETTE[mode];
   const canvas = document.createElement("canvas");
   canvas.width = 640; canvas.height = 480;
@@ -98,6 +98,13 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   ctx.font = "12px monospace";
   ctx.fillStyle = c.ink;
   ctx.fillText("SANDTABLE // DRAFTING WORKS · ALL RIGHTS RESERVED", 28, 458);
+  // Self-evolving mark: each regeneration stamps its revision.
+  if (revision > 0) {
+    ctx.textAlign = "right";
+    ctx.font = "12px monospace";
+    ctx.fillText(`SELF-DRAFTED · REV ${String(revision).padStart(2, "0")}`, 616, 30);
+    ctx.textAlign = "left";
+  }
 
   const glowX = 300 + seed * 60;
   const glowY = 150 + seed * 40;
@@ -278,14 +285,24 @@ function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: strin
 type SheetSpec = typeof SHEETS[number];
 function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: number; mode: CyanotypeMode; time: React.RefObject<number> }) {
   const surface = useRef<THREE.Mesh<THREE.PlaneGeometry>>(null);
-  const texture = useMemo(() => makeSheetTexture(mode, index + 2, index === 0), [mode, index]);
+  // Self-evolving loop: each sheet periodically redraws itself with a new
+  // drafting pattern and stamps its revision — the workspace improving
+  // its own blueprints, visible in the scene.
+  const [rev, setRev] = useState(0);
+  const flash = useRef(0);
+  useEffect(() => {
+    const id = setInterval(() => setRev(r => r + 1), 40000 + index * 13000);
+    return () => clearInterval(id);
+  }, [index]);
+  useEffect(() => { flash.current = 1; }, [rev]);
+  const texture = useMemo(() => makeSheetTexture(mode, index + 2 + rev * 11, index === 0, rev), [mode, index, rev]);
   const model = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
   const shader = useMemo(() => ({
-    uniforms: { map: { value: texture }, progress: { value: .5 } },
+    uniforms: { map: { value: texture }, progress: { value: .5 }, uFlash: { value: 0 } },
     vertexShader: `varying vec2 vUv;
       void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D map; uniform float progress; varying vec2 vUv;
+    fragmentShader: `uniform sampler2D map; uniform float progress; uniform float uFlash; varying vec2 vUv;
       void main() {
         vec4 paper = texture2D(map, vUv);
         float woven = 1.0 - smoothstep(progress - .015, progress + .015, vUv.y);
@@ -294,13 +311,14 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
         float row = smoothstep(.028, .0, abs(vUv.y - progress + .035));
         float dash = step(.55, fract(vUv.x * 34.0));
         float stitches = row * dash * .5;
-        gl_FragColor = vec4(paper.rgb + needle * .35 + stitches * paper.rgb * 1.6, .12 + woven * .76 + needle * .1 + stitches * .2);
+        vec3 ink = paper.rgb * (1.0 + uFlash * .8) + needle * .35 + stitches * paper.rgb * 1.6;
+        gl_FragColor = vec4(ink, .12 + woven * .76 + needle * .1 + stitches * .2 + uFlash * .12);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   }), [texture]);
   useEffect(() => () => texture.dispose(), [texture]);
-  useFrame(() => {
+  useFrame((_state, delta) => {
     const t = time.current;
     if (!surface.current) return;
     const positions = surface.current.geometry.attributes.position;
@@ -312,7 +330,11 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
     positions.needsUpdate = true;
     surface.current.geometry.computeBoundingSphere();
     surface.current.geometry.computeBoundingBox();
-    if (material.current) material.current.uniforms.progress.value = weaveProgress(t, index);
+    if (material.current) {
+      material.current.uniforms.progress.value = weaveProgress(t, index);
+      flash.current = Math.max(0, flash.current - delta * 1.4);
+      material.current.uniforms.uFlash.value = flash.current;
+    }
     if (model.current) {
       model.current.rotation.y = t * .22;
       model.current.rotation.z = Math.sin(t * .25) * .15;
@@ -332,26 +354,52 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
 const THREAD_VERT = `attribute float aU; varying float vU;
   void main() { vU = aU; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 
-/** A pulse of light travels root→needle along each thread: the "sewing
-    current" that makes the planet visibly thread the sheets. */
-const THREAD_FRAG = `uniform vec3 uInk; uniform float uTime; uniform float uOffset; varying float vU;
+/** Thread lifecycle: idle pulse → snap (gap opens) → fault (dim, amber) →
+    healing (two knit fronts converge) → whole again. The loom repairs
+    itself on a deterministic clock, so every viewer sees recovery. */
+const THREAD_FRAG = `uniform vec3 uInk; uniform float uTime; uniform float uOffset; uniform float uStage; uniform float uK; varying float vU;
   void main() {
-    float pulse = fract(uTime * .16 + uOffset);
-    float glow = exp(-abs(vU - pulse) * 22.0);
     float shimmer = .5 + .5 * sin(vU * 40.0 - uTime * 2.2);
-    float alpha = .38 + shimmer * .14 + glow * .85;
-    gl_FragColor = vec4(uInk + glow * .35, alpha);
+    float alpha = .38 + shimmer * .14;
+    float glow = 0.0;
+    if (uStage < 0.5) {
+      float pulse = fract(uTime * .16 + uOffset);
+      glow = exp(-abs(vU - pulse) * 22.0);
+    } else if (uStage < 1.5) {
+      alpha *= 1.0 - uK * .82;
+    } else {
+      alpha *= 1.0 - uK * .82;
+      float front = (1.0 - uK) * .5;
+      glow = exp(-abs(vU - front) * 26.0) + exp(-abs(vU - (1.0 - front)) * 26.0);
+      glow *= 1.4;
+    }
+    gl_FragColor = vec4(uInk + glow * .35, alpha + glow * .85);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }`;
 
+const HEAL_PERIOD = 26;
+/** Deterministic self-healing clock per thread: 0 idle · 1 snapped · 2 healing. */
+function healPhase(t: number, index: number, strand: number) {
+  const offset = (index * 3.7 + strand * 7.3) % HEAL_PERIOD;
+  const phase = (t + offset) % HEAL_PERIOD;
+  if (phase < 19) return { stage: 0, k: 0, fault: false };
+  if (phase < 20) return { stage: 1, k: phase - 19, fault: false };        // snapping open
+  if (phase < 22.5) return { stage: 1, k: 1, fault: true };                // fault: amber blink
+  if (phase < 24.5) return { stage: 2, k: 1 - (phase - 22.5) / 2, fault: false }; // re-threading
+  return { stage: 0, k: 0, fault: false };
+}
+
 function Thread({ target, index, strand, time, ink }: { target: readonly number[]; index: number; strand: number; time: React.RefObject<number>; ink: string }) {
   const head = useRef<THREE.Mesh>(null);
+  const fault = useRef<THREE.Mesh>(null);
   const thread = useRef<THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>>(null);
   const uniforms = useMemo(() => ({
     uInk: { value: new THREE.Color(ink) },
     uTime: { value: 0 },
     uOffset: { value: index / 3 + strand / 9 },
+    uStage: { value: 0 },
+    uK: { value: 0 },
   }), [ink, index, strand]);
   const line = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -366,6 +414,9 @@ function Thread({ target, index, strand, time, ink }: { target: readonly number[
   useFrame(() => {
     const t = time.current;
     uniforms.uTime.value = t;
+    const heal = healPhase(t, index, strand);
+    uniforms.uStage.value = heal.stage;
+    uniforms.uK.value = heal.k;
     const phase = t * .7 + index * 2 + strand * .5;
     const start = ORIGIN.clone().add(new THREE.Vector3(Math.cos(phase), Math.sin(phase) * .55, Math.sin(phase) * .7).normalize().multiplyScalar(1.23));
     const x = Math.sin(t * 2.4 + strand * 2.1) * SHEETS[index].size[0] * .46;
@@ -376,23 +427,47 @@ function Thread({ target, index, strand, time, ink }: { target: readonly number[
     const middle = start.clone().lerp(end, .5); middle.y += .8 + strand * .23;
     const curve = new THREE.QuadraticBezierCurve3(start, middle, end);
     if (!thread.current) return;
+    // Break direction: perpendicular to the curve's mid tangent.
+    const tangent = curve.getTangent(.5);
+    const breakDir = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0));
+    if (breakDir.lengthSq() < 1e-6) breakDir.set(1, 0, 0);
+    breakDir.normalize();
+    const gap = heal.stage === 0 ? 0 : heal.k;
     const pos = thread.current.geometry.attributes.position;
     for (let i = 0; i <= 80; i++) {
       const u = i / 80, p = curve.getPoint(u);
       p.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
+      if (gap > 0 && u > .4 && u < .6) {
+        const edge = Math.sin(((u - .4) / .2) * Math.PI);
+        p.addScaledVector(breakDir, gap * .42 * edge * (u < .5 ? -1 : 1));
+      }
       pos.setXYZ(i, p.x, p.y, p.z);
     }
     pos.needsUpdate = true;
     thread.current.geometry.computeBoundingSphere();
     if (head.current) {
-      const u = (t * .3 + strand / 3) % 1;
-      head.current.position.copy(curve.getPoint(u));
-      head.current.position.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
-      const pulse = .75 + .45 * Math.sin(t * 5 + strand * 2.1);
-      head.current.scale.setScalar(pulse);
+      head.current.visible = heal.stage !== 1;
+      if (head.current.visible) {
+        const u = (t * .3 + strand / 3) % 1;
+        head.current.position.copy(curve.getPoint(u));
+        head.current.position.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
+        head.current.scale.setScalar(.75 + .45 * Math.sin(t * 5 + strand * 2.1));
+      }
+    }
+    if (fault.current) {
+      fault.current.visible = heal.fault;
+      if (heal.fault) {
+        fault.current.position.copy(curve.getPoint(.5)).addScaledVector(breakDir, .42);
+        const blink = .5 + .5 * Math.sin(t * 7);
+        (fault.current.material as THREE.MeshBasicMaterial).opacity = .35 + blink * .5;
+        fault.current.scale.setScalar(.8 + blink * .5);
+      }
     }
   });
-  return <><primitive ref={thread} object={line} /><mesh ref={head}><sphereGeometry args={[.05, 10, 10]} /><meshBasicMaterial color={ink} transparent opacity={.9} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh></>;
+  return <><primitive ref={thread} object={line} />
+    <mesh ref={head}><sphereGeometry args={[.05, 10, 10]} /><meshBasicMaterial color={ink} transparent opacity={.9} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
+    <mesh ref={fault} visible={false}><sphereGeometry args={[.055, 10, 10]} /><meshBasicMaterial color="#ffb454" transparent opacity={.7} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
+  </>;
 }
 
 function SceneIllustration() {

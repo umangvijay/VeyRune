@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Pause, Play, Layers, Workflow, Grid2X2, Stamp } from "lucide-react";
 import type { SceneFocus, SceneStatus } from "@/components/CyanotypeScene";
 import PublicNavbar from "@/components/PublicNavbar";
+import { API_BASE } from "@/lib/api";
 import { readThemePref, resolveTheme } from "@/lib/theme";
 
 const CyanotypeScene = dynamic(() => import("@/components/CyanotypeScene"), {
@@ -17,6 +18,40 @@ const modules = [
   { label: "Builds", href: "/dashboard/workflows", icon: Workflow, number: "03" },
   { label: "Sheets", href: "/dashboard/operations", icon: Layers, number: "04" },
 ];
+
+/** Live vitals from the real /health endpoint — the same self-healing
+    loop (recovery agent, adaptive policy) that runs the workspace. Hidden
+    entirely when the API is unreachable, never faked. */
+function LoomVitals() {
+  const [vitals, setVitals] = useState<{ uptime: number; storage: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE.replace("/api/v1", "")}/health`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive && data?.status === "healthy") {
+          setVitals({
+            uptime: Math.max(1, Math.round((Number(data.uptime_seconds) || 0) / 60)),
+            storage: String(data.storage || "unknown").toUpperCase(),
+          });
+        }
+      } catch { /* vitals stay hidden while the API is down */ }
+    };
+    // load() commits real telemetry only after the fetch resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    const id = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  if (!vitals) return null;
+  return (
+    <div className="loom-vitals" role="status">
+      <span className="draft-dot" aria-hidden /> LOOM VITALS · UPTIME {vitals.uptime}M · {vitals.storage} · RECOVERY LOOPS ARMED
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const [mode, setMode] = useState<"light" | "dark">("dark");
@@ -72,6 +107,7 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="draft-footer">
+        <LoomVitals />
         {sceneStatus !== "ready" && <div className="scene-notice" role="status">
           <p>{sceneStatus === "loading" ? "Preparing your 3D world…" : "Showing the still illustration. Your workspace is ready to use."}</p>
           {sceneStatus === "fallback" && <button type="button" className="btn btn-secondary" onClick={retryScene}>Retry 3D scene</button>}

@@ -295,16 +295,30 @@ p { text-wrap: pretty; }
 
 /* ── Ink flow: accent words breathe through the blue family ────────── */
 @keyframes ink-flow { to { background-position: 200% center; } }
+/* A luminous glint band rides the gradient — reads as a shine passing
+   through the ink rather than a hue change. */
 .sheet-title em, .hero-card h1 em, .gradient-text {
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-purple) 30%, var(--steel) 55%, var(--accent) 85%);
+  background: linear-gradient(90deg,
+    var(--accent) 0%, var(--accent-purple) 22%, var(--steel) 38%,
+    var(--ink-glint) 50%,
+    var(--steel) 62%, var(--accent-purple) 78%, var(--accent) 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  animation: ink-flow 7s linear infinite;
+  animation: ink-flow 9s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .sheet-title em, .hero-card h1 em, .gradient-text { animation: none; }
 }
 :root.reduce-data .sheet-title em, :root.reduce-data .hero-card h1 em, :root.reduce-data .gradient-text { animation: none; }
+
+/* ── Loom vitals: real telemetry from /health, footer chip ─────────── */
+.loom-vitals { display:flex; align-items:center; justify-content:center; gap:8px; padding:2px 0 10px; color:var(--text-tertiary); font:8px var(--font-mono); letter-spacing:.14em; }
+.loom-vitals .draft-dot { animation:dot-pulse 2.8s ease-in-out infinite; }
+
+/* ── Ink flow v2: a luminous glint rides the gradient ──────────────── */
+@keyframes dot-pulse { 0%,100% { box-shadow:0 0 5px var(--accent); opacity:.85; } 50% { box-shadow:0 0 13px var(--accent); opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .draft-dot { animation:none; } }
+:root.reduce-data .draft-dot { animation:none; }

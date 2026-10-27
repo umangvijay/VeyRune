@@ -29,6 +29,7 @@
 
   /* ── Accent colors (Klein blue on drafting paper) ────────── */
   --accent: #2e56c4;
+  --ink-glint: #7ea6e8;
   /* Yantrika forge identity: brass/ember on steel */
   --ember: #2e56c4;
   --ember-bright: #3e6bff;
@@ -88,6 +89,7 @@
   --border-focus: rgba(216, 133, 143, 0.5);
 
   --accent: #8ab4ff;
+  --ink-glint: #cfe3ff;
   /* forge identity (dark): molten ember over graphite */
   --ember: #e8a34b;
   --ember-bright: #f4bc6e;

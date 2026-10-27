@@ -1,5 +1,34 @@
 # Changelog
 
+## v4.9.0 — 2026-10-28
+
+### The loom heals itself; the ink gained a glint
+
+**Self-healing loop, visible.** Each of the nine threads now runs a
+deterministic lifecycle on a staggered 26-second clock: the thread
+*snaps* (a gap opens mid-curve), a fault state dims it while an amber
+marker blinks at the break, then two knit fronts of light converge from
+both ends and the thread sews itself back together. With nine staggered
+threads, recovery is always happening somewhere in the frame — the
+product's recovery agent, made visible.
+
+**Self-evolving loop, visible.** Each blueprint sheet periodically
+redraws itself with a fresh drafting pattern, stamps
+"SELF-DRAFTED · REV NN" in its corner, and flashes briefly as the new
+revision lands — the workspace improving its own blueprints, on screen.
+
+**Loom vitals.** The footer now carries a real-telemetry chip fed by the
+live `/health` endpoint: uptime minutes, storage engine, and the
+recovery-loop status — hidden entirely when the API is unreachable,
+never faked.
+
+**Ink flow v2.** The accent-word gradient gained a luminous glint band
+that rides through it (reads as a shine passing through the ink, not a
+hue change), the cycle slowed to 9s, and the drafting dots now pulse
+gently on every page. Both effects respect prefers-reduced-motion.
+
+- 205 backend + 17 unit + 16 e2e tests green.
+
 ## v4.8.0 — 2026-10-28
 
 ### The loom sews, the ink flows
