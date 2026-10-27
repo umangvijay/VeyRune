@@ -33,6 +33,7 @@ export const metadata: Metadata = {
   description:
     "Sandtable turns goals into reviewed, executable workflows and can build missing API tools along the way.",
   keywords: ["AI", "autonomous", "workspace", "agents", "MCP", "integrations", "automation"],
+  manifest: "/manifest.json",
   ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   openGraph: {
     title: "Sandtable — A workspace that builds its own tools",

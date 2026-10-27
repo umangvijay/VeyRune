@@ -14,6 +14,7 @@ FastAPI application with:
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from backend.api.middleware.request_id import RequestIDMiddleware
 from fastapi.responses import StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
@@ -74,6 +75,7 @@ app = FastAPI(
 
 # ── CORS ──────────────────────────────────────────────────────────
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
