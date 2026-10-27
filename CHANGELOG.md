@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.1.1 — 2026-10-19
+
+### Fix: stuck-blur reveal bug + softer grid
+- The v3.5 blur addition to the scroll-reveal entrance was never reset by
+  `.is-in-view` — revealed cards stayed permanently blurred (visible on
+  About/Features). The in-view state now resets the filter to blur(0).
+- Dark drafting-grid backdrop softened (lower grid contrast).
+
+## v4.1.0 — 2026-10-19
+
+### Page transitions + full reveal coverage
+- Root template.tsx: every navigation fades up into place (Apple curve).
+- Reveals swept onto faq and docs/[slug] — all pages animate on scroll.
+
 ## v4.0.0 — 2026-10-19
 
 ### The Planetary Loom — the full cyanotype identity
