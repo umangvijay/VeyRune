@@ -23,6 +23,7 @@ export default function ContextUsageButton() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ContextUsage | null>(null);
   const [error, setError] = useState("");
+  const [noKey, setNoKey] = useState(false);
   const [pos, setPos] = useState({ top: 64, right: 16 });
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,14 @@ export default function ContextUsageButton() {
     // load() commits fetched data after the API promise resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/health");
+        const h = await res.json();
+        const status = h?.llm_status?.status;
+        setNoKey(status === "missing" || h?.llm === "unset");
+      } catch { /* health unreachable — keep estimate view */ }
+    })();
     const id = setInterval(load, 20000);
     return () => clearInterval(id);
   }, [load]);
@@ -109,7 +118,9 @@ export default function ContextUsageButton() {
           />
         </span>
         <span className="context-usage-label" aria-live="polite">
-          {data ? (
+          {noKey ? (
+            <span style={{ color: "var(--warm)" }}>No API key · add one in Settings</span>
+          ) : data ? (
             <>Context ~{formatTokens(used)} / {formatTokens(windowTokens)}
               <span style={{ color: "var(--text-tertiary)", marginLeft: 6 }}>
                 ({pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)}%)
@@ -135,6 +146,18 @@ export default function ContextUsageButton() {
           </div>
 
           {error && <p style={{ color: "var(--error)", fontSize: 13 }}>{error}</p>}
+          {noKey && (
+            <p style={{
+              margin: "0 0 12px", padding: "10px 12px", borderRadius: 10, fontSize: 12.5, lineHeight: 1.5,
+              border: "1px solid color-mix(in srgb, var(--warm) 45%, transparent)",
+              background: "color-mix(in srgb, var(--warm) 8%, transparent)",
+              color: "var(--text-secondary)",
+            }}>
+              No model API key configured. Token usage is 0 — the figures below
+              are size-based estimates of what a run <em>would</em> occupy, not
+              anything spent. Add a key in Settings to start real usage.
+            </p>
+          )}
           {!data && !error && <div className="skeleton" style={{ height: 80 }} />}
 
           {data && (

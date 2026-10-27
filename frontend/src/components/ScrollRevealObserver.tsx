@@ -4,7 +4,13 @@ import { useEffect } from "react";
 
 export default function ScrollRevealObserver() {
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Never hide content when observation is unavailable or motion is reduced.
+    if (motion.matches || !("IntersectionObserver" in window)) return;
+    const reduce = () => {
+      if (motion.matches) document.documentElement.classList.remove("scroll-reveal-ready");
+    };
+    motion.addEventListener("change", reduce);
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
@@ -31,6 +37,7 @@ export default function ScrollRevealObserver() {
     });
     mutations.observe(document.body, { childList: true, subtree: true });
     return () => {
+      motion.removeEventListener("change", reduce);
       mutations.disconnect();
       observer.disconnect();
       document.documentElement.classList.remove("scroll-reveal-ready");

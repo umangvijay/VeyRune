@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Sun, Moon } from "lucide-react";
 
-import BrandMark from "@/components/BrandMark";import { useState, useEffect, useCallback } from "react";
+import BrandMark from "@/components/BrandMark";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { applyTheme, readThemePref, resolveTheme, type ThemePref } from "@/lib/theme";
 
 /** Sandtable theme event — pages with a 3D scene listen and re-skin. */
@@ -16,10 +18,36 @@ export default function PublicNavbar() {
   const [lampMode, setLampMode] = useState<"light" | "dark">("dark");
   const [hidden, setHidden] = useState(false);
   const pathname = usePathname();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (!isMobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const links = () => Array.from(menu.current?.querySelectorAll<HTMLElement>("a[href], button") ?? []);
+    links()[0]?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+        menuButton.current?.focus();
+      }
+      if (event.key === "Tab") {
+        const items = [menuButton.current, ...links()].filter(Boolean) as HTMLElement[];
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    const desktop = window.matchMedia("(min-width: 1280px)");
+    const resize = () => { if (desktop.matches) setIsMobileMenuOpen(false); };
+    desktop.addEventListener("change", resize);
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", close);
+      desktop.removeEventListener("change", resize);
+    };
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
@@ -29,7 +57,11 @@ export default function PublicNavbar() {
   }, [pathname]);
 
   useEffect(() => {
-    setLampMode(resolveTheme(readThemePref()));
+    const sync = () => setLampMode(resolveTheme(readThemePref()));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
   }, []);
 
   const toggleLamp = useCallback(() => {
@@ -58,7 +90,7 @@ export default function PublicNavbar() {
       "/signup": "Sign up · Sandtable",
     };
     if (titles[pathname]) document.title = titles[pathname];
-    else if (pathname.startsWith("/docs/")) document.title = "Docs · Sandtable";
+
   }, [pathname]);
 
   useEffect(() => {
@@ -84,7 +116,7 @@ export default function PublicNavbar() {
 
   return (
     <>
-      <header className="navbar-public" style={{
+      <header className="navbar-public" onFocusCapture={() => setHidden(false)} style={{
         padding: "20px clamp(16px, 5vw, 40px)",
         display: "flex",
         justifyContent: "space-between",
@@ -115,8 +147,9 @@ export default function PublicNavbar() {
         <button
           type="button"
           onClick={toggleLamp}
-          aria-label={`Switch to ${lampMode === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
-          title="Draughting Lamp"
+          aria-label={`Switch to ${lampMode === "dark" ? "day" : "night"} theme`}
+          aria-pressed={lampMode === "dark"}
+          title={lampMode === "dark" ? "Switch to day theme" : "Switch to night theme"}
           style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             padding: "8px 13px", borderRadius: "var(--radius-md)",
@@ -126,13 +159,8 @@ export default function PublicNavbar() {
             cursor: "pointer", flexShrink: 0,
           }}
         >
-          <span style={{
-            width: 7, height: 7, borderRadius: "50%",
-            background: lampMode === "dark" ? "var(--warm)" : "#e8c15a",
-            boxShadow: "0 0 8px currentColor",
-            color: lampMode === "dark" ? "var(--warm)" : "#e8c15a",
-          }} />
-          {lampMode === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}
+          {lampMode === "dark" ? <Moon size={14} /> : <Sun size={14} />}
+          <span className="lamp-label">{lampMode === "dark" ? "NIGHT" : "DAY"}</span>
         </button>
 
         <nav
@@ -143,8 +171,9 @@ export default function PublicNavbar() {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={(pathname === link.href || pathname.startsWith(`${link.href}/`)) ? "page" : undefined}
               className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
-              style={{ color: pathname === link.href ? "var(--text-primary)" : "var(--text-secondary)" }}
+              style={{ color: (pathname === link.href || pathname.startsWith(`${link.href}/`)) ? "var(--text-primary)" : "var(--text-secondary)" }}
             >
               {link.label}
             </Link>
@@ -156,9 +185,11 @@ export default function PublicNavbar() {
           <Link href="/get-started" className="btn btn-secondary whitespace-nowrap public-nav-started hide-sm">Get Started</Link>
           <button
             type="button"
+            ref={menuButton}
             className="public-nav-hamburger"
             aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMobileMenuOpen}
+            aria-controls="public-mobile-menu"
             onClick={() => setIsMobileMenuOpen((v) => !v)}
             style={{ gap: 6, background: "transparent", border: "none", width: 44, height: 44, display: "none", flexDirection: "column", justifyContent: "center", alignItems: "center", cursor: "pointer" }}
           >
@@ -171,7 +202,9 @@ export default function PublicNavbar() {
 
       {isMobileMenuOpen && (
         <div
+          ref={menu}
           className="public-nav-overlay"
+          id="public-mobile-menu"
           style={{
             position: "fixed",
             inset: 0,
@@ -187,8 +220,9 @@ export default function PublicNavbar() {
               <Link
                 key={link.href}
                 href={link.href}
+              aria-current={(pathname === link.href || pathname.startsWith(`${link.href}/`)) ? "page" : undefined}
                 className="transition-colors border-b border-[var(--border-primary)] pb-4"
-                style={{ color: pathname === link.href ? "var(--text-primary)" : "var(--text-secondary)" }}
+                style={{ color: (pathname === link.href || pathname.startsWith(`${link.href}/`)) ? "var(--text-primary)" : "var(--text-secondary)" }}
               >
                 {link.label}
               </Link>

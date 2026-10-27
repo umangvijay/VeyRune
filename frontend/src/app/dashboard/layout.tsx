@@ -3,9 +3,9 @@
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect, ReactNode, useRef } from "react";
+import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import BrandMark from "@/components/BrandMark";
-import { applyTheme, watchSystemTheme, type ThemePref } from "@/lib/theme";
+import { applyTheme, watchSystemTheme, readThemePref, resolveTheme, type ThemePref } from "@/lib/theme";
 import { getUnreadCount, listNotifications, markNotificationRead, markAllNotificationsRead, listWorkflows, Notification, WorkflowRun } from "@/lib/api";
 import ContextUsageButton from "@/components/ContextUsage";
 import { AmbientOrbs } from "@/components/GlassPanel";
@@ -351,6 +351,17 @@ function DashboardInner({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   };
 
+  const [lamp, setLamp] = useState<"light" | "dark">("dark");
+  useEffect(() => {
+    setLamp(resolveTheme(readThemePref()));
+    return watchSystemTheme();
+  }, []);
+  const toggleLamp = useCallback(() => {
+    const next: ThemePref = lamp === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setLamp(next);
+  }, [lamp]);
+
   if (isLoading || !isAuthenticated) {
     return (
       <div className="mesh-gradient" style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -538,6 +549,28 @@ function DashboardInner({ children }: { children: ReactNode }) {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={toggleLamp}
+              aria-label={`Switch to ${lamp === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
+              title="Draughting Lamp — day / night"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "7px 12px", borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-primary)",
+                background: "var(--bg-glass)", color: "var(--text-secondary)",
+                fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.08em",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%",
+                background: lamp === "dark" ? "var(--warm)" : "#e8c15a",
+                boxShadow: "0 0 8px currentColor",
+                color: lamp === "dark" ? "var(--warm)" : "#e8c15a",
+              }} />
+              {lamp === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}
+            </button>
             <ContextUsageButton />
             {/* Notification bell */}
             <div style={{ position: "relative" }} ref={panelRef}>

@@ -12,6 +12,7 @@ import { getContextUsage } from "@/lib/api";
 export default function TokenStatusCard() {
   const [provider, setProvider] = useState<{ llm: string; status: string; detail: string } | null>(null);
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof getContextUsage>> | null>(null);
+  const hasKey = provider ? !["unset", "missing"].includes(provider.status) : false;
 
   useEffect(() => {
     (async () => {
@@ -47,12 +48,25 @@ export default function TokenStatusCard() {
         Model & tokens
       </h2>
 
+      {!hasKey && provider && (
+        <div style={{
+          padding: "10px 14px", marginBottom: 14, borderRadius: "var(--radius-md)",
+          border: "1px solid color-mix(in srgb, var(--warm) 45%, transparent)",
+          background: "color-mix(in srgb, var(--warm) 8%, transparent)",
+          fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5,
+        }}>
+          No model API key is configured yet — token usage is 0 and will start
+          counting once you add a key below. The context figures elsewhere are
+          estimates from text size (~4 characters per token), not billing data.
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ padding: 14, borderRadius: "var(--radius-md)", background: "var(--bg-tertiary)", border: "1px solid var(--border-primary)" }}>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Active provider</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{providerLabel[provider?.llm || ""] || (provider?.llm || "…")}</div>
           <div style={{ fontSize: 12.5, color: provider?.status === "catalog_ok" || provider?.status === "vertex" ? "var(--success, #22c55e)" : "var(--text-tertiary)", marginTop: 4 }}>
-            {provider?.status === "catalog_ok" ? "Credential working"
+            {provider?.status === "catalog_ok" ? "Your key is working"
               : provider?.status === "vertex" ? "Vertex credentials working"
               : provider?.status === "missing" ? "No credential on the server — add your own key below"
               : provider?.detail?.slice(0, 80) || "…"}
@@ -77,7 +91,7 @@ export default function TokenStatusCard() {
         }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
-        <span>{pct}% of your daily token budget</span>
+        <span>{pct}% of your daily token budget{hasKey ? "" : " · starts counting after you add a key"}</span>
         <span>{usage && usage.remaining_tokens != null ? `${Number(usage.remaining_tokens).toLocaleString()} remaining` : ""}</span>
       </div>
     </div>

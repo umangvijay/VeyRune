@@ -1,91 +1,17 @@
 "use client";
 
-/**
- * CyanotypeScene — the Drafting Works (Sandtable home backdrop).
- *
- * MOTION CONTRACT (audit the user's note): the camera never rotates.
- * It holds a fixed drafting angle and GLIDES laterally — all life comes
- * from the hall itself: the planner's tracer light running its path,
- * sheets breathing and unfolding, beams sweeping, dust drifting,
- * wireframes assembling. A tempo control scales the whole hall's clock.
- *
- * Theme-aware: "tungsten" (near-black #04060B + klein blue #3E6BFF) and
- * "north light" (pale drafting paper + prussian ink).
- */
-
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 
+export type SceneStatus = "loading" | "ready" | "fallback";
+
+export type SceneFocus = "overview" | "planet" | "sheet";
+
 export type CyanotypeMode = "dark" | "light";
-
-/** Central reprint scheduler: sheets redraw at random intervals. */
-const reprintWatchers: Array<(t: number) => void> = [];
-function watchSheetReprints(fn: (t: number) => void) {
-  reprintWatchers.push(fn);
-  return () => {
-    const i = reprintWatchers.indexOf(fn);
-    if (i >= 0) reprintWatchers.splice(i, 1);
-  };
-}
-
-/* ── Shared hall clock: one tempo drives every animation ── */
-const hall = { t: 0, tempo: 1, stepQueued: 0 };
-
-export function setHallTempo(multiplier: number) {
-  hall.tempo = multiplier;
-}
-
-export function hallStep() {
-  hall.stepQueued += 0.35; // manual frame advance for the STEP button
-}
-
-function useHallTime() {
-  const ref = useRef(0);
-  useFrame((_, delta) => {
-    hall.t += delta * hall.tempo;
-    if (hall.stepQueued > 0) {
-      hall.t += hall.stepQueued;
-      hall.stepQueued = 0;
-    }
-    ref.current = hall.t;
-  });
-  return ref;
-}
-
 const PALETTE = {
-  dark: {
-    bg: "#04060b",
-    fog: "#04060b",
-    sheetBase: "#0d3a8f",
-    sheetBase2: "#1a55c4",
-    ink: "rgba(220,235,255,0.92)",
-    inkSoft: "rgba(150,185,255,0.55)",
-    edge: "#9fc2ff",
-    line: "#6f9dff",
-    lineBright: "#cfe2ff",
-    icosa: "#39d9c0",
-    cone: "#3e6bff",
-    grid: "#0e1c3f",
-    dust: "#7d9bff",
-    beam: "#2a52c8",
-  },
-  light: {
-    bg: "#dfe7f3",
-    fog: "#dfe7f3",
-    sheetBase: "#7ea3e8",
-    sheetBase2: "#9dbdf2",
-    ink: "rgba(10,30,80,0.85)",
-    inkSoft: "rgba(10,30,80,0.5)",
-    edge: "#1d3f8f",
-    line: "#2e56c4",
-    lineBright: "#1d3f8f",
-    icosa: "#1f9e8e",
-    cone: "#2e56c4",
-    grid: "#c3d0e6",
-    dust: "#8fa6cc",
-    beam: "#b8ccf0",
-  },
+  dark: { sheetBase: "#073279", sheetBase2: "#1245a0", ink: "rgba(210,237,255,.9)", inkSoft: "rgba(130,190,255,.45)" },
+  light: { sheetBase: "#b6d0f3", sheetBase2: "#dce9fb", ink: "rgba(15,56,120,.9)", inkSoft: "rgba(25,70,140,.45)" },
 };
 
 function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean): THREE.CanvasTexture {
@@ -183,502 +109,248 @@ function makeSheetTexture(mode: CyanotypeMode, seed: number, withStamp: boolean)
   return tex;
 }
 
-type SheetSpec = {
-  position: [number, number, number];
-  rotation: [number, number, number];
-  size: [number, number];
-  seed: number;
-  withStamp: boolean;
-  unfold?: boolean;
-};
 
-/** Blueprint sheet — HOLDS its drawn angle (no rotation drift), only breathes.
- *  At random intervals the pattern REPRINTS: the sheet flashes and the
- *  drafting blocks change — plans being redrawn in front of you. */
-function Sheet({ spec, mode, hallTime }: { spec: SheetSpec; mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const group = useRef<THREE.Group>(null);
-  const { position, rotation, size, seed, withStamp, unfold } = spec;
+// Shared coordinates keep every strand physically attached to its source.
+function weaveProgress(t: number, index: number) {
+  return (Math.sin(t * .32 + index * 1.7) + 1) / 2;
+}
 
-  // reprint state: the pattern flips at random intervals; a SMOOTH CROSSFADE
-  // eases the new pattern in over the old one (no hard swaps)
-  const [variants, setVariants] = useState<{ prev: number; curr: number }>({ prev: seed, curr: seed });
-  const crossfade = useRef({ active: false, startedAt: 0, nextAt: 5 + Math.random() * 5 });
-  const fadeMats = useRef<{ back: THREE.MeshBasicMaterial | null; front: THREE.MeshBasicMaterial | null }>({ back: null, front: null });
+function sheetDepth(x: number, y: number, t: number, index: number) {
+  const fold = (Math.sin(t * .38 + index * 1.7) + 1) / 2;
+  return Math.sin(x * 1.7 + t * .7 + index) * .13 + Math.abs(x) ** 2 * fold * .2 + Math.sin(y * 2 + t) * .045;
+}
 
-  useEffect(() => {
-    return watchSheetReprints((t) => {
-      if (t >= crossfade.current.nextAt && !crossfade.current.active) {
-        crossfade.current.active = true;
-        crossfade.current.startedAt = t;
-        setVariants((v) => ({ prev: v.curr, curr: Math.floor(Math.random() * 100000) }));
-      }
-      if (crossfade.current.active && t - crossfade.current.startedAt > 1.7) {
-        crossfade.current.active = false;
-        crossfade.current.nextAt = t + 6 + Math.random() * 7;
-      }
-    });
-  }, []);
+const ORIGIN = new THREE.Vector3(1.65, 1.4, -2.2);
+const SHEETS = [
+  { position: [4.3, -.25, .1], rotation: [-.2, -.38, -.12], size: [3.5, 2.6] },
+  { position: [-1.4, -.8, -1], rotation: [.12, .28, .16], size: [3.1, 2.3] },
+  { position: [4.7, 3.15, -3.5], rotation: [.05, -.3, .1], size: [2.6, 1.9] },
+] as const;
 
-  const prevTex = useMemo(() => makeSheetTexture(mode, variants.prev, withStamp), [mode, variants.prev, withStamp]);
-  const currTex = useMemo(() => makeSheetTexture(mode, variants.curr, withStamp), [mode, variants.curr, withStamp]);
-
-  useFrame(() => {
-    if (!group.current) return;
-    const t = hallTime.current;
-    // breathing bob only — orientation stays exactly as drawn
-    group.current.position.y = position[1] + Math.sin(t * 0.3 + seed) * 0.1;
-    if (unfold) {
-      // the back sheets unfold like a drawing being spread open
-      group.current.rotation.x = rotation[0] + Math.sin(t * 0.12 + seed) * 0.055;
+// Camera motion stays responsive even when the loom animation is paused.
+function CameraRig({ focus, reducedMotion, zoom }: { focus: SceneFocus; reducedMotion: boolean; zoom: number }) {
+  const { invalidate } = useThree();
+  const aim = useRef(new THREE.Vector3(0, 1.2, 0));
+  const destination = useMemo(() => {
+    const target = focus === "planet" ? ORIGIN.clone() : focus === "sheet"
+      ? new THREE.Vector3(...SHEETS[0].position) : new THREE.Vector3(0, 1.2, 0);
+    return { target, eye: target.clone().add(new THREE.Vector3(0, 0, (focus === "overview" ? 11 : 5.8) / zoom)) };
+  }, [focus, zoom]);
+  useEffect(() => invalidate(), [destination, invalidate, reducedMotion]);
+  useFrame(({ camera, size }, delta) => {
+    const eye = destination.eye.clone();
+    const target = destination.target.clone();
+    if (size.width < 760) {
+      // Keep the selected object in the clear area above the mobile HUD.
+      const offset = focus === "overview" ? new THREE.Vector3(1.65, -2, 0) : new THREE.Vector3(0, -1.5, 0);
+      target.add(offset);
+      eye.add(offset);
+      if (focus !== "overview") eye.z += 2;
     }
-    // smooth crossfade: cubic ease-out over 1.4s while a reprint runs
-    const base = mode === "dark" ? 0.97 : 0.94;
-    if (fadeMats.current.back && fadeMats.current.front) {
-      const r = crossfade.current;
-      if (r.active) {
-        const raw = Math.min(1, (t - r.startedAt) / 1.4);
-        const eased = 1 - Math.pow(1 - raw, 3);
-        fadeMats.current.front.opacity = base * eased;
-        fadeMats.current.back.opacity = base * (1 - eased * 0.999);
-      } else {
-        fadeMats.current.front.opacity = base;
-        fadeMats.current.back.opacity = 0;
-      }
-    }
-  });
-
-  return (
-    <group ref={group} position={position} rotation={rotation}>
-      {/* back mesh: the previous pattern (fades out during a reprint) */}
-      <mesh>
-        <planeGeometry args={[size[0], size[1]]} />
-        <meshBasicMaterial ref={(m) => { fadeMats.current.back = m; }} map={prevTex} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} />
-      </mesh>
-      {/* front mesh: the current pattern (fades in during a reprint) */}
-      <mesh position={[0, 0, 0.005]}>
-        <planeGeometry args={[size[0], size[1]]} />
-        <meshBasicMaterial ref={(m) => { fadeMats.current.front = m; }} map={currTex} transparent opacity={mode === "dark" ? 0.97 : 0.94} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      <lineSegments>
-        <edgesGeometry args={[new THREE.PlaneGeometry(size[0], size[1])]} />
-        <lineBasicMaterial color={c.edge} transparent opacity={0.9} />
-      </lineSegments>
-    </group>
-  );
-}
-
-/** The planner's draughtsman: a light stream tracing its path. */
-function TracingLine({ mode, points, speed = 0.1, offset = 0, hallTime }: { mode: CyanotypeMode; points: [number, number, number][]; speed?: number; offset?: number; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const full = useMemo(() => points.map(p => new THREE.Vector3(...p)), [points]);
-  const { line, material } = useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(full.slice(0, 2));
-    const mat = new THREE.LineBasicMaterial({ color: c.lineBright, transparent: true, opacity: 0.85 });
-    return { line: new THREE.Line(geometry, mat), material: mat };
-  }, [full, c.lineBright]);
-  const total = points.length - 1;
-
-  useFrame(() => {
-    const t = (hallTime.current * speed + offset) % 1;
-    const head = Math.max(1, Math.ceil(t * total));
-    line.geometry.setFromPoints(full.slice(0, head + 1));
-    material.opacity = 0.35 + 0.6 * Math.sin(t * Math.PI);
-  });
-
-  return <primitive object={line} />;
-}
-
-/** Diagonal light beams — ruler-straight, sweeping slowly. */
-function LightBeams({ mode, hallTime }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const group = useRef<THREE.Group>(null);
-  useFrame(() => {
-    if (!group.current) return;
-    const t = hallTime.current;
-    group.current.children.forEach((child, i) => {
-      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.05 + 0.035 * Math.sin(t * 0.4 + i * 1.7);
-    });
-  });
-  return (
-    <group ref={group}>
-      {[[-5.5, 4.5, -6], [-1.5, 5, -7], [2.5, 4.8, -6.4], [6.5, 4.6, -7.5]].map(([x, y, z], i) => (
-        <mesh key={i} position={[x, y, z]} rotation={[0, 0, 0.6 + i * 0.07]}>
-          <planeGeometry args={[0.34, 14]} />
-          <meshBasicMaterial
-            color={c.beam}
-            transparent
-            opacity={0.06}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/** Wireframe structures assembling — piece by piece, minimal drift. */
-function Structure({ mode, position, kind, scale = 1, hallTime }: { mode: CyanotypeMode; position: [number, number, number]; kind: "icosa" | "cone" | "knot" | "dodeca"; scale?: number; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame(() => {
-    if (ref.current) {
-      const t = hallTime.current;
-      ref.current.rotation.y = t * 0.03;      // barely turning
-      ref.current.rotation.x = Math.sin(t * 0.1) * 0.05;
-    }
-  });
-  return (
-    <mesh ref={ref} position={position} scale={scale}>
-      {kind === "icosa" && <icosahedronGeometry args={[1.5, 1]} />}
-      {kind === "cone" && <coneGeometry args={[1, 2.6, 7, 4, true]} />}
-      {kind === "knot" && <torusKnotGeometry args={[0.8, 0.26, 90, 10]} />}
-      {kind === "dodeca" && <dodecahedronGeometry args={[1.1, 0]} />}
-      <meshBasicMaterial
-        color={kind === "icosa" ? c.icosa : kind === "knot" ? c.lineBright : c.cone}
-        wireframe
-        transparent
-        opacity={mode === "dark" ? 0.6 : 0.45}
-      />
-    </mesh>
-  );
-}
-
-/** The Planet: a drafting globe — prussian seas, blueprint meridians.
- *  It turns slowly, weaving the threads that draw every sheet. */
-function Planet({ mode, hallTime, position, scale = 1, withHalo = false }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number>; position: [number, number, number]; scale?: number; withHalo?: boolean }) {
-  const c = PALETTE[mode];
-  const globe = useRef<THREE.Mesh>(null);
-  const graticule = useRef<THREE.LineSegments>(null);
-
-  // graticule: meridians + parallels as line segments (the drafting globe)
-  const graticuleGeometry = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    const R = 1.25;
-    for (let i = 0; i < 10; i++) {
-      const lon = (i / 10) * Math.PI * 2;
-      for (let a = 0; a < 24; a++) {
-        const t1 = (a / 24) * Math.PI * 2;
-        const t2 = ((a + 1) / 24) * Math.PI * 2;
-        pts.push(new THREE.Vector3(
-          R * Math.sin(t1) * Math.cos(lon), R * Math.cos(t1), R * Math.sin(t1) * Math.sin(lon),
-        ), new THREE.Vector3(
-          R * Math.sin(t2) * Math.cos(lon), R * Math.cos(t2), R * Math.sin(t2) * Math.sin(lon),
-        ));
-      }
-    }
-    for (let i = 1; i < 6; i++) {
-      const lat = -Math.PI / 2 + (i / 6) * Math.PI;
-      const r = R * Math.cos(lat);
-      const y = R * Math.sin(lat);
-      for (let a = 0; a < 36; a++) {
-        const t1 = (a / 36) * Math.PI * 2;
-        const t2 = ((a + 1) / 36) * Math.PI * 2;
-        pts.push(new THREE.Vector3(r * Math.cos(t1), y, r * Math.sin(t1)),
-                 new THREE.Vector3(r * Math.cos(t2), y, r * Math.sin(t2)));
-      }
-    }
-    return new THREE.BufferGeometry().setFromPoints(pts);
-  }, []);
-
-  useFrame(() => {
-    const t = hallTime.current;
-    if (globe.current) globe.current.rotation.y = t * 0.05;
-    if (graticule.current) graticule.current.rotation.y = t * 0.05;
-  });
-
-  const halo = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 128; canvas.height = 128;
-    const ctx = canvas.getContext("2d")!;
-    const g = ctx.createRadialGradient(64, 64, 30, 64, 64, 64);
-    g.addColorStop(0, "rgba(90,140,255,0.4)");
-    g.addColorStop(0.7, "rgba(62,107,255,0.12)");
-    g.addColorStop(1, "rgba(62,107,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 128, 128);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(canvas),
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }));
-    sprite.scale.setScalar(4.6 * scale);
-    return sprite;
-  }, []);
-
-  return (
-    <group position={position} scale={scale}>
-      <primitive object={halo} />
-      <mesh ref={globe}>
-        <sphereGeometry args={[1.22, 32, 24]} />
-        <meshBasicMaterial color={mode === "dark" ? "#0a1e4d" : "#a8bfe8"} />
-      </mesh>
-      <lineSegments ref={graticule}>
-        <primitive object={graticuleGeometry} attach="geometry" />
-        <lineBasicMaterial color={c.edge} transparent opacity={mode === "dark" ? 0.95 : 0.8} />
-      </lineSegments>
-    </group>
-  );
-}
-
-/** A thread of the planet: a THICK glowing tube arcing to a sheet, woven
- *  stitch by stitch by a knitting head — with a wireframe patch that
- *  materializes on the sheet where the thread lands. */
-function Thread({
-  mode, from, to, landAt, hallTime, speed = 0.14, offset = 0,
-}: {
-  mode: CyanotypeMode;
-  from: [number, number, number];
-  to: [number, number, number];
-  landAt?: [number, number, number];
-  hallTime: React.MutableRefObject<number>;
-  speed?: number;
-  offset?: number;
-}) {
-  const c = PALETTE[mode];
-  const curve = useMemo(() => {
-    const a = new THREE.Vector3(...from);
-    const b = new THREE.Vector3(...to);
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    mid.y += 1.9;
-    return new THREE.QuadraticBezierCurve3(a, mid, b);
-  }, [from, to]);
-
-  const tube = useMemo(
-    () => new THREE.TubeGeometry(curve, 48, 0.035, 8, false),
-    [curve],
-  );
-  const tubeMat = useMemo(
-    () => new THREE.MeshBasicMaterial({
-      color: c.lineBright, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    }),
-    [c.lineBright],
-  );
-  const tubeMesh = useMemo(() => new THREE.Mesh(tube, tubeMat), [tube, tubeMat]);
-
-  // the knitting head: a bright glow sprite riding the weave point
-  const headSprite = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 64; canvas.height = 64;
-    const ctx = canvas.getContext("2d")!;
-    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(210,228,255,1)");
-    g.addColorStop(0.3, "rgba(130,170,255,0.95)");
-    g.addColorStop(1, "rgba(62,107,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 64, 64);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(canvas),
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }));
-    sprite.scale.setScalar(0.6);
-    return sprite;
-  }, []);
-
-  // the patch: a small wireframe lattice that GROWS on the sheet where the
-  // thread lands — the blueprint being knitted into existence
-  const patch = useRef<THREE.Group>(null);
-  const patchEdges = useMemo(() => {
-    const g = new THREE.Group();
-    const land = new THREE.Vector3(...(landAt || to));
-    const cell = 0.34;
-    for (let i = -1; i <= 1; i++) {
-      for (let j = -1; j <= 1; j++) {
-        const quad = new THREE.PlaneGeometry(cell, cell);
-        const edges = new THREE.EdgesGeometry(quad);
-        const mesh = new THREE.LineSegments(
-          edges,
-          new THREE.LineBasicMaterial({ color: c.lineBright, transparent: true, opacity: 0 }),
-        );
-        mesh.position.set(land.x + i * cell, land.y + j * cell, land.z + 0.02);
-        g.add(mesh);
-      }
-    }
-    return g;
-  }, [landAt, to, c.lineBright]);
-
-  useFrame(() => {
-    const t = (hallTime.current * speed + offset) % 1.5; // weave, hold, restart
-    const head = Math.min(1, t);
-
-    // draw the tube progressively (rebuild geometry is cheap at 48 segments)
-    const drawn = curve.getPoints(Math.max(2, Math.ceil(head * 48)));
-    const sub = new THREE.TubeGeometry(
-      new THREE.CatmullRomCurve3(drawn), Math.max(4, Math.ceil(head * 48)), 0.035, 8, false,
-    );
-    tubeMesh.geometry.dispose();
-    tubeMesh.geometry = sub;
-
-    // knitting head rides the weave point
-    const weavePoint = curve.getPoint(head);
-    headSprite.position.copy(weavePoint);
-    headSprite.visible = t <= 1.05;
-
-    // patch cells materialize one by one once the thread lands
-    if (patch.current) {
-      patch.current.children.forEach((cellMesh, idx) => {
-        const mat = (cellMesh as THREE.LineSegments).material as THREE.LineBasicMaterial;
-        const appear = Math.min(1, Math.max(0, (head - 0.9) * 10 - idx * 0.09));
-        mat.opacity = appear * 0.9;
-      });
-      patch.current.visible = head > 0.88;
-    }
-  });
-
-  return (
-    <>
-      <primitive object={tubeMesh} />
-      <primitive object={headSprite} />
-      <group ref={patch}>{patchEdges.children.map((child, i) => (
-        <primitive object={child} key={i} />
-      ))}</group>
-    </>
-  );
-}
-
-/** Small drafting cubes orbiting the planet — satellites of the workshop. */
-function OrbitingCubes({ mode, hallTime }: { mode: CyanotypeMode; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const group = useRef<THREE.Group>(null);
-  useFrame(() => {
-    if (group.current) group.current.rotation.y = hallTime.current * 0.18;
-  });
-  const cubes = useMemo(() => [0, 1, 2, 3].map(i => {
-    const angle = (i / 4) * Math.PI * 2;
-    return { position: [Math.cos(angle) * 2.3, 0.4 + (i % 2) * 0.5, Math.sin(angle) * 2.3] as [number, number, number], rotation: [i * 0.4, i * 0.7, 0] as [number, number, number] };
-  }), []);
-  return (
-    <group ref={group} position={[0.3, 2.6, -7.3]}>
-      {cubes.map((cube, i) => (
-        <mesh key={i} position={cube.position} rotation={cube.rotation}>
-          <boxGeometry args={[0.26, 0.26, 0.26]} />
-          <meshBasicMaterial color={c.edge} wireframe transparent opacity={mode === "dark" ? 0.7 : 0.5} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/** Graphite dust — sparse drifting points (not a starfield). */
-function Dust({ mode, count = 220, hallTime }: { mode: CyanotypeMode; count?: number; hallTime: React.MutableRefObject<number> }) {
-  const c = PALETTE[mode];
-  const ref = useRef<THREE.Points>(null);
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 26;
-      arr[i * 3 + 1] = Math.random() * 9 - 1;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 18 - 2;
-    }
-    return arr;
-  }, [count]);
-  useFrame(() => {
-    if (ref.current) ref.current.position.y = Math.sin(hallTime.current * 0.07) * 0.3;
-  });
-  return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <pointsMaterial color={c.dust} size={0.05} transparent opacity={mode === "dark" ? 0.8 : 0.55} sizeAttenuation />
-    </points>
-  );
-}
-
-function GridFloor({ mode }: { mode: CyanotypeMode }) {
-  const c = PALETTE[mode];
-  return (
-    <>
-      <gridHelper args={[46, 46, c.grid, c.grid]} position={[0, -1.7, 0]} />
-      <gridHelper args={[46, 8, c.line, c.line]} position={[0, -1.69, 0]} />
-    </>
-  );
-}
-
-/** Fixed drafting angle — the camera GLIDES laterally, never rotates. */
-function CameraGlide({ hallTime }: { hallTime: React.MutableRefObject<number> }) {
-  const { camera } = useThree();
-  useFrame(() => {
-    const t = hallTime.current;
-    const x = Math.sin(t * 0.1) * 0.5;      // slow lateral glide
-    const y = 0.9 + Math.sin(t * 0.13) * 0.12; // gentle bob
-    camera.position.x += (x - camera.position.x) * 0.05;
-    camera.position.y += (y - camera.position.y) * 0.05;
-    camera.lookAt(0.4, 2.1, -4);            // same bearing, always
+    const blend = reducedMotion ? 1 : 1 - Math.exp(-5 * Math.min(delta, .1));
+    camera.position.lerp(eye, blend);
+    aim.current.lerp(target, blend);
+    camera.lookAt(aim.current);
+    if (camera.position.distanceTo(eye) > .001 || aim.current.distanceTo(target) > .001) invalidate();
   });
   return null;
 }
 
-function Scene({ mode }: { mode: CyanotypeMode }) {
-  const c = PALETTE[mode];
-  const hallTime = useHallTime();
-
-  useFrame(() => {
-    for (const fn of reprintWatchers) fn(hall.t);
+function Loom({ mode, tempo, pointer, focus, onFocus, onWeave }: { mode: CyanotypeMode; tempo: number; pointer: React.RefObject<{ x: number; y: number }>; focus: SceneFocus; onFocus: (focus: SceneFocus) => void; onWeave: (progress: number) => void }) {
+  const { gl } = useThree();
+  useEffect(() => () => { gl.domElement.style.removeProperty("cursor"); }, [gl]);
+  const time = useRef(0);
+  const lastReport = useRef(-1);
+  const world = useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    time.current += Math.min(delta, .05) * tempo;
+    if (lastReport.current < 0 || time.current - lastReport.current >= .25) {
+      lastReport.current = time.current;
+      onWeave(Math.round(weaveProgress(time.current, 0) * 100));
+    }
+    if (world.current) {
+      world.current.rotation.y = THREE.MathUtils.damp(world.current.rotation.y, (focus === "overview" ? pointer.current.x * .065 : 0), 3, delta);
+      world.current.rotation.x = THREE.MathUtils.damp(world.current.rotation.x, (focus === "overview" ? pointer.current.y * .035 : 0), 3, delta);
+    }
   });
-
-  return (
-    <>
-      <color attach="background" args={[c.bg]} />
-      <fog attach="fog" args={[c.fog, 10, 30]} />
-      <CameraGlide hallTime={hallTime} />
-      <GridFloor mode={mode} />
-      <Dust mode={mode} hallTime={hallTime} />
-      <LightBeams mode={mode} hallTime={hallTime} />
-      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [3.6, 2.3, -4.2], rotation: [-0.03, -0.55, -0.04], size: [6.2, 4.6], seed: 0, withStamp: true }} />
-      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [-4.9, 2.0, -5.4], rotation: [0.05, 0.52, 0.03], size: [5.4, 4], seed: 1, withStamp: false, unfold: true }} />
-      <Sheet mode={mode} hallTime={hallTime} spec={{ position: [1.2, 3.4, -9.5], rotation: [0.08, 0.1, 0.05], size: [5, 3.8], seed: 2, withStamp: false, unfold: true }} />
-      <TracingLine mode={mode} hallTime={hallTime} offset={0} points={[[-6.5, 0.5, -2], [-4.6, 1.8, -3.6], [-1.4, 2.8, -5.8], [1.6, 1.6, -4.3], [4.6, 2.6, -6.4]]} />
-      <TracingLine mode={mode} hallTime={hallTime} offset={0.45} speed={0.085} points={[[6.2, 0.9, -1.4], [3.8, 2.6, -4.4], [0.6, 3.4, -7.6], [-3.4, 2, -5.4]]} />
-      <TracingLine mode={mode} hallTime={hallTime} offset={0.75} speed={0.11} points={[[0.2, 1.2, -2.6], [2.2, 2.2, -4.8], [5.4, 1.4, -6.8], [7.4, 2.4, -8.2]]} />
-      <Structure mode={mode} hallTime={hallTime} position={[-7.2, 0.6, -4.2]} kind="icosa" />
-      <Structure mode={mode} hallTime={hallTime} position={[7.8, 0.3, -5.6]} kind="cone" />
-      <Structure mode={mode} hallTime={hallTime} position={[6.2, 4.4, -10.5]} kind="knot" />
-      <Structure mode={mode} hallTime={hallTime} position={[-6.8, 4.2, -9.8]} kind="dodeca" />
-      <OrbitingCubes mode={mode} hallTime={hallTime} />
-      {/* The Planet — knitting every blueprint into existence */}
-      <Planet mode={mode} hallTime={hallTime} position={[1.1, 3.0, -8.2]} scale={1.45} withHalo />
-      {/* Three strands woven to the big stamped sheet */}
-      <Thread mode={mode} hallTime={hallTime} offset={0} speed={0.15}
-        from={[-1.7, 3.8, -7.2]} to={[2.6, 2.6, -4.1]} landAt={[2.3, 2.5, -4.05]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.18} speed={0.15}
-        from={[-1.9, 3.6, -7.3]} to={[3.6, 2.2, -4.2]} landAt={[3.3, 2.0, -4.15]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.36} speed={0.15}
-        from={[-2.1, 3.4, -7.4]} to={[4.2, 2.6, -4.3]} landAt={[3.9, 2.4, -4.25]} />
-      {/* Two strands to the left sheet */}
-      <Thread mode={mode} hallTime={hallTime} offset={0.55} speed={0.13}
-        from={[-2.0, 3.5, -7.3]} to={[-4.6, 2.2, -5.4]} landAt={[-4.3, 2.1, -5.3]} />
-      <Thread mode={mode} hallTime={hallTime} offset={0.7} speed={0.13}
-        from={[-2.3, 3.3, -7.4]} to={[-5.2, 2.6, -5.5]} landAt={[-4.9, 2.5, -5.4]} />
-      {/* One strand to the back sheet */}
-      <Thread mode={mode} hallTime={hallTime} offset={0.9} speed={0.11}
-        from={[-1.4, 3.9, -7.5]} to={[1.0, 3.3, -9.6]} landAt={[0.9, 3.2, -9.5]} />
-    </>
-  );
+  const ink = mode === "dark" ? "#94d8ff" : "#214c9a";
+  return <group ref={world}>
+    <ambientLight intensity={1.5} />
+    <pointLight position={[0, 5, 5]} color="#98caff" intensity={45} />
+    <group onPointerOver={() => { gl.domElement.style.setProperty("cursor", "zoom-in"); }} onPointerOut={() => { gl.domElement.style.removeProperty("cursor"); }} onClick={event => { event.stopPropagation(); onFocus(focus === "planet" ? "overview" : "planet"); }}>
+      <Planet time={time} ink={ink} mode={mode} />
+    </group>
+    {SHEETS.map((spec, index) => <group key={index} onPointerOver={index === 0 ? () => { gl.domElement.style.setProperty("cursor", "zoom-in"); } : undefined} onPointerOut={() => { gl.domElement.style.removeProperty("cursor"); }} onClick={index === 0 ? event => { event.stopPropagation(); onFocus(focus === "sheet" ? "overview" : "sheet"); } : undefined}><WovenSheet index={index} mode={mode} time={time} spec={spec} /></group>)}
+    {SHEETS.flatMap((spec, index) => [0, 1, 2].map(strand =>
+      <Thread key={`${index}-${strand}`} time={time} target={spec.position} index={index} strand={strand} ink={ink} />
+    ))}
+    <gridHelper args={[40, 60, mode === "dark" ? "#173766" : "#adc1df", mode === "dark" ? "#0b1a33" : "#ccd9ec"]} position={[0, -3, -4]} />
+  </group>;
 }
 
-export default function CyanotypeScene({ mode = "dark", tempo = 1 }: { mode?: CyanotypeMode; tempo?: number }) {
-  useEffect(() => {
-    setHallTempo(tempo);
-  }, [tempo]);
+function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: string; mode: CyanotypeMode }) {
+  const globe = useRef<THREE.Group>(null);
+  useFrame(() => { if (globe.current) globe.current.rotation.y = time.current * .12; });
+  return <group position={ORIGIN}>
+    <group ref={globe} rotation={[.12, 0, -.28]}>
+      <mesh><sphereGeometry args={[1.2, 48, 32]} /><meshStandardMaterial color={mode === "dark" ? "#071d40" : "#9fbde8"} roughness={.42} metalness={.65} /></mesh>
+      <mesh scale={1.006}><sphereGeometry args={[1.2, 28, 18]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.4} /></mesh>
+      {[0, 1, 2].map(i => <mesh key={i} rotation={[Math.PI / 2 + i * .35, i * .6, .2]}>
+        <torusGeometry args={[1.34 + i * .08, .008, 6, 100]} /><meshBasicMaterial color={ink} transparent opacity={.7} />
+      </mesh>)}
+    </group>
+    <mesh scale={1.12}><sphereGeometry args={[1.2, 32, 24]} /><meshBasicMaterial color="#3e6bff" transparent opacity={.07} side={THREE.BackSide} depthWrite={false} /></mesh>
+  </group>;
+}
 
-  return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 0 }} aria-hidden="true">
-      <Canvas
-        camera={{ position: [0, 0.9, 8.2], fov: 58 }}
-        dpr={[1, 1.75]}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
-        style={{ position: "absolute", inset: 0 }}
-      >
-        <Scene mode={mode} />
-      </Canvas>
-    </div>
-  );
+type SheetSpec = typeof SHEETS[number];
+function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: number; mode: CyanotypeMode; time: React.RefObject<number> }) {
+  const surface = useRef<THREE.Mesh<THREE.PlaneGeometry>>(null);
+  const texture = useMemo(() => makeSheetTexture(mode, index + 2, index === 0), [mode, index]);
+  const model = useRef<THREE.Mesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const shader = useMemo(() => ({
+    uniforms: { map: { value: texture }, progress: { value: .5 } },
+    vertexShader: `varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D map; uniform float progress; varying vec2 vUv;
+      void main() {
+        vec4 paper = texture2D(map, vUv);
+        float woven = 1.0 - smoothstep(progress - .015, progress + .015, vUv.y);
+        float needle = 1.0 - smoothstep(.0, .012, abs(vUv.y - progress));
+        gl_FragColor = vec4(paper.rgb + needle * .35, .12 + woven * .76);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  }), [texture]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  useFrame(() => {
+    const t = time.current;
+    if (!surface.current) return;
+    const positions = surface.current.geometry.attributes.position;
+    const fold = (Math.sin(t * .38 + index * 1.7) + 1) / 2;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i), y = positions.getY(i);
+      positions.setZ(i, sheetDepth(x, y, t, index));
+    }
+    positions.needsUpdate = true;
+    surface.current.geometry.computeBoundingSphere();
+    surface.current.geometry.computeBoundingBox();
+    if (material.current) material.current.uniforms.progress.value = weaveProgress(t, index);
+    if (model.current) {
+      model.current.rotation.y = t * .22;
+      model.current.rotation.z = Math.sin(t * .25) * .15;
+      model.current.scale.setScalar(.35 + fold * .5);
+      model.current.position.z = .6 + fold * .45;
+    }
+  });
+  return <group position={[...spec.position]} rotation={[...spec.rotation]}>
+    <mesh ref={surface}><planeGeometry args={[spec.size[0], spec.size[1], 32, 24]} /><shaderMaterial ref={material} args={[shader]} side={THREE.DoubleSide} transparent depthWrite={false} /></mesh>
+    <mesh ref={model} position={[.3, .1, .9]}>
+      {index === 0 ? <icosahedronGeometry args={[.7, 0]} /> : index === 1 ? <boxGeometry args={[1, .8, .8]} /> : <octahedronGeometry args={[.7]} />}
+      <meshBasicMaterial color={mode === "dark" ? "#b5eaff" : "#1e499c"} wireframe transparent opacity={.8} />
+    </mesh>
+  </group>;
+}
+
+function Thread({ target, index, strand, time, ink }: { target: readonly number[]; index: number; strand: number; time: React.RefObject<number>; ink: string }) {
+  const head = useRef<THREE.Mesh>(null);
+  const thread = useRef<THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>>(null);
+  const line = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(81 * 3), 3));
+    return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: .65 }));
+  }, [ink]);
+  useEffect(() => () => { line.geometry.dispose(); line.material.dispose(); }, [line]);
+  useFrame(() => {
+    const t = time.current;
+    const phase = t * .7 + index * 2 + strand * .5;
+    const start = ORIGIN.clone().add(new THREE.Vector3(Math.cos(phase), Math.sin(phase) * .55, Math.sin(phase) * .7).normalize().multiplyScalar(1.23));
+    const x = Math.sin(t * 2.4 + strand * 2.1) * SHEETS[index].size[0] * .46;
+    const y = (weaveProgress(t, index) - .5) * SHEETS[index].size[1];
+    const end = new THREE.Vector3(x, y, sheetDepth(x, y, t, index) + .025)
+      .applyEuler(new THREE.Euler(...SHEETS[index].rotation))
+      .add(new THREE.Vector3(target[0], target[1], target[2]));
+    const middle = start.clone().lerp(end, .5); middle.y += .8 + strand * .23;
+    const curve = new THREE.QuadraticBezierCurve3(start, middle, end);
+    if (!thread.current) return;
+    const pos = thread.current.geometry.attributes.position;
+    for (let i = 0; i <= 80; i++) {
+      const u = i / 80, p = curve.getPoint(u);
+      p.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
+      pos.setXYZ(i, p.x, p.y, p.z);
+    }
+    pos.needsUpdate = true;
+    thread.current.geometry.computeBoundingSphere();
+    if (head.current) {
+      const u = (t * .3 + strand / 3) % 1;
+      head.current.position.copy(curve.getPoint(u));
+      head.current.position.z += Math.sin(u * Math.PI * 12 - t * 3 + strand * Math.PI) * .07 * Math.sin(u * Math.PI);
+    }
+  });
+  return <><primitive ref={thread} object={line} /><mesh ref={head}><sphereGeometry args={[.045, 8, 8]} /><meshBasicMaterial color={ink} /></mesh></>;
+}
+
+function SceneIllustration() {
+  return <svg className="scene-illustration" viewBox="0 0 1200 800" fill="none" aria-hidden="true">
+    <g stroke="currentColor" strokeWidth="1">
+      <circle cx="790" cy="260" r="100" />
+      <ellipse cx="790" cy="260" rx="40" ry="100" />
+      <ellipse cx="790" cy="260" rx="100" ry="30" />
+      <ellipse cx="790" cy="260" rx="135" ry="45" transform="rotate(-25 790 260)" />
+      <path d="M790 160v200M690 260h200M720 330Q640 400 720 520M830 350Q1020 400 970 490M870 290Q1000 280 1070 330" />
+      <path d="m630 480 300-40 90 190-300 40zM650 520l300-40M670 560l300-40M690 600l300-40M700 470l90 190M780 460l90 190M860 450l90 190" />
+      <path d="m1020 320 125 10-15 110-125-10z" />
+      <circle cx="720" cy="520" r="5" /><circle cx="970" cy="490" r="5" />
+    </g>
+  </svg>;
+}
+
+function SceneUnavailable({ onStatus }: { onStatus: (status: SceneStatus) => void }) {
+  useEffect(() => onStatus("fallback"), [onStatus]);
+  return null;
+}
+
+class SceneBoundary extends Component<{ children: ReactNode; onStatus: (status: SceneStatus) => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onStatus("fallback"); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "overview", onFocus, reducedMotion = false, onStatus, onWeave, status, zoom = 1 }: {
+  mode?: CyanotypeMode; tempo?: number; focus?: SceneFocus; onFocus: (focus: SceneFocus) => void; reducedMotion?: boolean;
+  onStatus: (status: SceneStatus) => void; onWeave: (progress: number) => void; status: SceneStatus; zoom?: number;
+}) {
+  const pointer = useRef({ x: 0, y: 0 });
+  const [visible, setVisible] = useState(true);
+  const [lost, setLost] = useState(false);
+  useEffect(() => {
+    const move = (e: PointerEvent) => { if (reducedMotion) return; pointer.current = { x: e.clientX / window.innerWidth * 2 - 1, y: e.clientY / window.innerHeight * 2 - 1 }; };
+    const visibility = () => setVisible(!document.hidden);
+    window.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("visibilitychange", visibility);
+    return () => { window.removeEventListener("pointermove", move); document.removeEventListener("visibilitychange", visibility); };
+  }, [reducedMotion]);
+  return <div className="loom-scene" data-state={status} aria-hidden="true">
+    <div className="scene-fallback" /><SceneIllustration />
+    {!lost && <SceneBoundary onStatus={onStatus}><Canvas camera={{ position: [0, 1.2, 11], fov: 48 }} dpr={[1, 1.5]} frameloop={!visible ? "never" : tempo > 0 ? "always" : "demand"}
+      fallback={<SceneUnavailable onStatus={onStatus} />}
+      gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
+      onCreated={() => onStatus("ready")}>
+      <ContextMonitor onLost={() => { setLost(true); onStatus("fallback"); }} />
+      <CameraRig focus={focus} reducedMotion={reducedMotion} zoom={zoom} />
+      <Loom mode={mode} tempo={tempo} pointer={pointer} focus={focus} onFocus={onFocus} onWeave={onWeave} />
+    </Canvas></SceneBoundary>}
+  </div>;
+}
+
+function ContextMonitor({ onLost }: { onLost: () => void }) {
+  const { gl } = useThree();
+  useEffect(() => {
+    const lost = (event: Event) => { event.preventDefault(); onLost(); };
+    gl.domElement.addEventListener("webglcontextlost", lost);
+    return () => gl.domElement.removeEventListener("webglcontextlost", lost);
+  }, [gl, onLost]);
+  return null;
 }

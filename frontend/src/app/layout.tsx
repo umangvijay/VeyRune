@@ -2,9 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Fraunces, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/components/AppProviders";
 import "./globals.css";
+import "./drafting.css";
 
-const inter = Space_Grotesk({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const playfair = Fraunces({ subsets: ["latin"], variable: "--font-playfair", display: "swap" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk", display: "swap" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 
 export const viewport: Viewport = {
@@ -13,8 +14,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f2eb" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f0f11" },
+    { media: "(prefers-color-scheme: light)", color: "#e9eef6" },
+    { media: "(prefers-color-scheme: dark)", color: "#04060b" },
   ],
   colorScheme: "light dark",
 };
@@ -53,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable} ${jetbrains.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${spaceGrotesk.variable} ${fraunces.variable} ${jetbrains.variable}`}>
       <body className="font-sans">
         {/* First-paint theme: apply before React hydrates to prevent flash */}
         <script

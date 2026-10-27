@@ -11,8 +11,12 @@ const KEY = "agentos_theme";
 
 export function readThemePref(): ThemePref {
   if (typeof window === "undefined") return "system";
-  const stored = window.localStorage.getItem(KEY) as ThemePref | null;
-  return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+  try {
+    const stored = window.localStorage.getItem(KEY) as ThemePref | null;
+    return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+  } catch {
+    return "system";
+  }
 }
 
 export function resolveTheme(pref: ThemePref): "light" | "dark" {

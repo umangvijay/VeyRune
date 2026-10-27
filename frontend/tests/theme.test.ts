@@ -3,8 +3,9 @@ import { readThemePref, resolveTheme, applyTheme } from "../src/lib/theme";
 
 describe("theme resolution (light/dark/system)", () => {
   beforeEach(() => {
-    window.localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
   });
 
   it("defaults to system when nothing stored", () => {
@@ -18,6 +19,16 @@ describe("theme resolution (light/dark/system)", () => {
     expect(resolveTheme("system")).toBe("light");
     expect(resolveTheme("light")).toBe("light");
     expect(resolveTheme("dark")).toBe("dark");
+  });
+
+  it("keeps the theme switch usable when browser storage is blocked", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => { throw new Error("Storage blocked"); },
+      setItem: () => { throw new Error("Storage blocked"); },
+    });
+    expect(readThemePref()).toBe("system");
+    expect(applyTheme("dark")).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
   it("applyTheme persists the pref and stamps data-theme", () => {

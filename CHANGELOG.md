@@ -1,5 +1,31 @@
 # Changelog
 
+## v4.0.0 — 2026-10-19
+
+### The Planetary Loom — the full cyanotype identity
+The home page is now a single-viewport 3D experience built to the Stitch
+spec: a dark drafting hall where a **planetary loom** knits blueprints.
+
+- **The Planet**: a metallic graticule globe (standard material, torus
+  rings, wireframe shell, atmosphere) at the loom's center, turning slowly.
+- **Nine threads** in three strands weave from the planet to **three
+  morphing blueprint sheets** — each sheet is a displaced-plane shader whose
+  surface ripples as the weave progresses, with a wireframe model
+  (icosahedron/box/octahedron) assembling in front of it piece by piece.
+- **Interactive**: click the planet or the foreground sheet to focus
+  (camera dollies in), Esc/reset to return; camera zoom slider (80–160%);
+  tempo controls (0.5×/1.0×/2.0× + pause); pointer parallax.
+- **HUD chrome**: Planetary Loom panel (focus buttons, zoom, THREADS 09 /
+  BLUEPRINTS 03 MORPHING, FOREGROUND WEAVE meter), scene-controls tempo
+  dock, module dock (BOARD · STAMPS · BUILDS · SHEETS), axis ruler,
+  corner brackets, coordinate marks.
+- **Graceful degradation**: scene fallback → still illustration → retry
+  button; WebGL context-lost handling; reduced-motion support.
+- **Day/night**: the Draughting Lamp (NIGHT ↔ DAY) in the navbar re-skins
+  the loom live — North Light floods the hall with pale paper light.
+- Verified at 1440×900 and 390×844; the loom visibly animates between
+  frames (planet turns, weave meter advances 50%→63%).
+
 ## v3.10.0 — 2026-10-19
 
 ### Composition + scrollbars + reveals finalized

@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useRef, ReactNode, CSSProperties } from "react";
-import { motion, HTMLMotionProps } from "framer-motion";
+import { motion, useReducedMotion, HTMLMotionProps } from "framer-motion";
 
 export const springSoft = { type: "spring" as const, stiffness: 220, damping: 26, mass: 0.9 };
 export const springSnap = { type: "spring" as const, stiffness: 420, damping: 30 };
@@ -27,6 +27,7 @@ export default function GlassPanel({
   children, glow = 0.09, interactive = false, className = "", style, ...rest
 }: GlassPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
 
   const onMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
@@ -40,11 +41,11 @@ export default function GlassPanel({
     <motion.div
       ref={ref}
       onMouseMove={onMove}
-      initial={{ opacity: 0, y: 14, scale: 0.99 }}
+      initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={springSoft}
-      whileHover={interactive ? { y: -2 } : undefined}
-      whileTap={interactive ? { scale: 0.985 } : undefined}
+      whileHover={interactive && !reducedMotion ? { y: -2 } : undefined}
+      whileTap={interactive && !reducedMotion ? { scale: 0.985 } : undefined}
       className={`glass-dynamic ${interactive ? "glass-dynamic-interactive" : ""} ${className}`}
       style={{ ...(style || {}), "--glow": glow } as CSSProperties & Record<string, unknown>}
       {...rest}
