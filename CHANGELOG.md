@@ -1,5 +1,20 @@
 # Changelog
 
+## v4.2.0 — 2026-10-19
+
+### Regression analytics + perf + security
+- **Run regression model** (backend/services/run_analytics.py): per-agent
+  EWMA baselines (expected duration ± std) learned from real run history,
+  with z-score anomaly detection for statistically slow runs. Surfaced on
+  the Operations page ("Expected durations" + "Slow-run anomalies").
+  4 unit tests (Welford math, conservative small-n, outlier flagging).
+- **GZip compression** on all API responses over 1KB — real transfer-size
+  win for JSON-heavy endpoints.
+- **Refresh-endpoint rate limit** — /auth/refresh now sits behind the auth
+  rate limiter (was the last unthrottled credential surface).
+- **security.txt** (RFC 9116) served from /.well-known/security.txt.
+- **Lamp chip collapses to icon-only** on phones; topbar title shrinks.
+
 ## v4.1.1 — 2026-10-19
 
 ### Fix: stuck-blur reveal bug + softer grid

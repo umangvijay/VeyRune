@@ -350,6 +350,9 @@ async def refresh_token(body: RefreshRequest, request: Request):
     Refresh tokens are single-use — a new pair is issued each time.
     """
     factory = _get_factory(request)
+    # Rate limit: refresh does a hash + DB lookup per attempt — cap it
+    client_id = get_client_identifier(request)
+    check_rate_limit(client_id, "auth")
 
     # Verify the refresh JWT
     try:

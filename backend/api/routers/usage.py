@@ -156,7 +156,14 @@ async def get_operations(request: Request, user: AuthenticatedUser = Depends(get
     if not factory:
         raise HTTPException(status_code=503, detail='Workflow storage is unavailable')
     runs = await factory.workflow_repo.list_runs(user.user_id, limit=200, offset=0)
-    return summarize_runs(runs, user.user_id)
+    summary = summarize_runs(runs, user.user_id)
+    # Regression baselines + z-score anomalies from the same real history
+    try:
+        from backend.services.run_analytics import RunAnalytics
+        summary["analytics"] = RunAnalytics(factory).analyze(runs)
+    except Exception:
+        summary["analytics"] = {"baselines": [], "anomalies": []}
+    return summary
 
 @router.get("/models")
 async def get_model_leaderboard(request: Request, user: AuthenticatedUser = Depends(get_current_user)):

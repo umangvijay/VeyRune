@@ -7,10 +7,13 @@ import { getOperationsSummary, OperationsSummary, getModelLeaderboard, ModelLead
 export default function OperationsPage() {
   const [data, setData] = useState<OperationsSummary | null>(null);
   const [leaderboard, setLeaderboard] = useState<ModelLeaderboardRow[] | null>(null);
+  const [analytics, setAnalytics] = useState<{ baselines: { agent: string; expected_s: number; samples: number; std_s: number }[]; anomalies: { agent: string; duration_s: number; expected_s: number; z: number; run_id?: string; title?: string }[] } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const load = useCallback(() => Promise.all([getOperationsSummary(), getModelLeaderboard()]).then(([result, board]) => {
-    setData(result); setLeaderboard(board.models || []); setError("");
+    setData(result); setLeaderboard(board.models || []);
+    setAnalytics((result as { analytics?: { baselines: never[]; anomalies: never[] } }).analytics ?? { baselines: [], anomalies: [] });
+    setError("");
   }).catch((err: unknown) => {
     setError(err instanceof Error ? err.message : "Could not load run metrics");
   }).finally(() => setBusy(false)), []);
@@ -74,6 +77,39 @@ export default function OperationsPage() {
             </tbody>
           </table>
         </div>
+      </section>
+    )}
+  {analytics && analytics.baselines.length > 0 && (
+      <section style={{ marginTop: 28 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Expected durations (learned)</h2>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
+          Regression baselines per agent from your real run history (EWMA mean ± std).
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          {analytics.baselines.map(b => (
+            <div key={b.agent} style={{ padding: 14, borderRadius: 12, border: "1px solid var(--border-primary)", background: "var(--bg-secondary)" }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-tertiary)" }}>{b.agent}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{b.expected_s}s</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>± {b.std_s}s · {b.samples} samples</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+    {analytics && analytics.anomalies.length > 0 && (
+      <section style={{ marginTop: 28 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Slow-run anomalies</h2>
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
+          Statistically slow for their agent (z-score &gt; 2.5) — worth a look.
+        </p>
+        {analytics.anomalies.slice(0, 8).map((a, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border-primary)", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{a.agent}</span>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+              {a.duration_s}s vs expected {a.expected_s}s · z {a.z}
+            </span>
+          </div>
+        ))}
       </section>
     )}
   </main>
