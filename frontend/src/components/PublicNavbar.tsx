@@ -147,9 +147,9 @@ export default function PublicNavbar() {
         <button
           type="button"
           onClick={toggleLamp}
-          aria-label={`Switch to ${lampMode === "dark" ? "day" : "night"} theme`}
+          aria-label={`Switch to ${lampMode === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
           aria-pressed={lampMode === "dark"}
-          title={lampMode === "dark" ? "Switch to day theme" : "Switch to night theme"}
+          title="Draughting Lamp — North Light / Tungsten"
           style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             padding: "8px 13px", borderRadius: "var(--radius-md)",
@@ -160,7 +160,7 @@ export default function PublicNavbar() {
           }}
         >
           {lampMode === "dark" ? <Moon size={14} /> : <Sun size={14} />}
-          <span className="lamp-label">{lampMode === "dark" ? "NIGHT" : "DAY"}</span>
+          <span className="lamp-label">{lampMode === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}</span>
         </button>
 
         <nav

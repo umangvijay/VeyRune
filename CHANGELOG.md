@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.4.0 — 2026-10-19
+
+### Draughting Lamp labels restored
+- The day/night toggle labels restored to **TUNGSTEN** / **NORTH LIGHT**
+  (the Planetary Loom session had changed them to NIGHT/DAY).
+
 ## v4.3.0 — 2026-10-19
 
 ### Zoom that actually zooms
