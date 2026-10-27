@@ -309,6 +309,8 @@ async def shutdown_event():
     factory = getattr(app.state, "factory", None)
     if factory:
         await factory.shutdown()
+    from backend.services.http_pool import aclose_client
+    await aclose_client()
     logger.info("Shutdown complete.")
 
 

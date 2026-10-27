@@ -1,5 +1,41 @@
 # Changelog
 
+## v4.5.0 — 2026-10-28
+
+### NORTH LIGHT retold, pages polished, subagents verified live
+
+**Light theme rebuilt around blue ink on drafting paper.** The old NORTH
+LIGHT mixed olive-green text/borders with a blue paper and a klein-blue
+accent — the hue clash read as muddy. Ink, borders, glass, status colors
+and shadows are now one cool blue-gray family.
+
+- **Fixed the fuzzy checkerboard on every public page**: the
+  `.public-pages .mesh-gradient` override swapped the background image but
+  kept the 44px tile size, tiling a single radial into soft squares.
+  Public pages now share the crisp drafting grid with the home page.
+- **Sketch illustrations are theme-aware**: the hand-drawn sketches were
+  unconditionally `invert(1)`-ed (right on dark, a black box on light).
+  `multiply`/`screen` blend modes now drop the paper background on both
+  themes.
+- **HUD slimmed** (desktop and mobile): tighter paddings, 20px title,
+  34px view buttons, denser readings — the Planetary Loom control panel
+  takes ~30% less vertical space.
+- **More motion**: staggered scroll-reveals (`--reveal-delay`) wired into
+  About (team cards, CTA), Features (text columns) and Pricing (new
+  "Every plan includes" strip); old-identity leftovers fixed (pink card
+  shadow, maroon badge text, Veyrune "V" footer marks → "S").
+- **Backend: shared HTTP connection pool** (`backend/services/
+  http_pool.py`) — core.http and the MCP tool executor built a fresh
+  `httpx.AsyncClient` per call (new TCP+TLS handshake every time); both
+  now reuse keepalive connections, closed on app shutdown. Per-call
+  timeouts, SSRF validation and redirect rules unchanged.
+- **Subagent health verified against the live backend**: core.health and
+  core.http runs COMPLETED; MCPFactoryAgent built the 19-tool Swagger
+  Petstore MCP from the live OpenAPI spec; worker processed every task;
+  ResearchAgent and OrchestratorAgent construct cleanly (their planning
+  runs need an LLM key, reported honestly by /health).
+- 205 backend + 17 unit + 16 e2e tests green.
+
 ## v4.4.1 — 2026-10-27
 
 ### Dashboard sweep: two real bugs found and fixed

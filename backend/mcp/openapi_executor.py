@@ -136,24 +136,28 @@ async def execute_openapi_tool(
 
     method = (operation.get("http_method") or "GET").upper()
     redirect_hops = 0
+    # Pooled client: MCP tools are the hottest outbound path; per-request
+    # timeout/redirect semantics are identical to the old per-call client.
+    from backend.services.http_pool import get_client
+    client = await get_client()
     while True:
-        async with httpx.AsyncClient(follow_redirects=False, timeout=30.0) as client:
-            try:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    params=query_params,
-                    headers=headers,
-                    json=json_body,
-                )
-            except SSRFViolationError:
-                raise
-            except httpx.HTTPError as e:
-                from backend.engine.failure_classifier import classify_failure
-                failure = classify_failure(message=str(e))
-                return {"ok": False, "error": str(e), "url": url, "method": method,
-                        "failure": {"category": failure.category, "retryable": failure.retryable,
-                                    "recovery_hint": failure.recovery_hint}}
+        try:
+            response = await client.request(
+                method=method,
+                url=url,
+                params=query_params,
+                headers=headers,
+                json=json_body,
+                timeout=30.0,
+            )
+        except SSRFViolationError:
+            raise
+        except httpx.HTTPError as e:
+            from backend.engine.failure_classifier import classify_failure
+            failure = classify_failure(message=str(e))
+            return {"ok": False, "error": str(e), "url": url, "method": method,
+                    "failure": {"category": failure.category, "retryable": failure.retryable,
+                                "recovery_hint": failure.recovery_hint}}
 
         if response.status_code in (301, 302, 303, 307, 308) and redirect_hops < 3:
             loc = response.headers.get("Location", "")

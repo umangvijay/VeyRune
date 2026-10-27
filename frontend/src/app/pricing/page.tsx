@@ -40,8 +40,8 @@ export default function PricingPage() {
             </TiltCard>
 
             {/* Pro Plan */}
-            <TiltCard className="glass-card pricing-card animate-fade-in-up p-6 md:p-10 flex flex-col relative border-2 border-[var(--accent)]" style={{ animationDelay: "0.3s", boxShadow: "0 20px 40px rgba(216, 133, 143, 0.15)", overflow: "visible" }}>
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-[#5c1621] px-4 py-1 rounded-full text-xs font-extrabold tracking-widest whitespace-nowrap">
+            <TiltCard className="glass-card pricing-card animate-fade-in-up p-6 md:p-10 flex flex-col relative border-2 border-[var(--accent)]" style={{ animationDelay: "0.3s", boxShadow: "0 20px 40px rgba(46, 86, 196, 0.15)", overflow: "visible" }}>
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-white px-4 py-1 rounded-full text-xs font-extrabold tracking-widest whitespace-nowrap">
                 MOST POPULAR
               </div>
               <h2 className="text-xl md:text-2xl font-extrabold mb-2">Professional</h2>
@@ -70,6 +70,16 @@ export default function PricingPage() {
               <Link href="/contact" className="btn btn-secondary w-full mt-auto text-center">Contact Sales</Link>
             </TiltCard>
 
+          </div>
+
+          <div className="mt-14 md:mt-20 max-w-3xl mx-auto" data-scroll-reveal>
+            <div className="glass-card p-6 md:p-8 text-center">
+              <p className="text-xs font-extrabold tracking-[0.14em] text-[var(--accent)] mb-3">EVERY PLAN INCLUDES</p>
+              <p className="text-sm md:text-base text-[var(--text-secondary)] leading-relaxed">
+                RS-256 secured accounts · server-side session revocation · HMAC-signed webhooks ·
+                daily token budget guardrails · audit-logged agent actions · EU or US data residency.
+              </p>
+            </div>
           </div>
         </div>
       </main>

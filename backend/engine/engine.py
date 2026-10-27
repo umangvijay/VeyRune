@@ -456,33 +456,37 @@ class WorkflowEngine:
                     risk_level=RiskLevel.HIGH,
                 )
 
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                req_kwargs = {"headers": headers}
-                if body and method in ["POST", "PUT", "PATCH"]:
-                    if isinstance(body, dict):
-                        req_kwargs["json"] = body
-                    elif isinstance(body, str):
-                        try:
-                            req_kwargs["json"] = json.loads(body)
-                        except json.JSONDecodeError:
-                            req_kwargs["content"] = body
-                
-                async with client.stream(method, url, **req_kwargs) as response:
-                    if response.is_redirect:
-                        raise ValueError("HTTP workflow redirects require an explicit destination URL")
-                    response.raise_for_status()
-                    chunks = []
-                    size = 0
-                    async for chunk in response.aiter_bytes():
-                        size += len(chunk)
-                        if size > 5 * 1024 * 1024:
-                            raise ValueError("HTTP response exceeds the 5 MB limit")
-                        chunks.append(chunk)
-                    resp = httpx.Response(response.status_code, headers=response.headers, content=b"".join(chunks))
-                try:
-                    return {"status_code": resp.status_code, "data": resp.json()}
-                except Exception:
-                    return {"status_code": resp.status_code, "data": resp.text}
+            # Pooled client: reuses keepalive connections across tasks
+            # instead of a fresh TCP+TLS handshake per call. Per-call
+            # timeout and the redirect rule below are unchanged.
+            from backend.services.http_pool import get_client
+            client = await get_client()
+            req_kwargs = {"headers": headers}
+            if body and method in ["POST", "PUT", "PATCH"]:
+                if isinstance(body, dict):
+                    req_kwargs["json"] = body
+                elif isinstance(body, str):
+                    try:
+                        req_kwargs["json"] = json.loads(body)
+                    except json.JSONDecodeError:
+                        req_kwargs["content"] = body
+
+            async with client.stream(method, url, timeout=timeout, **req_kwargs) as response:
+                if response.is_redirect:
+                    raise ValueError("HTTP workflow redirects require an explicit destination URL")
+                response.raise_for_status()
+                chunks = []
+                size = 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > 5 * 1024 * 1024:
+                        raise ValueError("HTTP response exceeds the 5 MB limit")
+                    chunks.append(chunk)
+                resp = httpx.Response(response.status_code, headers=response.headers, content=b"".join(chunks))
+            try:
+                return {"status_code": resp.status_code, "data": resp.json()}
+            except Exception:
+                return {"status_code": resp.status_code, "data": resp.text}
 
         elif task.agent == "core.set":
             return interpolated_input.get("fields", {})

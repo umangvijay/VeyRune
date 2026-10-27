@@ -42,12 +42,12 @@ export default function AboutPage() {
         <div className="mb-24">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-12 text-center">Meet the Team</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-12">
-            <div className="flex flex-col items-center">
+            <div data-scroll-reveal className="flex flex-col items-center" style={{ "--reveal-delay": "0ms" } as React.CSSProperties}>
               <Image src="/images/umang-vijay.png" alt="Umang Vijay" width={128} height={128} className="w-32 h-32 rounded-full object-cover object-top mb-6 shadow-xl" />
               <h3 className="text-xl font-bold">Umang Vijay</h3>
               <p className="text-[var(--accent)] font-medium mt-1">Co-Founder & CTO</p>
             </div>
-            <div className="flex flex-col items-center">
+            <div data-scroll-reveal className="flex flex-col items-center" style={{ "--reveal-delay": "120ms" } as React.CSSProperties}>
               <Image src="/images/ashmit-rana.png" alt="Ashmit Rana" width={128} height={128} className="w-32 h-32 rounded-full object-cover object-top mb-6 shadow-xl" />
               <h3 className="text-xl font-bold">Ashmit Rana</h3>
               <p className="text-[var(--accent)] font-medium mt-1">Co-Founder & CEO</p>
@@ -65,7 +65,7 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div data-scroll-reveal className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/get-started" className="btn btn-primary btn-lg w-full sm:w-auto text-center">Try Sandtable Now</Link>
           <Link href="/features" className="btn btn-secondary btn-lg w-full sm:w-auto text-center">View Features</Link>
         </div>
@@ -80,7 +80,7 @@ export default function AboutPage() {
               background: "linear-gradient(135deg, var(--accent), var(--accent-pink))",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 800, color: "white"
-            }}>V</div>
+            }}>S</div>
             <span style={{ fontSize: 18, fontWeight: 800 }}>Sandtable</span>
           </div>
           <p>© 2026 Sandtable. All rights reserved.</p>

@@ -73,7 +73,7 @@ export default function LandingPage() {
         <aside className="loom-hud" aria-label="Planetary loom controls">
           <div className="hud-heading"><span className="draft-dot" /> PLANETARY LOOM <span>{focus === "overview" ? "01" : focus === "planet" ? "02" : "03"} / 03</span></div>
           <p className="hud-title">A world taking shape.</p>
-          <p className="hud-instruction">Select the planet or the foreground blueprint to get closer.</p>
+          <p className="hud-instruction">Select the planet or blueprint to get closer.</p>
           <div className="hud-views" role="group" aria-label="Camera view">
             <button disabled={sceneStatus !== "ready"} onClick={() => setFocus("planet")} aria-pressed={focus === "planet"}><Globe2 size={15} /> Planet</button>
             <button disabled={sceneStatus !== "ready"} onClick={() => setFocus("sheet")} aria-pressed={focus === "sheet"}><Focus size={15} /> Blueprint</button>

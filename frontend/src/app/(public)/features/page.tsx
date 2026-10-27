@@ -21,7 +21,7 @@ export default function FeaturesPage() {
 
         {/* Dynamic Builder */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 mb-20 md:mb-24 text-left items-center">
-          <div>
+          <div data-scroll-reveal>
             <h2 className="text-3xl md:text-4xl font-extrabold mb-4">The Dynamic Builder</h2>
             <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-6">
               Say goodbye to missing integrations. When you ask Sandtable to interact with an API it doesn&apos;t recognize, 
@@ -36,7 +36,7 @@ export default function FeaturesPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
             <div data-scroll-reveal className="glass-card" style={{ padding: 12, width: "100%", height: "auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12 }}>
-              <Image src="/images/workflow-sketch.png" alt="Workflow Sketch" width={600} height={400} style={{ width: "100%", height: "auto", objectFit: "contain", filter: "invert(1) opacity(0.8)", borderRadius: 6 }} />
+              <Image src="/images/workflow-sketch.png" alt="Workflow Sketch" width={600} height={400} className="sketch-img" style={{ width: "100%", height: "auto", objectFit: "contain", borderRadius: 6 }} />
             </div>
             <div style={{ fontFamily: "var(--font-mono)", color: "var(--accent-pink)", textAlign: "center" }}>Illustrative connector build</div>
           </div>
@@ -46,11 +46,11 @@ export default function FeaturesPage() {
         <div className="flex flex-col-reverse md:flex-row gap-10 md:gap-16 mb-20 md:mb-24 text-left items-center">
           <div className="flex flex-col gap-4 items-center w-full md:w-1/2">
             <div data-scroll-reveal className="glass-card p-3 w-full h-auto flex items-center justify-center rounded-xl">
-              <Image src="/images/network-sketch.png" alt="Network Sketch" width={600} height={400} className="w-full h-auto object-contain rounded-md" style={{ filter: "invert(1) opacity(0.8)" }} />
+              <Image src="/images/network-sketch.png" alt="Network Sketch" width={600} height={400} className="sketch-img w-full h-auto object-contain rounded-md" />
             </div>
             <div className="font-mono text-[var(--accent-purple)] text-center text-sm md:text-base">Illustrative specialist routing</div>
           </div>
-          <div className="w-full md:w-1/2">
+          <div data-scroll-reveal className="w-full md:w-1/2">
             <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Multi-Agent Orchestration</h2>
             <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-6">
               Sandtable doesn&apos;t rely on a single massive prompt. It utilizes a topology of specialized agents powered by Google&apos;s ADK.
@@ -74,7 +74,7 @@ export default function FeaturesPage() {
               background: "linear-gradient(135deg, var(--accent), var(--accent-pink))",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 800, color: "white"
-            }}>V</div>
+            }}>S</div>
             <span style={{ fontSize: 18, fontWeight: 800 }}>Sandtable</span>
           </div>
           <p>© 2026 Sandtable. All rights reserved.</p>

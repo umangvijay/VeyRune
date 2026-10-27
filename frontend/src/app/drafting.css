@@ -150,7 +150,9 @@ p { text-wrap: pretty; }
 :where(main) { min-width:0; }
 :where(main p,main li) { overflow-wrap:break-word; }
 :where(.public-pages main) { line-height:1.65; }
-.public-pages .mesh-gradient { background-image:radial-gradient(ellipse at 85% 10%,var(--accent-subtle),transparent 55%); }
+/* Public pages share the base .mesh-gradient drafting paper (grid + radial
+   wash). An earlier override here swapped the image but kept the 44px
+   background-size, tiling the radial into a fuzzy checkerboard — removed. */
 :where(.public-pages main,.dashboard-main) h2 { letter-spacing:-.025em; }
 :where(.public-pages main) h1 { font-family:var(--font-serif); font-weight:500; }
 :where(.public-pages footer) { border-top:1px solid var(--border-primary); }
@@ -180,20 +182,20 @@ p { text-wrap: pretty; }
 /* Full-viewport world with an independent, readable instrument layer. */
 .drafting-home .loom-scene { position:fixed; inset:0; width:100%; height:100dvh; }
 .loom-scene canvas { touch-action:pan-y; }
-.loom-hud { align-self:flex-end; width:280px; flex-shrink:0; padding:22px; pointer-events:auto; border:1px solid var(--glass-border); border-radius:12px; background:linear-gradient(135deg,var(--glass-hi),var(--glass-lo)); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 20px 70px #02081822,inset 0 1px 0 #b5d5ff15; }
+.loom-hud { align-self:flex-end; width:264px; flex-shrink:0; padding:14px 16px; pointer-events:auto; border:1px solid var(--glass-border); border-radius:12px; background:linear-gradient(135deg,var(--glass-hi),var(--glass-lo)); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 20px 70px #02081822,inset 0 1px 0 #b5d5ff15; }
 .hud-heading { display:flex; align-items:center; gap:8px; color:var(--accent); font:9px var(--font-mono); letter-spacing:.12em; }
 .hud-heading>span:last-child { margin-left:auto; color:var(--text-tertiary); font-size:8px; }
-.hud-title { font:26px/1.15 var(--font-serif); letter-spacing:-.03em; margin:18px 0 10px; }
-.hud-instruction { color:var(--text-secondary); font-size:11px; line-height:1.7; margin-bottom:16px; }
+.hud-title { font:20px/1.15 var(--font-serif); letter-spacing:-.03em; margin:12px 0 6px; }
+.hud-instruction { color:var(--text-secondary); font-size:11px; line-height:1.6; margin-bottom:10px; }
 .hud-views { display:flex; gap:6px; }
-.hud-views button { display:flex; gap:6px; align-items:center; justify-content:center; min-height:44px; padding:8px; background:var(--bg-glass); border:1px solid var(--border-primary); border-radius:6px; color:var(--text-secondary); cursor:pointer; font:10px var(--font-mono); transition:background .2s,border-color .2s; }
+.hud-views button { display:flex; gap:6px; align-items:center; justify-content:center; min-height:34px; padding:6px; background:var(--bg-glass); border:1px solid var(--border-primary); border-radius:6px; color:var(--text-secondary); cursor:pointer; font:10px var(--font-mono); transition:background .2s,border-color .2s; }
 .hud-views button[aria-pressed="true"],.hud-views button:hover { background:var(--accent-subtle); border-color:var(--accent); color:var(--text-primary); }
-.hud-views button:last-child { min-width:40px; }
-.hud-readings { display:grid; grid-template-columns:1fr 1fr; gap:18px 12px; margin:20px 0; padding-top:18px; border-top:1px solid var(--border-primary); }
-.hud-readings dt { font:8px var(--font-mono); letter-spacing:.13em; color:var(--text-tertiary); margin-bottom:7px; }
+.hud-views button:last-child { min-width:36px; }
+.hud-readings { display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; margin:12px 0; padding-top:12px; border-top:1px solid var(--border-primary); }
+.hud-readings dt { font:8px var(--font-mono); letter-spacing:.13em; color:var(--text-tertiary); margin-bottom:4px; }
 .hud-readings dd { font:12px var(--font-mono); margin:0; color:var(--text-primary); }
 .hud-readings small { font-size:7px; color:var(--text-secondary); }
-.hud-status { font:9px/1.6 var(--font-mono); color:var(--accent); border-top:1px solid var(--border-primary); padding-top:12px; }
+.hud-status { font:9px/1.6 var(--font-mono); color:var(--accent); border-top:1px solid var(--border-primary); padding-top:10px; }
 .is-inspecting .hero-card { opacity:.15; transition:opacity .3s,background .4s; }
 .is-inspecting .hero-card:hover,.is-inspecting .hero-card:focus-within { opacity:1; }
 .draft-stage { gap:clamp(20px,4vw,64px); }
@@ -214,11 +216,12 @@ p { text-wrap: pretty; }
 }
 @media(max-width:760px) {
   .draft-stage { flex-direction:column; align-items:stretch; padding-top:220px; gap:20px; }
-  .loom-hud { align-self:stretch; width:100%; padding:18px 20px; }
-  .hud-title { font-size:23px; }
-  .hud-readings { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
-  .hud-readings small { display:block; margin-top:5px; }
-  .hud-views button { flex:1; }
+  .loom-hud { align-self:stretch; width:100%; padding:12px 14px; }
+  .hud-title { font-size:17px; margin:8px 0 4px; }
+  .hud-instruction { margin-bottom:8px; }
+  .hud-readings { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:10px 0; padding-top:10px; }
+  .hud-readings small { display:block; margin-top:3px; }
+  .hud-views button { flex:1; min-height:32px; }
   .is-inspecting .draft-stage { padding-top:340px; }
   .is-inspecting .hero-card { display:none; }
   .is-inspecting .loom-hud { margin-top:auto; }
@@ -232,8 +235,8 @@ p { text-wrap: pretty; }
 .loom-scene[data-state="ready"] .scene-illustration { opacity:0; }
 .hud-views button:disabled,.scene-controls button:disabled { opacity:.4; cursor:not-allowed; }
 .hud-views button:disabled:hover,.scene-controls button:disabled:hover { background:transparent; border-color:var(--border-primary); }
-.weave-meter { padding:0 0 16px; }
-.weave-meter>div { display:flex; justify-content:space-between; margin-bottom:9px; color:var(--text-secondary); font:8px var(--font-mono); letter-spacing:.08em; }
+.weave-meter { padding:0 0 12px; }
+.weave-meter>div { display:flex; justify-content:space-between; margin-bottom:7px; color:var(--text-secondary); font:8px var(--font-mono); letter-spacing:.08em; }
 .weave-meter meter { display:block; width:100%; height:5px; appearance:none; border:0; border-radius:4px; overflow:hidden; background:var(--accent-subtle); }
 .weave-meter meter::-webkit-meter-bar { background:var(--accent-subtle); border:0; height:5px; }
 .weave-meter meter::-webkit-meter-optimum-value { background:var(--accent); transition:width .25s linear; }
@@ -265,9 +268,9 @@ p { text-wrap: pretty; }
 @media(prefers-reduced-motion:reduce) { .route-skeleton span { animation:none; } }
 
 /* Reading surfaces and scene instruments share the same fine-line detailing. */
-.camera-zoom { display:grid; grid-template-columns:1fr auto; align-items:center; gap:8px; margin-top:18px; color:var(--text-secondary); font:8px var(--font-mono); letter-spacing:.08em; }
+.camera-zoom { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px; margin-top:12px; color:var(--text-secondary); font:8px var(--font-mono); letter-spacing:.08em; }
 .camera-zoom output { color:var(--accent); }
-.camera-zoom input { grid-column:1/-1; width:100%; height:24px; cursor:ew-resize; accent-color:var(--accent); }
+.camera-zoom input { grid-column:1/-1; width:100%; height:20px; cursor:ew-resize; accent-color:var(--accent); }
 .camera-zoom input:disabled { cursor:not-allowed; }
 .docs-search { display:flex; align-items:center; gap:8px; border:1px solid var(--border-primary); border-radius:8px; background:var(--bg-input); padding:4px 10px; margin:4px 0 14px; color:var(--text-tertiary); }
 .docs-search:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle); }
