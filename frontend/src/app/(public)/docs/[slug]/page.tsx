@@ -27,7 +27,7 @@ export default async function DocArticle({ params }: { params: Promise<{ slug: s
   return (
     <div className="mesh-gradient" style={{ minHeight: "100vh" }}>
       <PublicNavbar />
-      <div className="docs-layout">
+      <div className="docs-layout" data-scroll-reveal>
         <DocsToc currentSlug={slug} />
         <article id="doc-top" className="docs-article">
           <Link href="/docs" style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none" }}>← All docs</Link>
@@ -40,7 +40,7 @@ export default async function DocArticle({ params }: { params: Promise<{ slug: s
             <img src={page.image} alt={`${page.title} diagram`} width={720} height={280} />
           </div>
 
-          <div className="flow-diagram glass-panel" style={{ padding: 20, margin: "28px 0" }}>
+          <div className="flow-diagram glass-panel" data-scroll-reveal style={{ padding: 20, margin: "28px 0" }}>
             <p className="eyebrow">Flow</p>
             <div className="flow-row">
               {page.diagram.map((step, i) => (

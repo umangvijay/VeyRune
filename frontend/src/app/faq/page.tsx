@@ -53,7 +53,7 @@ export default function FAQPage() {
           Workspace, MCP factory, vault, and quota. Deeper diagrams live in <Link href="/docs" style={{ color: "var(--accent)" }}>Docs</Link>.
         </p>
         {GROUPS.map((group, gi) => (
-          <section key={group.title} style={{ marginBottom: 32 }}>
+          <section data-scroll-reveal key={group.title} style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: 14, letterSpacing: 0.12, textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>{group.title}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {group.faqs.map((faq, i) => {
