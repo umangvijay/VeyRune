@@ -74,7 +74,7 @@ does not close a finding.
 
 | Evidence required | Status |
 |---|---|
-| Clean production image startup (API + worker) with declared dependencies | **Pending** — `google-cloud-pubsub` is declared; image build/start smoke needs the cloud project |
+| Clean production image build + startup (API + worker) | **Verified (clean-image, local)** — API and worker images build from a clean environment; Python 3.11.16 runtime parity confirmed by running the full 279-test suite INSIDE both images; declared deps import (pubsub, firestore); `pip check` clean; startup smoke reaches `/health` 200 with keys via secret-mount; production mode without keys fails with an actionable operator message. Cloud-project startup (Pub/Sub wiring) still needs the deployment |
 | Backup restoration drill | **Pending** |
 | Rollback drill | **Pending** |
 | Load/soak evidence | **Pending** |
@@ -101,7 +101,7 @@ does not close a finding.
 | F02 role bypass | 409 on re-add; atomic create-only repos | `test_audit_security.py` |
 | F03 disabled login | password + Google + refresh enforcement | `test_audit_security.py`, `test_auth_http.py` |
 | F04 revocation | fail-closed 503; current-state authorization | `test_audit_security.py`, `test_auth_http.py` |
-| F05 Pub/Sub dep | declared in requirements | `requirements.txt` |
+| F05 Pub/Sub dep | declared in requirements; imports verified in the clean image | `requirements.txt` + clean-image run |
 | F06 Firestore leases | expired-RUNNING reclaim + fencing | `test_chaos_recovery.py`, source parity check |
 | F07 exactly-once | uncertain quarantine + crash sweep + explicit reconciliation | `test_uncertain_reconciliation.py` |
 | F08 budgets | durable ledger + explicit failures | `test_usage_ledger.py` |
@@ -112,7 +112,7 @@ does not close a finding.
 | F13 local JSON | durable content repo + validation + limits | routers + e2e |
 | F14 sandbox | redaction, python3, clear unsupported failure, host-execution prevention | `test_cloud_contracts.py` |
 | F15 dead letters | DLQ + quarantine + bounded retries | Terraform |
-| F16 release gates | hermetic tests, lint clean, adversarial suites | full suite |
+| F16 release gates | hermetic tests, lint clean, adversarial suites, clean-image parity (279/279 in-image on 3.11) | full suite + container run |
 | G01 execution gate | trust_tier + per-operation evidence | `test_connector_coverage.py` |
 | G02 coverage | explicit evidence + coverage reporting | `test_connector_coverage.py` |
 | G03 artifacts | adapter default; standalone gated by protocol tests | `test_standalone_packaging.py` |

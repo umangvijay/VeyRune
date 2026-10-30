@@ -1,5 +1,38 @@
 # Changelog
 
+## v5.4.0 — 2026-10-30
+
+### Clean-image verification: the runtime-parity gate is closed
+
+The audit's F05/F16 "clean production image" acceptance is now
+demonstrated locally with Docker (colima):
+
+- **API and worker images build from a clean environment** and run
+  **Python 3.11.16** — the exact shipped runtime the audit flagged as
+  unverified (local dev was 3.14).
+- **Full suite inside the images**: all 279 backend tests pass inside
+  BOTH the API and worker images. The in-image run caught a real
+  parity defect: `test_ephemeral_vault_key_is_never_written_to_logs`
+  assumed a development `APP_ENV`; on the production-configured image
+  the vault correctly refuses ephemeral keys. The test now pins the
+  environment it tests.
+- **Declared dependencies verified in-image**: `google.cloud.pubsub_v1`
+  and firestore import; `pip check` clean (F05 acceptance).
+- **Startup smoke**: the API container starts with SQLite config and
+  reaches `/health` 200 with JWT keys via the documented secret-mount
+  path; worker housekeeping runs.
+- **Two real deploy blockers caught and fixed**: (1) the working tree's
+  `backend/` had 0700 permissions, which copied into the image and made
+  every module unimportable at runtime — permissions normalized;
+  (2) production mode without JWT keys failed with a raw
+  PermissionError — it now raises an actionable operator message
+  ("provide JWT_PRIVATE_KEY / JWT_PUBLIC_KEY via Secret Manager and
+  restart"), matching the audit's clear-disabled-state standard.
+- Remaining cloud-only items: Pub/Sub-wired startup, backup/rollback
+  drills, load evidence (need the actual cloud project).
+
+279 backend green (local and in-image) + 26 frontend + 16 e2e.
+
 ## v5.3.0 — 2026-10-30
 
 ### Audit: uncertain-outcome reconciliation + accepted invitations

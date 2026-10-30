@@ -686,6 +686,9 @@ async def test_gemini_probe_sends_key_in_header_not_request_url(monkeypatch):
 def test_ephemeral_vault_key_is_never_written_to_logs(monkeypatch, caplog):
     from backend.security.secrets_vault import SecretsVault, settings
 
+    # The ephemeral key is a development path; production correctly refuses
+    # to start without a real master key (clean-image run caught this).
+    monkeypatch.setattr(settings, 'APP_ENV', 'development')
     monkeypatch.setattr(settings, 'SECRETS_MASTER_KEY', None)
     monkeypatch.delenv('VAULT_USE_SECRET_MANAGER', raising=False)
     vault = SecretsVault()
