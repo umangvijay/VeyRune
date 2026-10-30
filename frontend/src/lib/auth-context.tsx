@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
+import { AUTH_KEY, AUTH_CHANGED, readSession, writeSession, refreshSession } from "./auth-session";
+
 export interface User {
   id: string;
   email: string;
@@ -97,46 +99,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    const finishHydration = (next: AuthState) => {
-      queueMicrotask(() => {
-        if (!cancelled) setState(next);
+    const sync = () => {
+      const session = readSession();
+      if (!cancelled) setState({
+        user: session?.user || null, accessToken: session?.accessToken || null,
+        refreshToken: session?.refreshToken || null, isLoading: false,
+        isAuthenticated: !!session?.accessToken,
       });
     };
-    let stored: string | null;
-    try {
-      stored = localStorage.getItem("agentos_auth");
-    } catch {
-      // Storage can be disabled by privacy mode or embedded browser policy.
-      // Anonymous use must still become available when auth persistence is not.
-      finishHydration({ user: null, accessToken: null, refreshToken: null, isLoading: false, isAuthenticated: false });
-      return () => { cancelled = true; };
-    }
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Authentication is hydrated asynchronously after browser storage is read.
-        finishHydration({
-          user: parsed.user,
-          accessToken: parsed.accessToken,
-          refreshToken: parsed.refreshToken,
-          isLoading: false,
-          isAuthenticated: !!parsed.accessToken,
-        });
-      } catch {
-        try { localStorage.removeItem("agentos_auth"); } catch { /* storage may be read-only */ }
-        // Clear invalid persisted auth after client hydration.
-        finishHydration({ user: null, accessToken: null, refreshToken: null, isLoading: false, isAuthenticated: false });
-      }
-    } else {
-      // Mark client-side auth hydration complete.
-      finishHydration({ user: null, accessToken: null, refreshToken: null, isLoading: false, isAuthenticated: false });
-    }
-    return () => { cancelled = true; };
+    const onStorage = (event: StorageEvent) => { if (!event.key || event.key === AUTH_KEY) sync(); };
+    queueMicrotask(sync);
+    window.addEventListener(AUTH_CHANGED, sync);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AUTH_CHANGED, sync);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const persistAuth = useCallback((user: User, accessToken: string, refreshToken: string) => {
     const data = { user, accessToken, refreshToken };
-    localStorage.setItem("agentos_auth", JSON.stringify(data));
+    writeSession(data);
     setState({
       user,
       accessToken,
@@ -147,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearAuth = useCallback(() => {
-    localStorage.removeItem("agentos_auth");
+    writeSession(null);
     setState({
       user: null,
       accessToken: null,
@@ -227,22 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.accessToken, clearAuth]);
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!state.refreshToken) return null;
-
-    try {
-      const data = await fetchJson(`${API_BASE}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ refresh_token: state.refreshToken }),
-      }, 8000);
-      persistAuth(data.user, data.access_token, data.refresh_token);
-      return data.access_token;
-    } catch {
-      clearAuth();
-      return null;
-    }
-  }, [state.refreshToken, persistAuth, clearAuth]);
+    return refreshSession(readSession()?.accessToken);
+  }, []);
 
   const updateProfile = useCallback(async (updates: { name?: string; avatar_url?: string }) => {
     const user = await fetchJson(`${API_BASE}/auth/me`, {

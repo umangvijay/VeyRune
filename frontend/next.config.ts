@@ -78,7 +78,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
+            value: "same-origin-allow-popups",
           },
           {
             key: "Content-Security-Policy",
@@ -86,7 +86,8 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               // 'unsafe-eval' is dev-only: react-refresh evaluates strings.
               // (This gap is what broke the workspace e2e spec since Round 3.)
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+              `script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
+              "frame-src 'self' https://accounts.google.com/gsi/",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",

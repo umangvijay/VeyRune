@@ -390,6 +390,17 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
 
 -- ── Idempotency Ledger ───────────────────────────────────────────
+-- ── Durable Usage Ledger (audit F08) ────────────────────────────
+-- Shared per-user daily token accounting; the process-local ContextManager
+-- dict is only a fast cache on top of this.
+CREATE TABLE IF NOT EXISTS usage_ledger (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
+
 CREATE TABLE IF NOT EXISTS idempotency_ledger (
     idempotency_key TEXT PRIMARY KEY,
     workflow_id TEXT NOT NULL,
@@ -399,6 +410,14 @@ CREATE TABLE IF NOT EXISTS idempotency_ledger (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS content_records (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_content_kind_created ON content_records(kind, created_at);
 """
 
 
@@ -483,8 +502,16 @@ class DatabaseManager:
             await self._connection.execute("ALTER TABLE workflow_runs ADD COLUMN parent_run_id TEXT")
         if "thread_id" not in cols:
             await self._connection.execute("ALTER TABLE workflow_runs ADD COLUMN thread_id TEXT")
+        # Explicit organization ownership (audit F01): NULL means personal.
+        # Membership alone never grants oversight access — only runs created
+        # with an explicit org_id are organization-owned.
+        if "org_id" not in cols:
+            await self._connection.execute("ALTER TABLE workflow_runs ADD COLUMN org_id TEXT")
         await self._connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_runs_thread ON workflow_runs(user_id, thread_id)"
+        )
+        await self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_runs_org ON workflow_runs(org_id)"
         )
 
     async def _migrate_task_columns(self) -> None:

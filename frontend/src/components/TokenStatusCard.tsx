@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getContextUsage } from "@/lib/api";
+import { API_BASE, getContextUsage } from "@/lib/api";
 
 /**
  * Live "Model & tokens" status for the Settings page:
@@ -12,13 +12,19 @@ import { getContextUsage } from "@/lib/api";
 export default function TokenStatusCard() {
   const [provider, setProvider] = useState<{ llm: string; status: string; detail: string } | null>(null);
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof getContextUsage>> | null>(null);
+  const [now, setNow] = useState(0);
   const hasKey = provider ? !["unset", "missing"].includes(provider.status) : false;
 
   useEffect(() => {
+    let active = true;
+    const tick = () => { if (active) setNow(Date.now()); };
+    queueMicrotask(tick);
+    const timer = setInterval(tick, 60000);
     (async () => {
       try {
-        const res = await fetch("/api/v1/health");
+        const res = await fetch(`${API_BASE.replace(/\/api\/v1\/?$/, "")}/health`);
         const h = await res.json();
+        if (!active) return;
         setProvider({
           llm: h.llm || "unset",
           status: h.llm_status?.status || "unknown",
@@ -26,16 +32,18 @@ export default function TokenStatusCard() {
         });
       } catch { /* health unreachable — leave status quiet */ }
       try {
-        setUsage(await getContextUsage());
+        const result = await getContextUsage();
+        if (active) setUsage(result);
       } catch { /* usage endpoint unavailable */ }
     })();
+    return () => { active = false; clearInterval(timer); };
   }, []);
 
   const used = Number(usage?.daily_used ?? 0);
   const limit = Number(usage?.daily_limit ?? 0);
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   const resetsAt = usage?.window_resets_at ? new Date(usage.window_resets_at) : null;
-  const minutesToReset = resetsAt ? Math.max(0, Math.round((resetsAt.getTime() - Date.now()) / 60000)) : null;
+  const minutesToReset = resetsAt && now ? Math.max(0, Math.round((resetsAt.getTime() - now) / 60000)) : null;
 
   const providerLabel: Record<string, string> = {
     gemini: "Gemini (AI Studio key)", vertex: "Google Vertex AI",

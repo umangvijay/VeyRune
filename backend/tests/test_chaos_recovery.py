@@ -68,6 +68,20 @@ async def test_duplicate_delivery_executes_exactly_once(stack):
 
 
 @pytest.mark.asyncio
+async def test_old_execution_cannot_overwrite_reclaimed_task(stack):
+    from backend.models.exceptions import StaleTaskLeaseError
+    repo = stack["repo"]
+    run = await _save_run(repo, "fenced")
+    assert await repo.claim_task(run.run_id, "t1", 60)
+    await repo.update_task(run.run_id, "t1", {"lease_expires_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()})
+    assert await repo.claim_task(run.run_id, "t1", 60)
+    with pytest.raises(StaleTaskLeaseError):
+        await repo.update_task(run.run_id, "t1", {"attempt": 1, "status": "COMPLETED", "output_data": {"stale": True}})
+    current = await repo.get_task(run.run_id, "t1")
+    assert current["attempt"] == 2 and current["status"] == "RUNNING"
+
+
+@pytest.mark.asyncio
 async def test_worker_kill_midrun_is_reclaimed_after_lease_expiry(stack):
     """A worker that dies while holding a lease must not strand the task."""
     repo = stack["repo"]

@@ -585,7 +585,7 @@ async def retry_workflow(
             await factory.idempotency_repo.reset_failed_task(run["workflow_id"], task["task_id"])
             await factory.workflow_repo.update_task(
                 run_id, task["task_id"],
-                {"status": "PENDING", "error": None, "error_type": None, "attempt": 0}
+                {"status": "PENDING", "error": None, "error_type": None}
             )
             retried_count += 1
 

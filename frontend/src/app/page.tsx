@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Pause, Play, Layers, Workflow, Grid2X2, Stamp } from "lucide-react";
+import { ArrowUpRight, Pause, Play, Layers, Workflow, Grid2X2, Stamp, Focus, Globe2, RotateCcw, SlidersHorizontal } from "lucide-react";
 import type { SceneFocus, SceneStatus } from "@/components/CyanotypeScene";
 import PublicNavbar from "@/components/PublicNavbar";
 import { API_BASE } from "@/lib/api";
@@ -29,18 +29,17 @@ function LoomVitals() {
     const load = async () => {
       try {
         const res = await fetch(`${API_BASE.replace("/api/v1", "")}/health`, { cache: "no-store" });
-        if (!res.ok) return;
+        if (!res.ok) { if (alive) setVitals(null); return; }
         const data = await res.json();
         if (alive && data?.status === "healthy") {
           setVitals({
-            uptime: Math.max(1, Math.round((Number(data.uptime_seconds) || 0) / 60)),
+            uptime: Math.max(0, Math.floor((Number(data.uptime_seconds) || 0) / 60)),
             storage: String(data.storage || "unknown").toUpperCase(),
           });
-        }
-      } catch { /* vitals stay hidden while the API is down */ }
+        } else if (alive) setVitals(null);
+      } catch { if (alive) setVitals(null); }
     };
     // load() commits real telemetry only after the fetch resolves.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const id = setInterval(load, 30000);
     return () => { alive = false; clearInterval(id); };
@@ -48,7 +47,7 @@ function LoomVitals() {
   if (!vitals) return null;
   return (
     <div className="loom-vitals" role="status">
-      <span className="draft-dot" aria-hidden /> LOOM VITALS · UPTIME {vitals.uptime}M · {vitals.storage} · RECOVERY LOOPS ARMED
+      <span className="draft-dot" aria-hidden /> LOOM VITALS · UPTIME {vitals.uptime}M · {vitals.storage} · API CONNECTED
     </div>
   );
 }
@@ -107,6 +106,20 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="draft-footer">
+        <details className="scene-inspector">
+          <summary><SlidersHorizontal size={14} /> Scene controls</summary>
+          <div className="scene-inspector-panel">
+            <div className="draft-eyebrow">PLANETARY LOOM / VIEW</div>
+            <div className="hud-views" role="group" aria-label="Camera view">
+              <button type="button" disabled={sceneStatus !== "ready"} aria-pressed={focus === "planet"} onClick={() => setFocus("planet")}><Globe2 size={15} /> Planet</button>
+              <button type="button" disabled={sceneStatus !== "ready"} aria-pressed={focus === "sheet"} onClick={() => setFocus("sheet")}><Focus size={15} /> Blueprint</button>
+              <button type="button" aria-label="Reset camera" onClick={() => { setFocus("overview"); setZoom(1); }}><RotateCcw size={15} /></button>
+            </div>
+            <label className="camera-zoom" htmlFor="scene-zoom"><span>ZOOM</span><output>{Math.round(zoom * 100)}%</output><input id="scene-zoom" type="range" min="0.4" max="2.8" step="0.01" value={zoom} disabled={sceneStatus !== "ready"} onChange={event => setZoom(Number(event.target.value))} /></label>
+            {sceneStatus === "ready" && <div className="weave-meter"><div><span>BLUEPRINT WEAVE</span><span>{weave}%</span></div><meter min={0} max={100} value={weave} aria-label="Blueprint weave progress" /></div>}
+            <p className="scene-control-hint">Click the planet or foreground blueprint to focus. Press Esc to reset.</p>
+          </div>
+        </details>
         <LoomVitals />
         {sceneStatus !== "ready" && <div className="scene-notice" role="status">
           <p>{sceneStatus === "loading" ? "Preparing your 3D world…" : "Showing the still illustration. Your workspace is ready to use."}</p>

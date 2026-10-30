@@ -32,8 +32,7 @@ security_scheme = HTTPBearer(auto_error=False)
 @dataclass
 class AuthenticatedUser:
     """
-    Extracted from a verified JWT. Available in every protected route.
-    No database lookup needed for basic auth checks.
+    Current account identity resolved after credential verification.
     """
     user_id: str
     email: str
@@ -65,7 +64,7 @@ async def get_current_user(
     - Token type is 'access'
     - Token jti is not on the server-side logout denylist
 
-    Returns AuthenticatedUser with claims from the token.
+    Returns AuthenticatedUser with current account status and role.
     Raises 401 on any failure.
     """
     if credentials is None:
@@ -103,8 +102,11 @@ async def get_current_user(
     # Server-side revocation: a logged-out token must not keep working
     # until its 15-minute TTL runs out.
     jti = claims.get("jti")
+    factory = getattr(request.app.state, "factory", None)
     if jti:
-        denylist = getattr(getattr(request.app.state, "factory", None), "token_denylist_repo", None)
+        denylist = getattr(factory, "token_denylist_repo", None)
+        if denylist is None:
+            raise HTTPException(status_code=503, detail="Authentication temporarily unavailable")
         if denylist is not None:
             try:
                 if await denylist.is_revoked(jti):
@@ -116,9 +118,8 @@ async def get_current_user(
             except HTTPException:
                 raise
             except Exception:
-                # Fail closed only for genuine outages is a tradeoff; failing
-                # open keeps the product usable if the denylist store blips.
-                logger.exception("Token denylist check failed; allowing request")
+                logger.exception("Token denylist check failed")
+                raise HTTPException(status_code=503, detail="Authentication temporarily unavailable")
 
     # Extract user identity from verified claims
     user_id = claims.get("sub")
@@ -128,12 +129,23 @@ async def get_current_user(
             detail="Token missing subject claim.",
         )
 
+    user_repo = getattr(factory, "user_repo", None)
+    if user_repo is None:
+        raise HTTPException(status_code=503, detail="Authentication temporarily unavailable")
+    try:
+        account = await user_repo.get_by_id(user_id)
+    except Exception:
+        logger.exception("Current account lookup failed")
+        raise HTTPException(status_code=503, detail="Authentication temporarily unavailable")
+    if not account or not account.get("is_active", True):
+        raise HTTPException(status_code=401, detail="User account unavailable")
+
     return AuthenticatedUser(
         user_id=user_id,
-        email=claims.get("email", ""),
-        name=claims.get("name", ""),
-        role=claims.get("role", "user"),
-        auth_provider=claims.get("auth_provider", "local"),
+        email=account.get("email", ""),
+        name=account.get("name", ""),
+        role=account.get("role", "viewer"),
+        auth_provider=account.get("auth_provider", "local"),
     )
 
 

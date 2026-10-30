@@ -69,6 +69,16 @@ def _get_factory(request: Request):
     return factory
 
 
+async def _create_account(factory, payload):
+    """Uniqueness is enforced in storage, including concurrent signup requests."""
+    import sqlite3
+    from backend.models.exceptions import DuplicateIdentityError
+    try:
+        return await factory.user_repo.create_user(payload)
+    except (DuplicateIdentityError, sqlite3.IntegrityError) as exc:
+        raise HTTPException(status_code=409, detail="Account already registered; please sign in") from exc
+
+
 # ══════════════════════════════════════════════════════════════════
 #  SIGNUP
 # ══════════════════════════════════════════════════════════════════
@@ -103,7 +113,7 @@ async def signup(body: SignupRequest, request: Request):
     user_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    await factory.user_repo.create_user({
+    await _create_account(factory, {
         "id": user_id,
         "email": email,
         "name": name,
@@ -163,6 +173,9 @@ async def login(body: LoginRequest, request: Request):
     # Find user
     user = await factory.user_repo.get_by_email(email)
     if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Check if it's an OAuth-only account
@@ -279,6 +292,8 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
         # Check if email already exists with local auth
         existing = await factory.user_repo.get_by_email(google_user["email"])
         if existing:
+            if not existing.get("is_active", True):
+                raise HTTPException(status_code=401, detail="User account deactivated")
             # Link Google account to existing local user
             await factory.user_repo.update_user(existing["id"], {
                 "google_id": google_user["google_id"],
@@ -289,7 +304,7 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
         else:
             # Create new user
             user_id = str(uuid.uuid4())
-            await factory.user_repo.create_user({
+            await _create_account(factory, {
                 "id": user_id,
                 "email": google_user["email"],
                 "name": google_user.get("name", ""),
@@ -307,6 +322,9 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
                 "resource_id": user_id,
                 "details": {"email": google_user["email"], "auth_provider": "google"},
             })
+
+    if not user or not user.get("is_active", True):
+        raise HTTPException(status_code=401, detail="User account deactivated")
 
     # Update last login
     await factory.user_repo.update_user(user["id"], {
@@ -542,7 +560,7 @@ async def create_guest_session(request: Request):
     # Guests authenticate only via the issued JWT. Low-cost hash keeps Get Started fast.
     guest_hash = bcrypt.hashpw(os.urandom(16), bcrypt.gensalt(rounds=4)).decode("utf-8")
 
-    await factory.user_repo.create_user({
+    await _create_account(factory, {
         "id": guest_id,
         "email": guest_email,
         "name": guest_name,

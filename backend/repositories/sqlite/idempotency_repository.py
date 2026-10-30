@@ -1,7 +1,7 @@
 """
 AgentOS — SQLite Idempotency Repository
 
-Exactly-once execution ledger using atomic INSERT with unique constraint.
+Execution deduplication ledger using atomic INSERT with unique constraint.
 Prevents duplicate tool calls in concurrent/distributed environments.
 """
 
@@ -88,6 +88,13 @@ class SQLiteIdempotencyRepository(BaseIdempotencyRepository):
         await self.db.execute(
             "UPDATE idempotency_ledger SET status = 'paused' WHERE idempotency_key = ? AND status = 'running'",
             (key,),
+        )
+        await self.db.commit()
+
+    async def commit_uncertain(self, key: str) -> None:
+        await self.db.execute(
+            "UPDATE idempotency_ledger SET status = 'uncertain', updated_at = ? WHERE idempotency_key = ? AND status = 'running'",
+            (datetime.now(timezone.utc).isoformat(), key),
         )
         await self.db.commit()
 

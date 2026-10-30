@@ -28,8 +28,10 @@ class SlidingWindowCounter:
     a smooth rate limit.
     """
 
-    def __init__(self):
+    def __init__(self, max_keys: int = 10000):
         self._lock = Lock()
+        self._max_keys = max_keys
+        self._next_cleanup = 0.0
         # Key: (identifier, group) → {window_start, prev_count, curr_count}
         self._windows: Dict[Tuple[str, str], Dict] = defaultdict(
             lambda: {"window_start": 0, "prev_count": 0, "curr_count": 0}
@@ -56,7 +58,15 @@ class SlidingWindowCounter:
         key = (identifier, group)
 
         with self._lock:
+            if now >= self._next_cleanup:
+                stale = [key for key, state in self._windows.items() if state.get("expires_at", 0) <= now]
+                for stale_key in stale:
+                    del self._windows[stale_key]
+                self._next_cleanup = now + 60
+            if key not in self._windows and len(self._windows) >= self._max_keys:
+                return False, {"limit": max_requests, "remaining": 0, "reset": 60, "retry_after": 60}
             state = self._windows[key]
+            state["expires_at"] = now + 2 * window_seconds
             window_start = state["window_start"]
             elapsed = now - window_start
 
@@ -155,10 +165,7 @@ def get_client_identifier(request: Request, user_id: Optional[str] = None) -> st
     if user_id:
         return f"user:{user_id}"
 
-    # Get real IP behind proxy
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return f"ip:{forwarded.split(',')[0].strip()}"
-
+    # ASGI server middleware owns trusted-proxy parsing. Raw forwarded headers
+    # are caller-controlled and must never replace the authenticated peer here.
     client = request.client
     return f"ip:{client.host}" if client else "ip:unknown"

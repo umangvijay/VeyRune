@@ -31,8 +31,8 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
         # Upsert the run
         await conn.execute(
             """
-            INSERT INTO workflow_runs (run_id, workflow_id, user_id, goal, status, created_at, updated_at, parent_run_id, thread_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO workflow_runs (run_id, workflow_id, user_id, goal, status, created_at, updated_at, parent_run_id, thread_id, org_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id) DO UPDATE SET
                 status = excluded.status,
                 updated_at = excluded.updated_at
@@ -47,6 +47,7 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
                 now,
                 run_data.get("parent_run_id"),
                 run_data.get("thread_id") or run_data["run_id"],
+                run_data.get("org_id"),
             ),
         )
 
@@ -182,11 +183,18 @@ class SQLiteWorkflowRepository(BaseWorkflowRepository):
         values.extend([run_id, task_id])
 
         conn = await self.db.connection()
-        await conn.execute(
-            f"UPDATE tasks SET {', '.join(set_clauses)} WHERE run_id = ? AND task_id = ?",
+        fence = ""
+        if "attempt" in updates:
+            fence = " AND attempt = ?"
+            values.append(updates["attempt"])
+        cursor = await conn.execute(
+            f"UPDATE tasks SET {', '.join(set_clauses)} WHERE run_id = ? AND task_id = ?{fence}",
             tuple(values),
         )
         await conn.commit()
+        if fence and cursor.rowcount == 0:
+            from backend.models.exceptions import StaleTaskLeaseError
+            raise StaleTaskLeaseError(f"Task {task_id} no longer belongs to this execution")
 
     async def claim_task(self, run_id: str, task_id: str, lease_seconds: int) -> bool:
         """

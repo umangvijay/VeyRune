@@ -167,6 +167,7 @@ class JWTManager:
             algorithms=[ALGORITHM],
             issuer=settings.JWT_ISSUER,
             audience=settings.JWT_AUDIENCE,
+            options={"require": ["sub", "jti", "exp", "iat", "iss", "aud", "type"]},
         )
 
         if claims.get("type") != TOKEN_TYPE_ACCESS:
@@ -187,6 +188,7 @@ class JWTManager:
             algorithms=[ALGORITHM],
             issuer=settings.JWT_ISSUER,
             audience=settings.JWT_AUDIENCE,
+            options={"require": ["sub", "jti", "exp", "iat", "iss", "aud", "type"]},
         )
 
         if claims.get("type") != TOKEN_TYPE_REFRESH:

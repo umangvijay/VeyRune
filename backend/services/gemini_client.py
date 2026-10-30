@@ -345,9 +345,13 @@ def _coerce_json(text: str) -> Any:
 
 
 def _record_usage_estimate(prompt: str, output: str) -> None:
-    """Record an estimated token spend for the user in context (4 chars/token),
-    so the daily budget check in workflow creation actually has data. The
-    budget is a cost guardrail, not billing. Never raises."""
+    """Record an estimated token spend for the user (4 chars/token), so the
+    daily budget check in workflow creation actually has data. The budget is
+    a cost guardrail, not billing. Never raises.
+
+    Two books are kept: the process-local ContextManager (fast, per-request)
+    and the durable usage ledger (audit F08) so the daily cap holds across
+    API/worker processes and restarts."""
     try:
         user_id = get_user_id()
         if not user_id:
@@ -355,7 +359,17 @@ def _record_usage_estimate(prompt: str, output: str) -> None:
         from backend.agents.context_manager import context_manager
         inp = max(0, (len(prompt or "") + 3) // 4)
         out = max(0, (len(output or "") + 3) // 4)
+        total = inp + out
         context_manager.record_usage(user_id, inp, out)
+        if total > 0:
+            import asyncio
+            from backend.repositories.usage_repository import record_usage_durably
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop is not None:
+                loop.create_task(record_usage_durably(user_id, total))
     except Exception:
         logger.debug("usage estimate recording failed", exc_info=True)
 

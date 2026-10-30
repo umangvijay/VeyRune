@@ -124,6 +124,8 @@ from backend.api.routers.orgs import router as orgs_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(contact_router, prefix="/api/v1")
+from backend.api.routers.blogs import router as blogs_router
+app.include_router(blogs_router, prefix="/api/v1")
 app.include_router(orgs_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")

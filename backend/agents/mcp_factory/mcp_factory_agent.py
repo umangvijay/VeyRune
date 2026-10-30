@@ -119,7 +119,8 @@ class MCPFactoryAgent:
                     if intent:
                         selected = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent)
                         combined = {t["tool_name"]: t for t in cached}
-                        combined.update({t.tool_name: t.model_dump(mode="json") for t in selected})
+                        for selected_tool in selected:
+                            combined.setdefault(selected_tool.tool_name, selected_tool.model_dump(mode="json"))
                         cached = list(combined.values())
                         await self.mcp_repo.cache_tools(mcp_id, cached)
                     summaries = [{"name": t.get("tool_name"), "description": t.get("description", "")} for t in cached]
@@ -144,6 +145,9 @@ class MCPFactoryAgent:
             for candidate in tools:
                 if (candidate.operation or {}).get("http_method") == "GET" and not candidate.input_schema.get("required"):
                     probe = await self._probe(candidate.model_dump(mode="json"), model)
+                    if probe.get("ok") is True:
+                        from backend.services.tool_validation import record_read_probe
+                        candidate.operation = record_read_probe(candidate.model_dump(mode="json"), spec_hash)["operation"]
                     break
             await self._log(build_id, f"Probe result: {probe.get('status', probe)}", logs)
 
@@ -183,19 +187,8 @@ class MCPFactoryAgent:
                     await self._log(build_id, f"Self-heal regeneration failed ({heal_exc}); registering the original build", logs)
 
             trust_tier = "verified" if method in ("url", "spec", "openapi") and probe.get("ok") is True else "pending_review"
-            # Golden-run gate (audit §9): a spec from a trusted URL that still
-            # CRASHED at probe time (exception, not an HTTP status) registers
-            # disabled — the user flips it on after checking, instead of a
-            # runtime surprise. Auth-required APIs that answered HTTP (401/403)
-            # are not crashes and stay enabled.
-            auto_enable = True
-            if method in ("url", "spec", "openapi") and probe.get("status") == "probe_error":
-                auto_enable = False
-                await self._log(
-                    build_id,
-                    "Golden-run gate: probe crashed, registering DISABLED for review",
-                    logs,
-                )
+            # A registered definition is not executable until its operation evidence passes policy.
+            auto_enable = trust_tier == "verified"
             # Prefer the spec's own security scheme placement; fall back to the requested auth_type.
             auth_meta = auth_metadata_from_spec(model, fallback_type=auth_type)
 
@@ -233,8 +226,8 @@ class MCPFactoryAgent:
             gate_warning = ""
             if not auto_enable:
                 gate_warning = (
-                    "\nThe integration was registered DISABLED because the live probe crashed. "
-                    "Review it on the Integrations page and enable it when ready."
+                    "\nThe integration is registered DISABLED pending validation. "
+                    "Connect credentials, run validation, then enable the tested operations."
                 )
             msg = (
                 f"Built {display_name} with {len(tools)} tool{'s' if len(tools) != 1 else ''}"

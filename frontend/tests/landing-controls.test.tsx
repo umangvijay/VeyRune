@@ -12,6 +12,7 @@ vi.mock("next/dynamic", () => ({ default: () => function TestScene(props: SceneP
   useEffect(() => { scene.mounts += 1; onStatus("ready"); }, [onStatus]);
   return null;
 } }));
+vi.mock("@/lib/api", () => ({ API_BASE: "http://localhost/api/v1" }));
 vi.mock("@/components/PublicNavbar", () => ({ default: () => null }));
 vi.mock("next/link", () => ({ default: ({ children, ...props }: { children: ReactNode; href: string }) => <a {...props}>{children}</a> }));
 
@@ -22,6 +23,7 @@ async function click(label: string) { await act(async () => button(label).click(
 
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
   scene.mounts = 0;
   window.localStorage.clear();
   host = document.createElement("div");

@@ -9,6 +9,8 @@ parsing, resolve against the spec's own URL, and stay SSRF-guarded.
 """
 
 import pytest
+import socket
+import ipaddress
 
 from backend.mcp.builder.openapi_parser import OpenAPIParser, SSRFViolationError
 from backend.agents.mcp_factory.mcp_factory_agent import MCPFactoryAgent
@@ -29,6 +31,20 @@ paths:
         '200':
           description: ok
 """
+
+
+@pytest.fixture(autouse=True)
+def deterministic_dns(monkeypatch):
+    """Exercise SSRF validation without depending on public DNS availability."""
+    def resolve(host, port, **kwargs):
+        try:
+            address = str(ipaddress.ip_address(host))
+        except ValueError:
+            if host != "petstore3.swagger.io":
+                raise socket.gaierror("Unmapped test host")
+            address = "8.8.8.8"
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, port))]
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
 
 
 def test_relative_servers_survive_parsing():
@@ -69,7 +85,7 @@ def test_factory_rejects_relative_spec_without_source_url_with_clear_error():
 
 
 def test_absolute_https_servers_still_work():
-    # Must be a real, resolvable public host — _validate_ssrf checks DNS too
+    # DNS is deterministic, while the real address validation still runs.
     spec = PETSTORE_LIKE.replace("url: /api/v3", "url: https://petstore3.swagger.io/api/v3")
     model = OpenAPIParser().parse_text(spec)
     assert model.servers[0].url == "https://petstore3.swagger.io/api/v3"

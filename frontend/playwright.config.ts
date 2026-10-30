@@ -18,10 +18,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // next start is incompatible with output: "standalone". Use Next's dev server for e2e.
-    command: 'npm run dev:fast',
+    // Run against the actual production artifact when requested by the release gate.
+    command: process.env.E2E_PRODUCTION === '1'
+      ? 'HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js'
+      : 'npm run dev:fast',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && process.env.E2E_PRODUCTION !== '1',
     timeout: 120 * 1000,
   },
 });

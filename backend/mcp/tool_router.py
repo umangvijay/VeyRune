@@ -103,6 +103,10 @@ class ToolRouter:
             raise ToolRouterError(f"Unknown MCP Server: {mcp_id}")
         mcp = _as_manifest(mcp_raw)
 
+        user_id = (context or {}).get("user_id")
+        if not user_id or mcp.owner not in (user_id, "system"):
+            raise ToolRouterError("Integration is not accessible to this user")
+
         cached_tools = await self.mcp_repo.get_cached_tools(mcp_id)
         raw_tool = next((t for t in cached_tools if (t.get("tool_name") if isinstance(t, dict) else t.tool_name) == tool_name), None)
         if not raw_tool:
@@ -228,6 +232,7 @@ class ToolRouter:
                     tool_name=agent_tool_name,
                     arguments=arguments,
                     execute_fn=_execute,
+                    retry_safe=False,
                 )
                 if result.blocked:
                     raise ToolRouterError(f"Idempotency blocked execution: {result.reason}")

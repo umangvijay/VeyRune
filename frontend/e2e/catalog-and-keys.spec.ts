@@ -19,7 +19,7 @@ test.describe('Catalog page', () => {
   test('shows published integrations and installs one', async ({ page }) => {
     let installed = false;
     await page.addInitScript(() => localStorage.setItem('agentos_auth', JSON.stringify({
-      accessToken: 'test-only-token', refreshToken: null,
+      accessToken: 'test-only-token', refreshToken: 'test-only-refresh',
       user: { id: 'test-user', email: 't@example.invalid', name: 'T', role: 'user', is_active: true },
     })));
     await page.route('**/api/v1/**', async route => {
@@ -50,7 +50,7 @@ test.describe('Catalog page', () => {
 
   test('empty catalog renders the honest empty state', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('agentos_auth', JSON.stringify({
-      accessToken: 'test-only-token', refreshToken: null,
+      accessToken: 'test-only-token', refreshToken: 'test-only-refresh',
       user: { id: 'test-user', email: 't@example.invalid', name: 'T', role: 'user', is_active: true },
     })));
     await page.route('**/api/v1/**', async route => {
@@ -72,7 +72,7 @@ test.describe('API keys manager', () => {
     let seq = 0;
     let lastCreated: string | null = null;
     await page.addInitScript(() => localStorage.setItem('agentos_auth', JSON.stringify({
-      accessToken: 'test-only-token', refreshToken: null,
+      accessToken: 'test-only-token', refreshToken: 'test-only-refresh',
       user: { id: 'test-user', email: 't@example.invalid', name: 'T', role: 'user', is_active: true },
     })));
     await page.route('**/api/v1/**', async route => {

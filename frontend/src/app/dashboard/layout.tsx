@@ -3,9 +3,10 @@
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
+import { useState, useEffect, ReactNode, useRef } from "react";
+import ThemeSwitch from "@/components/ThemeSwitch";
 import BrandMark from "@/components/BrandMark";
-import { applyTheme, watchSystemTheme, readThemePref, resolveTheme, type ThemePref } from "@/lib/theme";
+import { applyTheme, watchSystemTheme, type ThemePref } from "@/lib/theme";
 import { getUnreadCount, listNotifications, markNotificationRead, markAllNotificationsRead, listWorkflows, Notification, WorkflowRun } from "@/lib/api";
 import ContextUsageButton from "@/components/ContextUsage";
 import { AmbientOrbs } from "@/components/GlassPanel";
@@ -351,17 +352,6 @@ function DashboardInner({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   };
 
-  const [lamp, setLamp] = useState<"light" | "dark">("dark");
-  useEffect(() => {
-    setLamp(resolveTheme(readThemePref()));
-    return watchSystemTheme();
-  }, []);
-  const toggleLamp = useCallback(() => {
-    const next: ThemePref = lamp === "dark" ? "light" : "dark";
-    applyTheme(next);
-    setLamp(next);
-  }, [lamp]);
-
   if (isLoading || !isAuthenticated) {
     return (
       <div className="mesh-gradient" style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -383,7 +373,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const isWorkspace = pathname === "/dashboard" || pathname.startsWith("/dashboard/workspace");
   const pageTitle =
     NAV_ITEMS.find((i) => pathname.startsWith(i.href))?.label
-    || (pathname.startsWith("/dashboard/workspace") ? "Chat" : "New chat");
+    || (pathname.startsWith("/dashboard/workspace") ? "Chat" : "Board");
 
   return (
     <div className="mesh-gradient dashboard-shell">
@@ -396,7 +386,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           onClick={() => setMobileOpen(false)}
         />
       )}
-      <aside className={`sidebar ${!isMobile && collapsed ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
+      <aside aria-label="Workspace navigation" className={`sidebar ${!isMobile && collapsed ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
         {/* Logo */}
         <Link href="/" style={{ textDecoration: "none" }}>
           <div style={{
@@ -536,6 +526,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
               className="btn btn-ghost btn-sm"
               style={{ padding: 4, flexShrink: 0 }}
               onClick={toggleSidebar}
+              aria-expanded={isMobile ? mobileOpen : !collapsed}
               aria-label={showLabels ? "Collapse sidebar" : "Expand sidebar"}
               title={showLabels ? "Collapse sidebar" : "Expand sidebar"}
             >
@@ -543,39 +534,24 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+            <div className="workspace-heading">
+              <nav aria-label="Workspace breadcrumb"><Link href="/dashboard">WORKSPACE</Link><span aria-hidden="true">/</span><span>{isWorkspace ? "BOARD" : "TOOLS"}</span></nav>
             <h1 className="truncate" style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
               {pageTitle}
             </h1>
+            </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={toggleLamp}
-              aria-label={`Switch to ${lamp === "dark" ? "North Light (day)" : "Tungsten (night)"}`}
-              title="Draughting Lamp — day / night"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                padding: "7px 12px", borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border-primary)",
-                background: "var(--bg-glass)", color: "var(--text-secondary)",
-                fontFamily: "var(--font-mono)", fontSize: 10.5, letterSpacing: "0.08em",
-                cursor: "pointer",
-              }}
-            >
-              <span style={{
-                width: 7, height: 7, borderRadius: "50%",
-                background: lamp === "dark" ? "var(--warm)" : "#e8c15a",
-                boxShadow: "0 0 8px currentColor",
-                color: lamp === "dark" ? "var(--warm)" : "#e8c15a",
-              }} />
-              <span className="lamp-label">{lamp === "dark" ? "TUNGSTEN" : "NORTH LIGHT"}</span>
-            </button>
+            <ThemeSwitch />
             <ContextUsageButton />
             {/* Notification bell */}
             <div style={{ position: "relative" }} ref={panelRef}>
               <button
                 className="btn btn-ghost btn-sm"
+                aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+                aria-expanded={showNotifications}
+                aria-controls="workspace-notifications"
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{ position: "relative" }}
               >
@@ -597,7 +573,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
               {/* Notification Slide-Out Panel */}
               {showNotifications && (
-                <div className="glass-card animate-slide-in" style={{
+                <div id="workspace-notifications" role="region" aria-label="Notifications" className="glass-card animate-slide-in" style={{
                   position: "absolute", top: "100%", right: 0, width: "min(360px, calc(100vw - 24px))",
                   marginTop: 8, zIndex: 100, display: "flex", flexDirection: "column",
                   maxHeight: "80vh", overflow: "hidden", border: "1px solid var(--border-primary)"
@@ -614,7 +590,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   <div style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
                     {notifications.length === 0 ? (
                       <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-                        All caught up! Your agents are running smoothly.
+                        You’re all caught up. New notifications will appear here.
                       </div>
                     ) : (
                       notifications.map(n => (

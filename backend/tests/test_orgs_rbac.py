@@ -50,7 +50,7 @@ def _org_repo():
         audit_repo=AsyncMock(),
         user_repo=SimpleNamespace(get_by_email=AsyncMock(side_effect=lambda e: {"id": f"u-{e}", "email": e} if e == "new@x" else None)),
         workflow_repo=SimpleNamespace(list_runs=AsyncMock(side_effect=lambda uid, limit, offset: [
-            {"run_id": f"run-{uid}", "user_id": uid, "created_at": "t", "tasks": [{"task_id": "t", "title": "T", "agent": "a", "status": "COMPLETED", "error": None}]},
+            {"run_id": f"run-{uid}", "org_id": "org-1", "user_id": uid, "created_at": "t", "tasks": [{"task_id": "t", "title": "T", "agent": "a", "status": "COMPLETED", "error": None}]},
         ])),
     )
     return factory, org_repo
@@ -155,3 +155,35 @@ async def test_delete_org_is_owner_only():
     assert e.value.status_code == 403
     result = await delete_org("org-1", _request(factory), _user("owner"))
     assert result["deleted"] is True
+
+
+@pytest.mark.asyncio
+async def test_membership_never_exposes_personal_or_other_org_runs():
+    factory, _ = _org_repo()
+    factory.workflow_repo.list_runs.side_effect = None
+    factory.workflow_repo.list_runs.return_value = [
+        {"run_id": "private", "user_id": "mem1", "goal": "private goal"},
+        {"run_id": "other", "user_id": "mem1", "org_id": "other-org"},
+    ]
+    result = await org_run_oversight("org-1", _request(factory), _user("owner"), limit=20)
+    assert result["runs"] == []
+
+
+@pytest.mark.asyncio
+async def test_add_member_cannot_change_existing_role():
+    factory, repo = _org_repo()
+    factory.user_repo.get_by_email.side_effect = None
+    factory.user_repo.get_by_email.return_value = {"id": "admin1", "email": "admin@x"}
+    with pytest.raises(HTTPException) as error:
+        await add_member("org-1", SimpleNamespace(email="admin@x", role="viewer"), _request(factory), _user("admin1"))
+    assert error.value.status_code == 409
+    repo.add_member.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_appoint_admin_through_add_member():
+    factory, repo = _org_repo()
+    with pytest.raises(HTTPException) as error:
+        await add_member("org-1", SimpleNamespace(email="new@x", role="admin"), _request(factory), _user("admin1"))
+    assert error.value.status_code == 403
+    repo.add_member.assert_not_awaited()

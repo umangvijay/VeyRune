@@ -19,14 +19,17 @@ export default function ApiKeyManager() {
     try {
       const res = await listApiKeys();
       setKeys(res.keys || []);
-    } catch {
-      // Keys may not be available on older deployments — stay quiet.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load API keys");
     }
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    listApiKeys().then(res => { if (active) setKeys(res.keys || []); })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load API keys"); });
+    return () => { active = false; };
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

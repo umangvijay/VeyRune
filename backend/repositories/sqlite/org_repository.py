@@ -77,16 +77,16 @@ class SQLiteOrgRepository(BaseOrgRepository):
         if await self.get_org(org_id) is None:
             return False
         now = datetime.now(timezone.utc).isoformat()
-        await self.db.execute(
+        cursor = await self.db.execute(
             """
             INSERT INTO org_members (org_id, user_id, role, added_at, added_by)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(org_id, user_id) DO UPDATE SET role = excluded.role, added_by = excluded.added_by
+            ON CONFLICT(org_id, user_id) DO NOTHING
             """,
             (org_id, user_id, role, now, added_by),
         )
         await self.db.commit()
-        return True
+        return cursor.rowcount > 0
 
     async def set_member_role(self, org_id: str, user_id: str, role: str) -> bool:
         cursor = await self.db.execute(

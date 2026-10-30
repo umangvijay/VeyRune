@@ -433,9 +433,13 @@ class FirestoreOrgRepository(BaseOrgRepository):
         if await self.get_org(org_id) is None:
             return False
         db = await _db()
-        await db.collection("org_members").document(f"{org_id}_{user_id}").set(
-            {"org_id": org_id, "user_id": user_id, "role": role, "added_at": _now(), "added_by": added_by}
-        )
+        from google.api_core.exceptions import AlreadyExists
+        try:
+            await db.collection("org_members").document(f"{org_id}_{user_id}").create(
+                {"org_id": org_id, "user_id": user_id, "role": role, "added_at": _now(), "added_by": added_by}
+            )
+        except AlreadyExists:
+            return False
         return True
 
     async def set_member_role(self, org_id: str, user_id: str, role: str) -> bool:

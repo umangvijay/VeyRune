@@ -49,6 +49,7 @@ class RepositoryFactory:
         self.adaptive_policy_repo = None
         self.api_keys_repo = None
         self.org_repo = None
+        self.content_repo = None
 
         # Infrastructure
         self.message_bus = None
@@ -113,6 +114,11 @@ class RepositoryFactory:
         self.adaptive_policy_repo = SQLiteAdaptivePolicyRepository(self.db_manager)
         self.api_keys_repo = SQLiteApiKeysRepository(self.db_manager)
         self.org_repo = SQLiteOrgRepository(self.db_manager)
+        from backend.repositories.content_repository import SQLiteContentRepository
+        self.content_repo = SQLiteContentRepository(self.db_manager)
+        from backend.repositories.usage_repository import SQLiteUsageRepository, set_usage_repo
+        self.usage_repo = SQLiteUsageRepository(self.db_manager)
+        set_usage_repo(self.usage_repo)
 
         # In-process message bus for local mode
         self.message_bus = InMemoryMessageBus()
@@ -137,6 +143,11 @@ class RepositoryFactory:
         from backend.repositories.in_memory_message_bus import InMemoryMessageBus
         
         self.user_repo = FirestoreUserRepository()
+        from backend.repositories.content_repository import FirestoreContentRepository
+        self.content_repo = FirestoreContentRepository()
+        from backend.repositories.usage_repository import FirestoreUsageRepository, set_usage_repo
+        self.usage_repo = FirestoreUsageRepository()
+        set_usage_repo(self.usage_repo)
         from backend.repositories.plugin_repository import AsyncFirestorePluginRepository
         self.plugin_repo = AsyncFirestorePluginRepository(await FirestoreDB.get_client())
         self.workflow_repo = FirestoreWorkflowRepository()

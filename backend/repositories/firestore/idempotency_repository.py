@@ -50,6 +50,18 @@ class FirestoreIdempotencyRepository(BaseIdempotencyRepository):
     async def commit_failure(self, key: str) -> None:
         await self.mark_failed(key)
 
+    async def commit_uncertain(self, key: str) -> None:
+        db = await self._get_db()
+        ref = db.collection("idempotency_ledger").document(key)
+
+        @firestore.async_transactional
+        async def quarantine(transaction):
+            snapshot = await ref.get(transaction=transaction)
+            if (snapshot.to_dict() or {}).get("status") == "running":
+                transaction.update(ref, {"status": "uncertain", "updated_at": datetime.now(timezone.utc).isoformat()})
+
+        await quarantine(db.transaction())
+
     async def commit_pause(self, key: str) -> None:
         db = await self._get_db()
         await db.collection("idempotency_ledger").document(key).update({
@@ -87,9 +99,9 @@ class FirestoreIdempotencyRepository(BaseIdempotencyRepository):
                 data = snapshot.to_dict() or {}
                 if data.get("status") == "completed":
                     return data.get("result_payload")
-                elif data.get("status") == "running":
-                    raise ValueError("already_running")
-                # If failed, we can claim it again
+                else:
+                    if data.get("status") != "paused":
+                        raise ValueError("Execution blocked; reconciliation or explicit retry required")
 
             transaction.set(ref, {
                 "idempotency_key": idempotency_key,

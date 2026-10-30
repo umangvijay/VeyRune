@@ -41,11 +41,6 @@ export default function WorkflowExecutionPage() {
 
   // Subscribe to SSE
   useEffect(() => {
-    if (!workflow || ["COMPLETED", "FAILED", "CANCELLED"].includes(workflow.status)) {
-      // Don't subscribe if already in terminal state (though we could for history if API supported it)
-      // For now, if we want live updates, we subscribe
-    }
-
     const unsubscribe = subscribeWorkflowEvents(
       runId,
       (event) => {
@@ -56,7 +51,7 @@ export default function WorkflowExecutionPage() {
         // Update local workflow state based on event
         setWorkflow(prev => {
           if (!prev) return prev;
-          const updated = { ...prev };
+          const updated = { ...prev, tasks: [...prev.tasks] };
           
           if (event.type === "WORKFLOW_COMPLETED") updated.status = "COMPLETED";
           if (event.type === "WORKFLOW_FAILED") updated.status = "FAILED";
@@ -210,7 +205,7 @@ export default function WorkflowExecutionPage() {
                     respondToApproval(task.task_id, true);
                     setWorkflow(prev => {
                       if (!prev) return prev;
-                      const updated = { ...prev };
+                      const updated = { ...prev, tasks: [...prev.tasks] };
                       const idx = updated.tasks.findIndex(t => t.task_id === task.task_id);
                       if (idx >= 0) updated.tasks[idx].status = "RUNNING";
                       return updated;
@@ -226,7 +221,7 @@ export default function WorkflowExecutionPage() {
                     respondToApproval(task.task_id, false);
                     setWorkflow(prev => {
                       if (!prev) return prev;
-                      const updated = { ...prev };
+                      const updated = { ...prev, tasks: [...prev.tasks] };
                       const idx = updated.tasks.findIndex(t => t.task_id === task.task_id);
                       if (idx >= 0) {
                         updated.tasks[idx].status = "FAILED";

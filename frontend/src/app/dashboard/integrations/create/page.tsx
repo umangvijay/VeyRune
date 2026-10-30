@@ -17,7 +17,8 @@ type Method = "url" | "spec" | "website" | "prompt";
 export default function CreateIntegrationPage() {
   const router = useRouter();
   const stopStream = useRef<(() => void) | null>(null);
-  useEffect(() => () => { stopStream.current?.(); }, []);
+  const observation = useRef<AbortController | null>(null);
+  useEffect(() => () => { stopStream.current?.(); observation.current?.abort(); }, []);
   const [method, setMethod] = useState<Method>("url");
   const [name, setName] = useState("");
   const [input, setInput] = useState("");
@@ -42,6 +43,9 @@ export default function CreateIntegrationPage() {
     setLoading(true);
     setLogs(["Initializing MCP Factory Agent...", `Building from ${method}...`]);
     setSuccess(false);
+    observation.current?.abort();
+    const controller = new AbortController();
+    observation.current = controller;
 
     try {
       let res;
@@ -56,20 +60,31 @@ export default function CreateIntegrationPage() {
       }
 
       const buildId = res.build_id;
+      if (controller.signal.aborted) return;
       if (buildId) {
         stopStream.current?.();
         stopStream.current = subscribeBuildEvents(buildId, build => {
           setLogs(build.logs || [`Stage: ${build.stage}`]);
         });
         for (let i = 0; i < 900; i++) {
-          const build = await getIntegrationBuild(buildId);
+          if (controller.signal.aborted) return;
+          const build = await getIntegrationBuild(buildId, controller.signal);
+          if (controller.signal.aborted) return;
           setLogs(build.logs?.length ? build.logs : [`Stage: ${build.stage}`]);
           if (build.status === "success") {
+            setSuccess(true);
             setLogs([...(build.logs || []), "✅ " + (build.message || res.message || "Registered")]);
             if (apiKey.trim() && build.mcp_id) {
-              await attachIntegrationKey(build.mcp_id, apiKey.trim());
-              setApiKey("");
-              setLogs((prev) => [...prev, "🔑 API key stored in Vault (names only; value encrypted)."]);
+              try {
+                await attachIntegrationKey(build.mcp_id, apiKey.trim());
+                if (controller.signal.aborted) return;
+                setApiKey("");
+                setLogs((prev) => [...prev, "🔑 API key stored in Vault (names only; value encrypted)."]);
+              } catch {
+                if (controller.signal.aborted) return;
+                setError("Integration built. Credential connection failed; open this integration to reconnect and test it.");
+                setLogs((prev) => [...prev, "Credential connection needs attention. The integration is already registered."]);
+              }
             }
             setSuccess(true);
             return;
@@ -85,11 +100,12 @@ export default function CreateIntegrationPage() {
       setLogs((prev) => [...prev, "✅ " + res.message]);
       setSuccess(true);
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Factory failed to build integration");
       setLogs((prev) => [...prev, "❌ Build Failed"]);
     } finally {
       stopStream.current?.();
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 

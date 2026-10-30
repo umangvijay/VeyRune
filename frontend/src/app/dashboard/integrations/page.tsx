@@ -88,10 +88,10 @@ export default function IntegrationsPage() {
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-primary)", paddingTop: 16 }}>
                 <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-                  {mcp.tool_count ?? 0} tools available
+                  {mcp.validated_tool_count ?? 0} / {mcp.tool_count ?? 0} operations tested
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: mcp.trust_tier === 'verified' ? "var(--success)" : "var(--warning)" }}>
-                  Tier: {mcp.trust_tier}
+                  {mcp.is_enabled ? "Enabled · tested operations only" : "Disabled"}
                 </div>
               </div>
             </Link>

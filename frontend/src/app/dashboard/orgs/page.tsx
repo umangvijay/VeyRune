@@ -37,7 +37,12 @@ export default function OrgsPage() {
     }
   }, []);
 
-  useEffect(() => { void loadOrgs(); }, [loadOrgs]);
+  useEffect(() => {
+    let active = true;
+    listMyOrgs().then(res => { if (active) setOrgs(res.orgs || []); })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load organizations"); });
+    return () => { active = false; };
+  }, []);
 
   const openOrg = useCallback(async (org: OrgRow) => {
     setSelected(org);

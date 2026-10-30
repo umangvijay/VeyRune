@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
-import { listAdminUsers, adminStats, adminAudit, AdminAuditEvent, setUserActive, setUserRole, deleteAnyUser, setUserLimits } from "@/lib/api";
+import { listAdminUsers, adminStats, adminAudit, AdminAuditEvent, setUserActive, setUserRole } from "@/lib/api";
 import GlassPanel, { AmbientOrbs, springSoft } from "@/components/GlassPanel";
 
 type AdminUserRow = {
@@ -66,26 +66,6 @@ export default function StealthAdminPage() {
       setUsers(refreshed.users as AdminUserRow[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change role");
-    }
-  }
-
-  async function remove(u: AdminUserRow) {
-    setError("");
-    try {
-      await deleteAnyUser(u.user_id);
-      setUsers((prev) => prev.filter((x) => x.user_id !== u.user_id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-    }
-  }
-
-  async function saveLimits(u: AdminUserRow, limit: number, hours: number) {
-    setError("");
-    try {
-      await setUserLimits(u.user_id, limit, hours);
-      setError(`Limits saved for ${u.email}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save limits");
     }
   }
 

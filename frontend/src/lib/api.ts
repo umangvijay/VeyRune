@@ -6,6 +6,7 @@
  */
 
 import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { readSession, refreshSession } from "./auth-session";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -13,18 +14,8 @@ export const API_BASE =
 // ── Token management ─────────────────────────────────────────────
 
 function getAuthData(): { accessToken: string | null; refreshToken: string | null } {
-  if (typeof window === "undefined") return { accessToken: null, refreshToken: null };
-  try {
-    const stored = localStorage.getItem("agentos_auth");
-    if (!stored) return { accessToken: null, refreshToken: null };
-    const parsed = JSON.parse(stored);
-    return {
-      accessToken: parsed.accessToken || null,
-      refreshToken: parsed.refreshToken || null,
-    };
-  } catch {
-    return { accessToken: null, refreshToken: null };
-  }
+  const session = readSession();
+  return { accessToken: session?.accessToken || null, refreshToken: session?.refreshToken || null };
 }
 
 function getToken(): string | null {
@@ -99,7 +90,7 @@ function rewriteFetchError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -123,44 +114,13 @@ async function apiFetch<T>(
   }
 
   if (res.status === 401) {
-    // Try refresh
-    const { refreshToken } = getAuthData();
-    if (refreshToken) {
-      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-      if (refreshRes.ok) {
-        const data = await refreshRes.json();
-        const stored = JSON.parse(localStorage.getItem("agentos_auth") || "{}");
-        stored.accessToken = data.access_token;
-        stored.refreshToken = data.refresh_token;
-        stored.user = data.user;
-        localStorage.setItem("agentos_auth", JSON.stringify(stored));
-
-        // Retry original request
-        headers.Authorization = `Bearer ${data.access_token}`;
-        let retry: Response;
-        try {
-          retry = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: "include" });
-        } catch (err) {
-          throw rewriteFetchError(err);
-        }
-        if (!retry.ok) {
-          const errData = await retry.json().catch(() => ({}));
-          throw new Error(formatApiError(errData, retry.status));
-        }
-        return retry.json();
-      } else {
-        localStorage.removeItem("agentos_auth");
-        window.location.href = "/login";
-        return new Promise(() => {}) as Promise<T>;
-      }
-    }
-    localStorage.removeItem("agentos_auth");
-    window.location.href = "/login";
-    return new Promise(() => {}) as Promise<T>;
+    const failedToken = headers.Authorization?.replace(/^Bearer /, "") || null;
+    const accessToken = await refreshSession(failedToken);
+    if (!accessToken) throw new Error("Your session has expired. Please sign in again.");
+    headers.Authorization = `Bearer ${accessToken}`;
+    try {
+      res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: "include" });
+    } catch (err) { throw rewriteFetchError(err); }
   }
 
   if (res.status === 403) {
@@ -247,6 +207,7 @@ export interface Integration {
   is_enabled: boolean;
   health?: string;
   tool_count: number;
+  validated_tool_count?: number;
   circuit_breaker: {
     state: string;
     failure_count: number;
@@ -513,7 +474,7 @@ export async function buildIntegrationFromPrompt(prompt: string, name?: string) 
   );
 }
 
-export async function getIntegrationBuild(buildId: string) {
+export async function getIntegrationBuild(buildId: string, signal?: AbortSignal) {
   return apiFetch<{
     build_id: string;
     status: string;
@@ -523,7 +484,7 @@ export async function getIntegrationBuild(buildId: string) {
     tools?: unknown[];
     error?: string;
     message?: string;
-  }>(`/integrations/builds/${buildId}`);
+  }>(`/integrations/builds/${buildId}`, { signal });
 }
 
 export async function testIntegration(mcpId: string) {

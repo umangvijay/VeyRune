@@ -322,3 +322,55 @@ p { text-wrap: pretty; }
 @keyframes dot-pulse { 0%,100% { box-shadow:0 0 5px var(--accent); opacity:.85; } 50% { box-shadow:0 0 13px var(--accent); opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .draft-dot { animation:none; } }
 :root.reduce-data .draft-dot { animation:none; }
+
+/* Account pages are a quiet drafting desk, using the same paper and ink. */
+.theme-switch { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid var(--border-primary); border-radius:8px; background:var(--bg-glass); color:var(--text-secondary); font:10px var(--font-mono); letter-spacing:.12em; cursor:pointer; }
+.theme-switch:hover { border-color:var(--accent); color:var(--accent); }
+.auth-shell { min-height:100svh; padding:28px clamp(20px,5vw,80px); display:flex; flex-direction:column; background:radial-gradient(ellipse at 10% 50%,var(--accent-subtle),transparent 65%),var(--bg-primary); }
+.auth-topline { display:flex; align-items:center; justify-content:space-between; padding-bottom:24px; border-bottom:1px solid var(--border-primary); }
+.auth-topline>a { display:flex; align-items:center; gap:12px; font:600 20px var(--font-serif); letter-spacing:.03em; }
+.auth-layout { width:100%; max-width:1180px; margin:auto; display:grid; grid-template-columns:1fr 440px; gap:clamp(40px,8vw,120px); align-items:center; padding:56px 0; }
+.auth-story h2 { font:500 clamp(40px,4.3vw,62px)/1.1 var(--font-serif); letter-spacing:-.04em; margin:26px 0; }
+.auth-story h2 em { color:var(--accent); font-weight:400; }
+.auth-story>p { max-width:38ch; font-size:15px; line-height:1.9; color:var(--text-secondary); }
+.auth-diagram { display:block; width:100%; max-width:460px; color:var(--accent); opacity:.6; margin:12px 0; }
+.auth-sequence { display:flex; flex-wrap:wrap; gap:22px; font:9px var(--font-mono); color:var(--text-tertiary); letter-spacing:.08em; }
+.auth-form-region { padding:32px; border:1px solid var(--glass-border); border-radius:16px; background:linear-gradient(140deg,var(--glass-hi),var(--glass-lo)); box-shadow:var(--glass-shadow); }
+.auth-form-region h1 { font:500 34px/1.15 var(--font-serif); letter-spacing:-.035em; margin:18px 0 10px; }
+.auth-intro { color:var(--text-secondary); font-size:13px; line-height:1.7; margin-bottom:28px; }
+.auth-form-region .btn { justify-content:center; gap:10px; }
+.auth-form-region .input { min-height:48px; font-size:16px; }
+.password-field { position:relative; }
+.password-field .input { padding-right:52px; }
+.password-field button { position:absolute; right:4px; top:2px; width:44px; height:44px; border:0; background:transparent; color:var(--text-secondary); display:grid; place-items:center; cursor:pointer; }
+.password-field button:hover { color:var(--accent); }
+.auth-footer { border-top:1px solid var(--border-primary); padding-top:22px; display:flex; justify-content:space-between; gap:16px; color:var(--text-tertiary); font:9px var(--font-mono); letter-spacing:.07em; }
+.auth-footer nav { display:flex; gap:20px; }
+.auth-footer a:hover { color:var(--accent); }
+.scene-inspector { position:relative; pointer-events:auto; }
+.scene-inspector summary { display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; color:var(--text-secondary); min-height:44px; font:10px var(--font-mono); padding:8px 12px; border:1px solid var(--border-primary); border-radius:8px; }
+.scene-inspector summary::-webkit-details-marker { display:none; }
+.scene-inspector[open] summary { color:var(--accent); background:var(--accent-subtle); }
+.scene-inspector-panel { position:absolute; bottom:calc(100% + 14px); left:0; width:min(310px,calc(100vw - 40px)); padding:20px; border:1px solid var(--glass-border); border-radius:12px; background:var(--glass-hi); backdrop-filter:blur(20px); box-shadow:var(--glass-shadow); }
+.scene-inspector-panel .hud-views { margin-top:16px; }
+.scene-inspector-panel .weave-meter { margin-top:18px; }
+.scene-control-hint { color:var(--text-tertiary); font:10px/1.7 var(--font-mono); margin-top:12px; }
+.public-pages .glass-card,.dashboard-shell .glass-card { border-color:var(--glass-border); }
+.dashboard-shell .topbar { box-shadow:0 4px 20px #02081808; }
+.dashboard-shell .sidebar-nav-item { min-height:44px; }
+.dashboard-shell :where(.badge,.sidebar-section-label) { font-family:var(--font-mono); }
+@media(max-width:900px) { .auth-layout { grid-template-columns:1fr; max-width:480px; padding-block:32px; } .auth-story { display:none; } .auth-footer { flex-wrap:wrap; justify-content:center; text-align:center; } }
+@media(max-width:480px) { .auth-shell { padding:16px; } .auth-form-region { padding:24px 20px; } .auth-form-region h1 { font-size:30px; } .scene-inspector-panel { position:fixed; bottom:180px; left:20px; right:20px; width:auto; } }
+.workspace-heading { min-width:0; }
+.workspace-heading nav { display:flex; align-items:center; gap:8px; color:var(--text-tertiary); font:8px var(--font-mono); letter-spacing:.1em; margin-bottom:4px; }
+.workspace-heading nav a:hover { color:var(--accent); }
+.auth-provider-error { color:var(--error); font-size:13px; line-height:1.6; margin-bottom:12px; }
+.scene-inspector-panel { max-height:calc(100dvh - 220px); overflow-y:auto; }
+.scene-inspector-panel .hud-views { display:flex; gap:6px; }
+.scene-inspector-panel .hud-views button { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:9px; border:1px solid var(--border-primary); border-radius:6px; background:transparent; color:var(--text-secondary); font:10px var(--font-mono); cursor:pointer; }
+.scene-inspector-panel .hud-views button[aria-pressed="true"] { color:var(--accent); border-color:var(--accent); background:var(--accent-subtle); }
+.scene-inspector-panel .camera-zoom { display:grid; grid-template-columns:1fr auto; gap:10px; margin:18px 0; color:var(--text-secondary); font:9px var(--font-mono); }
+.scene-inspector-panel input { grid-column:1/-1; width:100%; height:24px; accent-color:var(--accent); }
+.scene-inspector-panel .weave-meter>div { display:flex; justify-content:space-between; color:var(--text-secondary); font:9px var(--font-mono); margin-bottom:8px; }
+.scene-inspector-panel meter { width:100%; height:6px; accent-color:var(--accent); }
+@media(max-width:480px) { .topbar .theme-switch span { display:none; } .topbar .theme-switch { padding:10px; } }

@@ -259,6 +259,7 @@ class WorkflowEngine:
         if task.status == TaskStatus.RECOVERING:
             return
             
+        expected_attempt = task.attempt + 1
         claimed = await maybe_await(self.repo.claim_task(run_id, task_id, lease_seconds))
         if not claimed:
             logger.info(f"Task {task_id} already claimed or completed.")
@@ -268,6 +269,9 @@ class WorkflowEngine:
 
         run = await load_run(self.repo, run_id)
         task = next((t for t in run.tasks if t.task_id == task_id), None)
+        if task is None or task.attempt != expected_attempt:
+            logger.info("Task %s was reclaimed before execution began", task_id)
+            return
 
         # Record the true execution start once, on first claim — the UI and
         # the timeline depend on started_at being set for completed tasks.
@@ -372,6 +376,10 @@ class WorkflowEngine:
             logger.error(f"Task {task_id} semantic failure: {e.message}")
             await self._handle_task_failure(run_id, task, e.message, ErrorType.SEMANTIC_ERROR, e.reason)
         except Exception as e:
+            from backend.models.exceptions import StaleTaskLeaseError
+            if isinstance(e, StaleTaskLeaseError):
+                logger.warning("Discarding stale task completion for %s", task_id)
+                return
             logger.error(f"Task {task_id} failed: {e}")
             traceback.print_exc()
             error_type = self._classify_error(e)

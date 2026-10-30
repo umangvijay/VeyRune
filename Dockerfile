@@ -30,6 +30,7 @@ RUN playwright install --with-deps chromium \
 
 COPY backend ./backend
 COPY main.py ./main.py
+COPY scripts/verify_deployed_workflows.py ./scripts/verify_deployed_workflows.py
 
 # STORAGE_BACKEND is not baked in. Local docker defaults to sqlite via Settings.
 # Cloud Run production must set STORAGE_BACKEND=firestore (and GOOGLE_CLOUD_PROJECT).

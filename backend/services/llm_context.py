@@ -205,20 +205,48 @@ async def load_user_llm_keys(secrets_repo, user_id: str) -> None:
     set_user_hf_token(hf_token)
 
 async def check_user_budget(settings_repo, user_id: str) -> Optional[Dict[str, Any]]:
-    """Daily token-budget guardrail (audit §9: cost guardrails with a hard stop).
-
-    Returns the budget dict from context_manager.check_budget, or None when
-    budgeting is unavailable. `exceeded` means creation should be refused."""
+    """Daily token-budget guardrail (audit §9 / F08: cost guardrails with a
+    hard stop). Usage is read from the DURABLE ledger — shared across API and
+    worker processes and stable across restarts — combined with this
+    process's unsaved local total so a just-finished LLM call is still
+    counted. Store failures fail closed. `exceeded` refuses creation."""
     if not user_id:
         return None
+    from fastapi import HTTPException
     try:
         from backend.agents.context_manager import context_manager
+        from backend.repositories.usage_repository import get_durable_usage
         daily_limit = None
         if settings_repo:
             saved = await settings_repo.get_settings(user_id) or {}
             if saved.get("daily_token_limit") is not None:
                 daily_limit = int(saved["daily_token_limit"])
-        return context_manager.check_budget(user_id, daily_limit=daily_limit)
-    except Exception:
-        return None
+        budget = context_manager.check_budget(user_id, daily_limit=daily_limit)
+        durable = await get_durable_usage(user_id)
+        if durable > budget["used"]:
+            # Recompute against the durable total without double-counting
+            # this process's already-persisted spend.
+            limit = daily_limit if daily_limit is not None else _default_daily_limit()
+            used = durable
+            remaining = max(0, limit - used)
+            pct = (used / limit * 100) if limit > 0 else 100
+            budget = {
+                "used": used,
+                "limit": limit,
+                "remaining": remaining,
+                "percentage": round(pct, 1),
+                "exceeded": used >= limit,
+                "warning": pct >= 80,
+            }
+        return budget
+    except HTTPException:
+        raise
+    except Exception as exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Budget verification temporarily unavailable") from exc
+
+
+def _default_daily_limit() -> int:
+    from backend.config.settings import settings
+    return settings.DEFAULT_DAILY_TOKEN_LIMIT
 

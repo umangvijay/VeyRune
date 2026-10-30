@@ -166,6 +166,9 @@ class FirestoreWorkflowRepository(BaseWorkflowRepository):
             found = False
             for i, t in enumerate(tasks):
                 if isinstance(t, dict) and t.get("task_id") == task_id:
+                    if "attempt" in updates and int(updates["attempt"]) != int(t.get("attempt") or 0):
+                        from backend.models.exceptions import StaleTaskLeaseError
+                        raise StaleTaskLeaseError(f"Task {task_id} no longer belongs to this execution")
                     merged = dict(t)
                     merged.update(_as_dict(updates))
                     merged["task_id"] = task_id
@@ -213,10 +216,20 @@ class FirestoreWorkflowRepository(BaseWorkflowRepository):
             for i, t in enumerate(tasks):
                 if t.get("task_id") == task_id:
                     status = t.get("status")
-                    if status not in ["PENDING", "RETRYING", "WAITING"]:
+                    now = datetime.now(timezone.utc)
+                    expired = False
+                    if status == "RUNNING" and t.get("lease_expires_at"):
+                        expiry = t["lease_expires_at"]
+                        if isinstance(expiry, str):
+                            try:
+                                expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                            except ValueError:
+                                return False
+                        if isinstance(expiry, datetime) and expiry.tzinfo is not None:
+                            expired = expiry < now
+                    if status not in ["PENDING", "RETRYING", "WAITING"] and not expired:
                         return False
 
-                    now = datetime.now(timezone.utc)
                     t["status"] = "RUNNING"
                     t["lease_started_at"] = now.isoformat()
                     t["lease_expires_at"] = (now + timedelta(seconds=lease_seconds)).isoformat()

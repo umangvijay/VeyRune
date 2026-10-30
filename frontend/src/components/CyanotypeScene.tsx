@@ -248,6 +248,7 @@ function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: strin
   const ringsRef = useRef<THREE.Group>(null);
   const base = mode === "dark" ? "#0a2350" : "#8fb4e4";
   const glow = mode === "dark" ? "#5f9bff" : "#3e6bff";
+  const planetMaterial = useRef<THREE.ShaderMaterial>(null);
   const surfaceUniforms = useMemo(() => ({ base: { value: new THREE.Color(base) }, ink: { value: new THREE.Color(ink) }, time: { value: 0 } }), [base, ink]);
   const atmoUniforms = useMemo(() => ({ glow: { value: new THREE.Color(glow) } }), [glow]);
   useFrame(() => {
@@ -258,14 +259,14 @@ function Planet({ time, ink, mode }: { time: React.RefObject<number>; ink: strin
     }
     if (holder.current) holder.current.position.y = Math.sin(time.current * .5) * .06;
     if (ringsRef.current) ringsRef.current.rotation.z = Math.sin(time.current * .1) * .04;
-    surfaceUniforms.time.value = time.current;
+    if (planetMaterial.current) planetMaterial.current.uniforms.time.value = time.current;
   });
   return <group position={ORIGIN}>
     <group ref={holder}>
       <group ref={globe} rotation={[.12, 0, -.28]}>
         <mesh>
           <sphereGeometry args={[1.2, 64, 48]} />
-          <shaderMaterial vertexShader={PLANET_VERT} fragmentShader={PLANET_FRAG} uniforms={surfaceUniforms} />
+          <shaderMaterial ref={planetMaterial} vertexShader={PLANET_VERT} fragmentShader={PLANET_FRAG} uniforms={surfaceUniforms} />
         </mesh>
         <mesh scale={1.004}><sphereGeometry args={[1.2, 36, 24]} /><meshBasicMaterial color={ink} wireframe transparent opacity={.32} depthWrite={false} /></mesh>
         <group ref={ringsRef}>
@@ -290,13 +291,16 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
   // its own blueprints, visible in the scene.
   const [rev, setRev] = useState(0);
   const flash = useRef(0);
-  useEffect(() => {
-    const id = setInterval(() => setRev(r => r + 1), 40000 + index * 13000);
-    return () => clearInterval(id);
-  }, [index]);
+
   useEffect(() => { flash.current = 1; }, [rev]);
   const texture = useMemo(() => makeSheetTexture(mode, index + 2 + rev * 11, index === 0, rev), [mode, index, rev]);
   const model = useRef<THREE.Mesh>(null);
+  const formVertices = useMemo(() => {
+    const geometry = new THREE.IcosahedronGeometry(.7, 1);
+    const vertices = Float32Array.from(geometry.attributes.position.array);
+    geometry.dispose();
+    return vertices;
+  }, []);
   const material = useRef<THREE.ShaderMaterial>(null);
   const shader = useMemo(() => ({
     uniforms: { map: { value: texture }, progress: { value: .5 }, uFlash: { value: 0 } },
@@ -308,7 +312,7 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
         float woven = 1.0 - smoothstep(progress - .015, progress + .015, vUv.y);
         float needle = 1.0 - smoothstep(.0, .012, abs(vUv.y - progress));
         // Stitch dashes trail just behind the needle: the sheet is being sewn.
-        float row = smoothstep(.028, .0, abs(vUv.y - progress + .035));
+        float row = 1.0 - smoothstep(.0, .028, abs(vUv.y - progress + .035));
         float dash = step(.55, fract(vUv.x * 34.0));
         float stitches = row * dash * .5;
         vec3 ink = paper.rgb * (1.0 + uFlash * .8) + needle * .35 + stitches * paper.rgb * 1.6;
@@ -320,6 +324,8 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
   useEffect(() => () => texture.dispose(), [texture]);
   useFrame((_state, delta) => {
     const t = time.current;
+    const nextRevision = Math.floor(t / (40 + index * 13));
+    if (nextRevision !== rev) setRev(nextRevision);
     if (!surface.current) return;
     const positions = surface.current.geometry.attributes.position;
     const fold = (Math.sin(t * .38 + index * 1.7) + 1) / 2;
@@ -336,6 +342,17 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
       material.current.uniforms.uFlash.value = flash.current;
     }
     if (model.current) {
+      const vertices = model.current.geometry.attributes.position;
+      const morph = (Math.sin(t * .3 + index * 2) + 1) / 2;
+      for (let i = 0; i < vertices.count; i++) {
+        const x = formVertices[i * 3], y = formVertices[i * 3 + 1], z = formVertices[i * 3 + 2];
+        const sphere = .7 / Math.hypot(x, y, z);
+        const cube = .52 / Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
+        const scale = THREE.MathUtils.lerp(sphere, cube, morph);
+        vertices.setXYZ(i, x * scale, y * scale, z * scale);
+      }
+      vertices.needsUpdate = true;
+      model.current.geometry.computeBoundingSphere();
       model.current.rotation.y = t * .22;
       model.current.rotation.z = Math.sin(t * .25) * .15;
       model.current.scale.setScalar(.35 + fold * .5);
@@ -345,7 +362,7 @@ function WovenSheet({ spec, index, mode, time }: { spec: SheetSpec; index: numbe
   return <group position={[...spec.position]} rotation={[...spec.rotation]}>
     <mesh ref={surface}><planeGeometry args={[spec.size[0], spec.size[1], 32, 24]} /><shaderMaterial ref={material} args={[shader]} side={THREE.DoubleSide} transparent depthWrite={false} /></mesh>
     <mesh ref={model} position={[.3, .1, .9]}>
-      {index === 0 ? <icosahedronGeometry args={[.7, 0]} /> : index === 1 ? <boxGeometry args={[1, .8, .8]} /> : <octahedronGeometry args={[.7]} />}
+      <icosahedronGeometry args={[.7, 1]} />
       <meshBasicMaterial color={mode === "dark" ? "#b5eaff" : "#1e499c"} wireframe transparent opacity={.8} />
     </mesh>
   </group>;
@@ -413,12 +430,14 @@ function Thread({ target, index, strand, time, ink }: { target: readonly number[
   useEffect(() => () => { line.geometry.dispose(); (line.material as THREE.ShaderMaterial).dispose(); }, [line]);
   useFrame(() => {
     const t = time.current;
-    uniforms.uTime.value = t;
+    if (!thread.current) return;
     const heal = healPhase(t, index, strand);
-    uniforms.uStage.value = heal.stage;
-    uniforms.uK.value = heal.k;
+    thread.current.material.uniforms.uTime.value = t;
+    thread.current.material.uniforms.uStage.value = heal.stage;
+    thread.current.material.uniforms.uK.value = heal.k;
     const phase = t * .7 + index * 2 + strand * .5;
     const start = ORIGIN.clone().add(new THREE.Vector3(Math.cos(phase), Math.sin(phase) * .55, Math.sin(phase) * .7).normalize().multiplyScalar(1.23));
+    start.y += Math.sin(t * .5) * .06;
     const x = Math.sin(t * 2.4 + strand * 2.1) * SHEETS[index].size[0] * .46;
     const y = (weaveProgress(t, index) - .5) * SHEETS[index].size[1];
     const end = new THREE.Vector3(x, y, sheetDepth(x, y, t, index) + .025)
@@ -502,6 +521,9 @@ export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "over
   onStatus: (status: SceneStatus) => void; onWeave: (progress: number) => void; status: SceneStatus; zoom?: number; onZoom?: (zoom: number) => void;
 }) {
   const pointer = useRef({ x: 0, y: 0 });
+  const sceneElement = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef(zoom);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   const [visible, setVisible] = useState(true);
   const [lost, setLost] = useState(false);
   useEffect(() => {
@@ -512,17 +534,20 @@ export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "over
     return () => { window.removeEventListener("pointermove", move); document.removeEventListener("visibilitychange", visibility); };
   }, [reducedMotion]);
   useEffect(() => {
-    if (!onZoom) return;
-    const el = document.querySelector(".loom-scene");
+    if (!onZoom || status !== "ready") return;
+    const el = sceneElement.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
-      const next = Math.max(0.4, Math.min(2.8, zoom - e.deltaY * 0.0015));
+      const next = Math.max(0.4, Math.min(2.8, zoomRef.current - e.deltaY * 0.0015));
       onZoom(Number(next.toFixed(2)));
     };
     let pinchStart = 0;
+    let pinchZoom = 1;
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
+        pinchZoom = zoomRef.current;
         pinchStart = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY,
@@ -536,7 +561,7 @@ export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "over
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY,
         );
-        const next = Math.max(0.4, Math.min(2.8, zoom * (pinchStart / dist)));
+        const next = Math.max(0.4, Math.min(2.8, pinchZoom * (dist / pinchStart)));
         onZoom(Number(next.toFixed(2)));
       }
     };
@@ -545,15 +570,17 @@ export default function CyanotypeScene({ mode = "dark", tempo = 1, focus = "over
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
     return () => {
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [zoom, onZoom]);
+  }, [onZoom, status]);
 
-  return <div className="loom-scene" data-state={status} aria-hidden="true">
+  return <div ref={sceneElement} className="loom-scene" data-state={status} aria-hidden="true">
     <div className="scene-fallback" /><SceneIllustration />
     {!lost && <SceneBoundary onStatus={onStatus}><Canvas camera={{ position: [0, 1.2, 11], fov: 48 }} dpr={[1, 1.5]} frameloop={!visible ? "never" : tempo > 0 ? "always" : "demand"}
       fallback={<SceneUnavailable onStatus={onStatus} />}

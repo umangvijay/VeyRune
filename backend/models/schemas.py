@@ -108,6 +108,9 @@ class WorkflowRun(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     parent_run_id: Optional[str] = None
     thread_id: Optional[str] = None
+    # Explicit organization ownership (audit F01). None = personal run;
+    # membership alone never makes a run organization-owned.
+    org_id: Optional[str] = None
 
 class IntentSchema(GeminiCompatibleBaseModel):
     action: str = Field(description="The core action the user wants to perform")

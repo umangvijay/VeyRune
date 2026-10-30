@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { listCatalog, installFromCatalog, CatalogEntry } from "@/lib/api";
 
 export default function CatalogPage() {
@@ -11,22 +11,13 @@ export default function CatalogPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await listCatalog();
-      setEntries(res.integrations || []);
-      setError("");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load the catalog");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    listCatalog().then(res => { if (active) setEntries(res.integrations || []); })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : "Failed to load the catalog"); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const handleInstall = async (entry: CatalogEntry) => {
     setBusyId(entry.mcp_id);

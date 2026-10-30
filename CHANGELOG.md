@@ -1,5 +1,61 @@
 # Changelog
 
+## v5.0.0 — 2026-10-30
+
+### Audit remediation verified: F01–F16 + G01–G08 against the 30-Oct audit
+
+The full-stack audit (F01–F16 baseline + G01–G08 connector observations)
+was re-verified finding by finding against the current tree, with the
+gaps closed and every first-batch acceptance criterion encoded as an
+adversarial regression test. 253 backend + 26 frontend + 16 e2e green.
+
+**Security (F01–F04) — closed and proven.** New adversarial suite
+(`test_audit_security.py`, 8 tests): duplicate membership cannot mutate
+roles at the router OR repository (atomic create-only insert in both
+SQLite and Firestore); disabled accounts receive no tokens via password
+or Google login; a logged-out/revoked token is refused; a denylist
+outage fails CLOSED (503, never allow); demotion/disable takes effect
+immediately because authorization re-reads current account state rather
+than trusting JWT claims; organization oversight exposes only explicitly
+organization-owned runs — personal runs stay private before and after
+membership, and task payloads are sanitized. To make org-owned runs
+possible, `WorkflowRun.org_id` was added (SQLite column migration +
+model field; Firestore persists the payload).
+
+**Cloud correctness (F05/F06/F10) — verified closed.** `google-cloud-
+pubsub` is declared in requirements; Firestore `claim_task` reclaims
+RUNNING tasks with expired leases (fenced by attempt); Firestore user
+repository has transactional email-uniqueness registry, transactional
+failed-login counters, `set_user_active`, and honors
+`FIRESTORE_DATABASE_ID`.
+
+**Shared controls (F08) — implemented.** New durable usage ledger
+(`usage_ledger` table / `usage_ledger` collection, atomic increments in
+both backends, wired through the factory). Every LLM path records spend
+durably; the daily budget check reads the durable total so the cap
+survives restarts and holds across API/worker processes. Ledger failures
+are explicit (503), never a silent pass. (`test_usage_ledger.py`, 4
+tests.)
+
+**Verified already-closed in the working tree:** F09 (trusted-proxy
+parsing, bounded state, group quotas), F11 (single-flight refresh with
+Web-Lock cross-tab coordination + 204 handling), F12 (GIS script-src +
+frame-src + build-time client ID + clean disabled state), F13
+(blog/contact moved to durable backend content repo with typed bounds,
+rate limits, roles), F14 (sandbox: python3 handling, redacted logs,
+clear unsupported-runtime failure, host-execution prevention test), F15
+(dead-letter topics + quarantine subscriptions + bounded retries), G01
+(trust_tier lifecycle enforced at discovery AND execution, probe
+evidence bound to spec-hash + credential), G05 (cancellable build
+observation), F16 lint (0 errors / 0 warnings).
+
+**Still open (staged, per the audit's own sequencing):** G02 full
+per-operation authenticated test packs beyond the read probe; G03
+standalone MCP server packaging/deployment path; G06 spec-provenance
+labels; G07 unified durable build service; G08 resume provenance
+labels; release-operations drills (backup restore, rollback, load) which
+require the actual cloud deployment.
+
 ## v4.9.0 — 2026-10-28
 
 ### The loom heals itself; the ink gained a glint

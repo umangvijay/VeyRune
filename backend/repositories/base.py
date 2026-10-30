@@ -355,9 +355,14 @@ class BaseScheduleRepository(ABC):
 
 class BaseIdempotencyRepository(ABC):
     """
-    Exactly-once execution ledger.
+    Execution deduplication ledger; remote effects require provider reconciliation.
     Prevents duplicate tool calls in distributed/concurrent environments.
     """
+
+    @abstractmethod
+    async def commit_uncertain(self, key: str) -> None:
+        """Quarantine an ambiguous external outcome; ordinary retry must not release it."""
+        ...
 
     @abstractmethod
     async def commit_pause(self, key: str) -> None:

@@ -58,6 +58,15 @@ class BuildFromWebsiteRequest(BaseModel):
     notes: Optional[str] = None
 
 
+def _validated_operation_count(mcp, tools):
+    from backend.services.tool_validation import has_valid_read_probe
+    auth = mcp.get("auth") or {}
+    if isinstance(auth, str):
+        import json
+        auth = json.loads(auth)
+    return sum(has_valid_read_probe(t, mcp.get("spec_hash"), auth.get("credential_ref")) for t in tools)
+
+
 # ══════════════════════════════════════════════════════════════════
 #  LIST / GET
 # ══════════════════════════════════════════════════════════════════
@@ -81,6 +90,7 @@ async def list_integrations(
         # Get cached tool count
         tools = await factory.mcp_repo.get_cached_tools(mcp_id=mcp_id)
         mcp["tool_count"] = len(tools)
+        mcp["validated_tool_count"] = _validated_operation_count(mcp, tools)
         results.append(mcp)
 
     return {"integrations": results, "count": len(results)}
@@ -116,6 +126,7 @@ async def get_integration(
         **mcp,
         "tools": tools,
         "tool_count": len(tools),
+        "validated_tool_count": _validated_operation_count(mcp, tools),
         "circuit_breaker": breaker_status,
     }
 
@@ -287,17 +298,29 @@ async def test_integration(
         if transport == "internal":
             if not tools:
                 raise ValueError("No tools registered for this integration")
-            # Live probe: first GET tool with no required arguments
+            # Evidence belongs only to the selected operation, never all cached tools.
             probe = {"status": "skipped", "reason": "no parameterless GET tool"}
             for tool in tools:
                 op = tool.get("operation") or {}
                 required = (tool.get("input_schema") or {}).get("required") or []
                 if op.get("http_method") == "GET" and not required:
                     from backend.mcp.openapi_executor import execute_openapi_tool
+                    tool["operation"] = {k: v for k, v in op.items() if k != "_validation"}
+                    await factory.mcp_repo.cache_tools(mcp_id, tools)
                     result = await execute_openapi_tool(
                         mcp, tool, {}, user_id=user.user_id, secrets_repo=factory.secrets_repo,
                     )
-                    probe = {"status": "probed", "ok": result.get("ok"), "http_status": result.get("status")}
+                    probe = {"status": "probed", "ok": result.get("ok"), "http_status": result.get("status"), "tool_name": tool.get("tool_name")}
+                    if result.get("ok") is True:
+                        from backend.services.tool_validation import record_read_probe
+                        auth = mcp.get("auth") or {}
+                        if isinstance(auth, str):
+                            import json
+                            auth = json.loads(auth)
+                        tested = record_read_probe(tool, mcp.get("spec_hash"), auth.get("credential_ref"))
+                        tools = [tested if t.get("tool_name") == tool.get("tool_name") else t for t in tools]
+                        await factory.mcp_repo.cache_tools(mcp_id, tools)
+                        await factory.mcp_repo.register_mcp({**mcp, "trust_tier": "verified"})
                     break
             if probe.get("status") == "skipped":
                 return {"status": "untested", "tools_discovered": len(tools), "probe": probe}
@@ -309,6 +332,7 @@ async def test_integration(
             return {
                 "status": "healthy" if healthy else "unhealthy",
                 "tools_discovered": len(tools),
+                "validated_tool_count": _validated_operation_count(mcp, tools),
                 "probe": probe,
             }
 
@@ -319,6 +343,7 @@ async def test_integration(
         circuit_breaker.record_success(mcp_id)
         return {"status": "healthy", "tools_discovered": len(discovered) if discovered else 0}
     except Exception as e:
+        await factory.mcp_repo.set_mcp_enabled(mcp_id, False)
         await factory.mcp_repo.update_mcp_health(
             mcp_id, "UNHEALTHY", datetime.now(timezone.utc)
         )
@@ -356,6 +381,12 @@ async def set_credentials(
     from backend.security.secrets_vault import secrets_vault
     credential_ref = f"mcp:{mcp_id}:api_key"
     encrypted = secrets_vault.encrypt(api_key)
+    # Invalidate before replacing a credential at the same reference.
+    await factory.mcp_repo.set_mcp_enabled(mcp_id, False)
+    tools = await factory.mcp_repo.get_cached_tools(mcp_id=mcp_id)
+    for tool in tools:
+        tool["operation"] = {k: v for k, v in (tool.get("operation") or {}).items() if k != "_validation"}
+    await factory.mcp_repo.cache_tools(mcp_id, tools)
     await factory.secrets_repo.store_secret(user.user_id, credential_ref, encrypted)
 
     auth = mcp.get("auth") or {}
@@ -543,6 +574,17 @@ async def enable_integration(
     mcp = await factory.mcp_repo.get_mcp(mcp_id)
     if not mcp or (mcp.get("owner") not in (user.user_id, "system") and not user.is_admin()):
         raise HTTPException(status_code=404, detail="Integration not found")
+    if mcp.get("trust_tier") != "verified":
+        raise HTTPException(status_code=409, detail="Validate this connector revision before enabling it")
+    from backend.services.tool_validation import has_valid_read_probe
+    auth = mcp.get("auth") or {}
+    if isinstance(auth, str):
+        import json
+        auth = json.loads(auth)
+    if mcp.get("transport") == "internal":
+        tools = await factory.mcp_repo.get_cached_tools(mcp_id=mcp_id)
+        if not any(has_valid_read_probe(t, mcp.get("spec_hash"), auth.get("credential_ref")) for t in tools):
+            raise HTTPException(status_code=409, detail="No operation has current validation evidence; connect credentials and test first")
     await factory.mcp_repo.set_mcp_enabled(mcp_id, True)
     return {"mcp_id": mcp_id, "is_enabled": True}
 

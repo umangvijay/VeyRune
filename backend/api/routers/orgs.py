@@ -112,6 +112,8 @@ async def add_member(org_id: str, body: AddMemberRequest, request: Request, user
     factory, org, role = await _member_org(org_id, request, user, "admin")
     if body.role not in ASSIGNABLE_ROLES:
         raise HTTPException(status_code=422, detail=f"role must be one of {sorted(ASSIGNABLE_ROLES)}")
+    if body.role == "admin" and role != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner can appoint an admin")
     try:
         email = sanitize_email(body.email)
     except InputValidationError as e:
@@ -122,9 +124,11 @@ async def add_member(org_id: str, body: AddMemberRequest, request: Request, user
         raise HTTPException(status_code=404, detail="No user with that email exists")
     if target["id"] == org["owner_id"] and body.role != "owner":
         raise HTTPException(status_code=409, detail="The owner's role is fixed")
+    if await factory.org_repo.get_member_role(org_id, target["id"]) is not None:
+        raise HTTPException(status_code=409, detail="Already a member; use the owner-only role endpoint")
     ok = await factory.org_repo.add_member(org_id, target["id"], body.role, user.user_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="Organization not found")
+        raise HTTPException(status_code=409, detail="Membership could not be created; refresh and try again")
     await factory.audit_repo.log_event({
         "event_type": "ORG_MEMBER_ADDED",
         "actor_id": user.user_id, "actor_type": "USER",
@@ -182,8 +186,7 @@ async def org_run_oversight(
     user: AuthenticatedUser = Depends(get_current_user),
     limit: int = Query(20, ge=1, le=100),
 ):
-    """Read-only oversight of member runs for org admins/owners (the
-    enterprise oversight primitive; shared workspaces are a next step)."""
+    """Summarize explicitly organization-owned runs; membership is not sharing."""
     factory, org, role = await _member_org(org_id, request, user, "admin")
     members = await factory.org_repo.list_members(org_id)
     emails = {m.get("user_id"): m.get("email") for m in members}
@@ -198,6 +201,10 @@ async def org_run_oversight(
             continue
         for r in member_runs:
             r = dict(r)
+            # Legacy and personal runs have no organization ownership. Never
+            # infer sharing from membership, including newly added members.
+            if r.get("org_id") != org_id:
+                continue
             r["member_email"] = emails.get(r.get("user_id"))
             r["tasks"] = [
                 {k: t.get(k) for k in ("task_id", "title", "agent", "status", "error")}

@@ -10,7 +10,7 @@ test('completed thread handles null output and invalid event timestamp', async (
   const errors: string[] = [];
   page.on('pageerror',error => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem('agentos_auth',JSON.stringify({
-    accessToken:'test-only-token',refreshToken:null,user:{id:'test-user',email:'test@example.invalid',name:'Test',role:'user',is_active:true},
+    accessToken:'test-only-token',refreshToken:'test-only-refresh',user:{id:'test-user',email:'test@example.invalid',name:'Test',role:'user',is_active:true},
   })));
   await page.route('**/api/v1/**',async route => {
     const path=new URL(route.request().url()).pathname;

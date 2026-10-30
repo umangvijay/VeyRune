@@ -70,7 +70,8 @@ async def test_failure_requires_explicit_retry_and_success_is_preserved(ledger):
     guard = IdempotencyGuard(ledger)
     call = AsyncMock(side_effect=[RuntimeError('transient'), {'ok': True}])
     with pytest.raises(RuntimeError):
-        await guard.execute_once('wf', 'task', 'tool', {}, call)
+        # Only a call explicitly known to be safe to replay may be released by Retry.
+        await guard.execute_once('wf', 'task', 'tool', {}, call, retry_safe=True)
     assert (await guard.execute_once('wf', 'task', 'tool', {}, call)).blocked
     await ledger.reset_failed_task('wf', 'task')
     assert (await guard.execute_once('wf', 'task', 'tool', {}, call)).executed
@@ -399,7 +400,8 @@ async def test_failed_tool_result_is_not_cached_as_success(ledger):
     with pytest.raises(ToolRouterError, match='upstream unavailable'):
         await router.execute_tool_safe('unique-test-mcp__list', {}, {'user_id':'user','workflow_id':'wf','task_id':'task'})
     key = IdempotencyGuard.compute_key('wf','task','unique-test-mcp__list',{})
-    assert (await ledger.get_record(key))['status'] == 'failed'
+    # A remote error does not establish that a side effect did not occur.
+    assert (await ledger.get_record(key))['status'] == 'uncertain'
 
 @pytest.mark.asyncio
 async def test_schedule_creation_persists_tasks_atomically_and_deduplicates(tmp_path):
@@ -590,8 +592,11 @@ async def test_approval_persistence_failure_does_not_leave_task_waiting(monkeypa
 
     task = Task(task_id='send', workflow_id='wf', run_id='run', user_id='alice', agent='OrchestratorAgent')
     run = WorkflowRun(run_id='run', workflow_id='wf', user_id='alice', goal='send an email', tasks=[task])
+    claimed_run = run.model_dump(mode='json')
+    claimed_run['tasks'][0]['attempt'] = 1
+    claimed_run['tasks'][0]['status'] = 'RUNNING'
     repo = SimpleNamespace(
-        get_run=AsyncMock(return_value=run.model_dump(mode='json')),
+        get_run=AsyncMock(side_effect=[run.model_dump(mode='json'), claimed_run]),
         claim_task=AsyncMock(return_value=True),
         update_task=AsyncMock(),
         save_approval=AsyncMock(side_effect=OSError('database unavailable')),

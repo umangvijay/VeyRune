@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { getSettings, updateSettings, UserSettings, storeCredential, validateCredential, pingGemini, listAdminUsers, setUserActive, adminStats } from "@/lib/api";
 import ApiKeyManager from "@/components/ApiKeyManager";
 import TokenStatusCard from "@/components/TokenStatusCard";
-import { applyTheme, readThemePref, type ThemePref } from "@/lib/theme";
+import { applyTheme, type ThemePref } from "@/lib/theme";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {

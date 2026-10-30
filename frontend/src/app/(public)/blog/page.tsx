@@ -28,13 +28,16 @@ export default function BlogPage() {
   // Fetch blogs on mount
   useEffect(() => {
     fetch("/api/blogs")
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Posts are temporarily unavailable. Please try again later.");
+        return res.json();
+      })
       .then((data) => {
         setPosts(Array.isArray(data) && data.length ? data : []);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to load blogs", err);
+        setError(err instanceof Error ? err.message : "Could not load posts");
         setLoading(false);
       });
   }, []);
@@ -74,7 +77,7 @@ export default function BlogPage() {
     }
   };
 
-  const isGoogleUser = isAuthenticated && user?.auth_provider === "google";
+  const canPublish = isAuthenticated && ["admin", "super_admin"].includes(user?.role || "");
 
   return (
     <div className="mesh-gradient" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -93,9 +96,9 @@ export default function BlogPage() {
               </p>
             </div>
             
-            {/* The Google-Restricted Create Button */}
+            {/* Publishing is restricted to administrators */}
             <div>
-              {isGoogleUser ? (
+              {canPublish ? (
                 <button 
                   onClick={() => setIsModalOpen(true)}
                   className="btn btn-primary"
@@ -115,12 +118,13 @@ export default function BlogPage() {
                     </svg>
                     Create Post (Locked)
                   </button>
-                  <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Requires Google Auth</span>
+                  <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Administrator access required</span>
                 </div>
               )}
             </div>
           </div>
 
+          {error && !isModalOpen && <p role="alert" style={{ color: "var(--error)", marginBottom: 20 }}>{error}</p>}
           {/* Blog Grid (Block Content) */}
           {loading ? (
             <div style={{ display: "flex", justifyContent: "center", padding: 64 }}>
