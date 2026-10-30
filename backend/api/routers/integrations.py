@@ -127,6 +127,11 @@ async def get_integration(
         "tools": tools,
         "tool_count": len(tools),
         "validated_tool_count": _validated_operation_count(mcp, tools),
+        # Live evidence is per-credential: the stored build-time coverage is
+        # the builder's record; this count is what policy enforces now.
+        "spec_provenance": mcp.get("spec_provenance", "official_spec"),
+        "test_coverage": mcp.get("test_coverage") or {},
+        "capabilities_omitted": int(mcp.get("capabilities_omitted") or 0),
         "circuit_breaker": breaker_status,
     }
 
@@ -136,59 +141,15 @@ async def get_integration(
 # ══════════════════════════════════════════════════════════════════
 
 async def _start_build(factory, user_id: str, method: str, source: str, name: Optional[str], workflow_engine=None) -> dict:
-    """Persist MCP build as a normal workflow task so worker restarts cannot lose it."""
-    import uuid
-    from backend.models.schemas import Task, TaskStatus, WorkflowRun, TaskTriggerEvent
+    """Persist MCP build as a normal workflow task so worker restarts cannot lose it.
+    Routed through the shared durable build service (audit G07)."""
+    from backend.services.connector_build_service import ORIGIN_API, request_durable_build
 
-    build_id = str(uuid.uuid4())
-    await factory.mcp_repo.create_build({
-        "build_id": build_id,
-        "user_id": user_id,
-        "name": name or "",
-        "method": method,
-        "source": source[:2000],
-        "status": "queued",
-        "stage": "queued",
-    })
-
-    run_id = f"mcp-{build_id}"
-    workflow_id = f"wf-{build_id[:8]}"
-    goal = f"Build MCP integration {name or source[:160]}"
-    task = Task(
-        task_id="mcp-build", workflow_id=workflow_id, run_id=run_id,
-        user_id=user_id, agent="core.mcp_build", tool="mcp_build",
-        input_data={"method": method, "source": source, "name": name or "", "build_id": build_id, "intent": source[:4000]},
-        status=TaskStatus.PENDING, timeout_seconds=300, max_retries=2,
-        recovery_enabled=True,
+    result = await request_durable_build(
+        factory, user_id=user_id, method=method, source=source, name=name,
+        origin=ORIGIN_API, workflow_engine=workflow_engine,
     )
-    run = WorkflowRun(
-        run_id=run_id, workflow_id=workflow_id, user_id=user_id,
-        goal=goal, status=TaskStatus.RUNNING, tasks=[task], thread_id=run_id,
-    )
-    run_data = run.model_dump(mode="json")
-    run_data["tasks"] = [task.model_dump(mode="json")]
-    try:
-        await factory.workflow_repo.save_run(run_data)
-        if workflow_engine:
-            await workflow_engine.evaluate_dag(run_id)
-        else:
-            # Durable Pub/Sub in cloud; the in-process bus in local development.
-            await factory.message_bus.publish("agentos-workflow-events", TaskTriggerEvent(
-                workflow_id=workflow_id, run_id=run_id, task_id=task.task_id,
-            ))
-    except Exception as exc:
-        await factory.mcp_repo.update_build(build_id, {
-            "status": "error", "stage": "enqueue_failed",
-            "error": "Could not enqueue MCP build; retry the request.",
-        })
-        logger.exception("Could not enqueue MCP build %s", build_id)
-        raise HTTPException(status_code=503, detail="Could not queue MCP build") from exc
-    return {
-        "build_id": build_id,
-        "run_id": run_id,
-        "status": "queued",
-        "message": "MCP Factory build started. Poll /integrations/builds/{build_id} for progress.",
-    }
+    return {"message": "MCP Factory build started. Poll /integrations/builds/{build_id} for progress.", **result}
 
 
 @router.post("/build-from-spec", status_code=status.HTTP_202_ACCEPTED)
@@ -491,6 +452,8 @@ def _catalog_entry(mcp: dict, tools: list) -> dict:
         "description": mcp.get("description"),
         "source_type": mcp.get("source_type"),
         "trust_tier": mcp.get("trust_tier"),
+        "spec_provenance": mcp.get("spec_provenance", "official_spec"),
+        "test_coverage": mcp.get("test_coverage") or {},
         "spec_version": mcp.get("spec_version"),
         "updated_at": mcp.get("updated_at"),
         "tools": [{"name": t.get("tool_name"), "description": t.get("description")} for t in tools],

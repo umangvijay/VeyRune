@@ -113,8 +113,20 @@ def get_orchestrator_agent(tool_router=None, catalog_json: str = "[]", memory_re
                 method = "url"
             else:
                 method = "prompt"
+            # Audit G07: even the agent-initiated build gets ONE durable
+            # record — origin and the waiting parent run persist with it, so
+            # a restart mid-build leaves a recoverable trace and the stage
+            # logs land in the same place as API-initiated builds.
+            from backend.services.connector_build_service import ORIGIN_ORCHESTRATOR, track_inline_build
+            track = await track_inline_build(
+                tool_router.mcp_repo, user_id=user_id, method=method,
+                source=source, name=name, origin=ORIGIN_ORCHESTRATOR,
+                parent_run_id=(execution_context or {}).get("run_id"),
+            )
+            build_id = track["build_id"]
             result = await factory_agent.run_build(
                 user_id=user_id, method=method, source=source, name=name,
+                build_id=build_id,
             )
             # MCPFactoryAgent deliberately returns a status object so the API can
             # persist build diagnostics. At the agent-tool boundary, however, a

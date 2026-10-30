@@ -61,6 +61,12 @@ class JobDescription(BaseModel):
 
 class ATSScore(BaseModel):
     overall_score: float = Field(description="Score from 0.0 to 100.0")
+    # Audit G08: this number is Sandtable's matching heuristic — weighted
+    # skill/keyword/experience/education/completeness arithmetic — NOT a
+    # guarantee of acceptance by any applicant-tracking system.
+    score_kind: str = "heuristic"
+    score_note: str = ("Weighted keyword/skill match heuristic produced by Sandtable. "
+                       "It does not predict ATS acceptance or employment outcomes.")
     skill_match_score: float
     keyword_match_score: float
     experience_match_score: float

@@ -246,6 +246,9 @@ CREATE TABLE IF NOT EXISTS mcp_builds (
     mcp_id TEXT,
     tools_json TEXT NOT NULL DEFAULT '[]',
     error TEXT,
+    origin TEXT,
+    parent_run_id TEXT,
+    wait_reason TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -470,6 +473,7 @@ class DatabaseManager:
         await self._migrate_mcp_columns()
         await self._migrate_workflow_thread_columns()
         await self._migrate_task_columns()
+        await self._migrate_mcp_build_columns()
         await self._connection.commit()
         logger.info("Database schema migration complete")
 
@@ -513,6 +517,15 @@ class DatabaseManager:
         await self._connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_runs_org ON workflow_runs(org_id)"
         )
+
+    async def _migrate_mcp_build_columns(self) -> None:
+        cursor = await self._connection.execute("PRAGMA table_info(mcp_builds)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        # Build provenance (audit G07): which surface asked for the build and
+        # which run is waiting on it.
+        for column in ("origin", "parent_run_id", "wait_reason"):
+            if column not in cols:
+                await self._connection.execute(f"ALTER TABLE mcp_builds ADD COLUMN {column} TEXT")
 
     async def _migrate_task_columns(self) -> None:
         cursor = await self._connection.execute("PRAGMA table_info(tasks)")

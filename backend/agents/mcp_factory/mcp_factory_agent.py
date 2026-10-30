@@ -130,8 +130,17 @@ class MCPFactoryAgent:
                     return {"status": "success", "reused": True, "mcp_id": mcp_id, "tools": summaries,
                             "message": f"Reusing {existing.get('name') or display_name}", "name": existing.get("name") or display_name}
 
-            await self._log(build_id, f"Generating tool schemas ({min(len(model.operations), 30)} ops)", logs)
-            tools = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent)
+            # Spec provenance (audit G06): where the operation definitions
+            # came from determines the trust ceiling — an inferred sketch can
+            # never earn the verified tier, whatever a probe says.
+            spec_provenance = {
+                "url": "official_spec", "spec": "official_spec", "openapi": "official_spec",
+                "docs": "extracted_docs", "prompt": "inferred_description",
+            }.get(method, "official_spec")
+            total_operations = len(model.operations)
+            await self._log(build_id, f"Generating tool schemas ({min(total_operations, 30)} ops)", logs)
+            tools = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent,
+                                             spec_provenance=spec_provenance)
             if not tools:
                 raise ValueError("Schema generator produced no tools")
 
@@ -176,7 +185,8 @@ class MCPFactoryAgent:
                             spec_hash = healed_hash
                             spec_version = str(model.info.get("version") or "1.0.0")
                             mcp_id = hashlib.sha256(f"{user_id}:{spec_hash}".encode("utf-8")).hexdigest()[:16]
-                            tools = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent)
+                            tools = self.schema_gen.generate(model, mcp_id, spec_version, intent=intent,
+                                                             spec_provenance=spec_provenance)
                             probe = {"status": "skipped", "reason": "regenerated spec"}
                             for candidate in tools:
                                 if (candidate.operation or {}).get("http_method") == "GET" and not candidate.input_schema.get("required"):
@@ -189,6 +199,19 @@ class MCPFactoryAgent:
             trust_tier = "verified" if method in ("url", "spec", "openapi") and probe.get("ok") is True else "pending_review"
             # A registered definition is not executable until its operation evidence passes policy.
             auto_enable = trust_tier == "verified"
+
+            # Per-operation test coverage (audit G02): the probe proves exactly
+            # one operation; everything else is explicitly untested.
+            from backend.services.tool_validation import coverage_from_tools
+            test_coverage = coverage_from_tools(tools)
+            capabilities_omitted = max(0, total_operations - len(tools))
+            await self._log(
+                build_id,
+                f"Coverage: {test_coverage['read_probe_passed']}/{test_coverage['total']} operations "
+                f"probe-tested ({test_coverage['mutating_untested']} untested writes); "
+                f"provenance={spec_provenance}; {capabilities_omitted} capability(ies) not selected",
+                logs,
+            )
             # Prefer the spec's own security scheme placement; fall back to the requested auth_type.
             auth_meta = auth_metadata_from_spec(model, fallback_type=auth_type)
 
@@ -207,6 +230,9 @@ class MCPFactoryAgent:
                 auth=auth_meta,
                 is_enabled=auto_enable,
                 mcp_id=mcp_id,
+                spec_provenance=spec_provenance,
+                test_coverage=test_coverage,
+                capabilities_omitted=capabilities_omitted,
             )
 
             tool_summaries = [{"name": t.tool_name, "description": t.description} for t in tools]

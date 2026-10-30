@@ -26,6 +26,9 @@ class ToolRegistryManager:
         auth: Optional[Dict[str, Any]] = None,
         is_enabled: bool = False,
         mcp_id: Optional[str] = None,
+        spec_provenance: str = "official_spec",
+        test_coverage: Optional[Dict[str, Any]] = None,
+        capabilities_omitted: int = 0,
     ) -> str:
         mcp_id = mcp_id or str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -56,6 +59,9 @@ class ToolRegistryManager:
             "trust_tier": trust_tier,
             "source_type": source_type,
             "spec_json": spec_json,
+            "spec_provenance": spec_provenance,
+            "test_coverage": test_coverage or {},
+            "capabilities_omitted": capabilities_omitted,
         })
         await self.mcp_repo.cache_tools(mcp_id, tools_payload)
         if callable(getattr(self.mcp_repo, "save_revision", None)):

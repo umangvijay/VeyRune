@@ -37,6 +37,37 @@ def _as_resume(source: Union[str, dict, Resume]) -> Resume:
     raise ResumeBuilderError("Resume text must be parsed first")
 
 
+def verify_resume_provenance(source_text: str, resume: dict) -> dict:
+    """Deterministic grounding check (audit G08): every employer, institution
+    and degree the model produced must literally appear in the source text.
+    The model is instructed not to invent facts; this check makes any
+    invention visible instead of trusting the instruction."""
+    source = (source_text or "").casefold()
+    source_norm = " ".join(source.split())
+
+    def grounded(value: str) -> bool:
+        if not str(value or "").strip():
+            return True  # absent fields are not inventions
+        needle = " ".join(str(value).casefold().split())
+        return needle in source_norm or needle in source
+
+    unverified: list = []
+    verified: list = []
+    for item in resume.get("experience") or []:
+        name = str(item.get("company") or "").strip()
+        if not name:
+            continue
+        (verified if grounded(name) else unverified).append({"kind": "employer", "value": name})
+    for item in resume.get("education") or []:
+        for key, kind in (("institution", "institution"), ("degree", "degree")):
+            value = str(item.get(key) or "").strip()
+            if not value:
+                continue
+            (verified if grounded(value) else unverified).append({"kind": kind, "value": value})
+    return {"verified": verified, "unverified": unverified,
+            "needs_review": bool(unverified)}
+
+
 async def parse_resume_from_text(profile_text: str) -> Resume:
     """Convert a CV / notes dump into a structured Resume. Never invent employers."""
     if not (profile_text or "").strip():
@@ -82,6 +113,7 @@ async def create_and_score(
     result: Dict[str, Any] = {
         "resume": resume.model_dump(mode="json"),
         "html": renderer.render_html(resume),
+        "provenance": verify_resume_provenance(profile_text, resume.model_dump(mode="json")),
     }
     if not job_description.strip():
         return result

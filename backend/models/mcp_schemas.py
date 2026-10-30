@@ -69,6 +69,14 @@ class MCPManifest(BaseModel):
     description: str = ""
     trust_tier: str = "pending_review"
     source_type: str = "openapi"
+    # Audit G06: where the operation definitions came from. official_spec |
+    # extracted_docs | inferred_description. The provenance is the trust
+    # ceiling: inferred sketches never reach the verified tier.
+    spec_provenance: str = "official_spec"
+    # Audit G02: per-operation test coverage summary. A passing probe is
+    # evidence for exactly one operation.
+    test_coverage: Dict[str, Any] = {}
+    capabilities_omitted: int = 0
     spec_json: Optional[str] = None
     owner: str = "system"
     is_enabled: bool = True

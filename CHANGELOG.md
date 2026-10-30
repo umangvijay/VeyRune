@@ -1,5 +1,48 @@
 # Changelog
 
+## v5.1.0 — 2026-10-30
+
+### Audit stage 4+: connector evidence, provenance, and one durable build path
+
+**G02 — per-operation test evidence.** Every generated operation is now
+stamped with explicit validation evidence ("not run") at generation; a
+passing probe upgrades exactly one operation, and a coverage summary
+(total / read_probe_passed / untested / mutating_untested) is computed at
+build time, logged, persisted on the manifest, and surfaced in catalog,
+integration-detail responses. Untested operations cannot inherit the
+verified badge — ToolPolicy denies them per operation (test: an
+integration with ten operations and one passing probe reports exactly
+that coverage).
+
+**G06 — spec provenance is the trust ceiling.** Operations carry
+`spec_provenance` (official_spec / extracted_docs / inferred_description)
+stamped at generation and preserved through probes. The build's trust
+tier keys on the SOURCE: url/spec/openapi can earn verified;
+docs/prompt stay pending_review however good the probe looks. Manifest
+fields `spec_provenance`, `test_coverage`, `capabilities_omitted` are
+backward-compatible defaults on old records. Tests
+(`test_connector_coverage.py`, 7).
+
+**G07 — one durable build path.** New shared
+`connector_build_service`: the API entry point delegates to it
+(record + workflow task + dispatch, origin=api), and the orchestrator's
+`build_integration` now creates the same durable record with
+origin=orchestrator and the waiting parent run before running the
+factory inline with the build_id — stage logs and outcomes land in the
+same durable place and a restart mid-build leaves a recoverable trace.
+`mcp_builds` gained origin / parent_run_id / wait_reason columns
+(SQLite migration; Firestore stores the full payload). Tests
+(`test_connector_build_service.py`, 3).
+
+**G08 — resume provenance.** New deterministic grounding check
+(`verify_resume_provenance`): every employer, institution and degree the
+model produced must literally appear in the source text; anything else
+is flagged `needs_review` in the build result. The ATS score now labels
+itself: `score_kind: "heuristic"` with an explicit note that it does not
+predict ATS acceptance or employment outcomes.
+
+263 backend + 26 frontend + 16 e2e green; ESLint clean.
+
 ## v5.0.0 — 2026-10-30
 
 ### Audit remediation verified: F01–F16 + G01–G08 against the 30-Oct audit
