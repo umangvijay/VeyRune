@@ -62,6 +62,10 @@ class ToolRegistryManager:
             "spec_provenance": spec_provenance,
             "test_coverage": test_coverage or {},
             "capabilities_omitted": capabilities_omitted,
+            # Audit G03: the factory's product is the declarative adapter.
+            # Standalone servers are an explicit export action, never the
+            # default build output.
+            "artifact_type": "adapter",
         })
         await self.mcp_repo.cache_tools(mcp_id, tools_payload)
         if callable(getattr(self.mcp_repo, "save_revision", None)):

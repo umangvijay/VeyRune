@@ -1,5 +1,35 @@
 # Changelog
 
+## v5.2.0 — 2026-10-30
+
+### Audit closure: explicit artifact products + release evidence packet
+
+**G03 — explicit artifact products.** The connector product boundary the
+audit required is now concrete: `artifact_type` on every manifest, with
+**adapter** (declarative mapping, the default and only auto-activated
+product) distinct from **standalone_server** (an explicit export
+package). Packaging produces an immutable, content-addressed artifact —
+versioned source, dependency lock, per-tool schemas — that ALWAYS ships
+`deployable: false`; `mark_deployable` refuses unless initialize,
+tools/list AND tools/call protocol tests have all passed on the exact
+artifact (hash-bound). Nothing in the build pipeline calls packaging
+automatically. 5 tests (`test_standalone_packaging.py`).
+
+**F16 — hermetic tests verified.** The three OpenAPI tests the audit saw
+fail on petstore3.swagger.io DNS already run through a deterministic
+`getaddrinfo` stub — 6/6 pass fully offline; the audit's flaky-network
+class is retired.
+
+**Release evidence packet.** `docs/RELEASE_EVIDENCE.md` now tracks every
+audit evidence requirement with its honest status: verified (local)
+with the exact regression file, or pending with the reason (deployment,
+provider accounts, or independent review). Includes the full F01–F16 +
+G01–G08 change ledger. The packet's claim is explicit: repository-level
+remediation is complete and tested; the release verdict beyond local
+evidence is unchanged until deployment-stage items are demonstrated.
+
+268 backend + 26 frontend + 16 e2e green.
+
 ## v5.1.0 — 2026-10-30
 
 ### Audit stage 4+: connector evidence, provenance, and one durable build path
