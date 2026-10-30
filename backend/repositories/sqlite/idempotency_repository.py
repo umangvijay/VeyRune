@@ -98,6 +98,48 @@ class SQLiteIdempotencyRepository(BaseIdempotencyRepository):
         )
         await self.db.commit()
 
+    async def sweep_stale_running(self, older_than_seconds: int = 1800) -> int:
+        """Quarantine ledger entries stuck in 'running' past the threshold.
+
+        A worker crash between claim and commit leaves 'running' forever.
+        We do NOT know whether the external effect happened, so the stale
+        entry becomes 'uncertain' (audit F07) — never 'failed', which would
+        invite a blind replay of an irreversible action."""
+        cutoff = (datetime.now(timezone.utc).isoformat())
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=older_than_seconds)).isoformat()
+        cursor = await self.db.execute(
+            """
+            UPDATE idempotency_ledger SET status = 'uncertain', updated_at = ?
+            WHERE status = 'running' AND updated_at < ?
+            """,
+            (datetime.now(timezone.utc).isoformat(), cutoff),
+        )
+        await self.db.commit()
+        return cursor.rowcount or 0
+
+    async def reconcile_uncertain(self, key: str, outcome: str, result_payload: Optional[str] = None) -> None:
+        """Deliberate resolution of an uncertain outcome (operator or provider
+        receipt check). Only 'uncertain' entries are reconcilable; anything
+        else refuses rather than rewriting history."""
+        if outcome not in ("completed", "failed"):
+            raise ValueError("outcome must be 'completed' or 'failed'")
+        record = await self.get_record(key)
+        if not record or record.get("status") != "uncertain":
+            raise ValueError("Only 'uncertain' ledger entries can be reconciled")
+        now = datetime.now(timezone.utc).isoformat()
+        if outcome == "completed":
+            await self.db.execute(
+                "UPDATE idempotency_ledger SET status = 'completed', result_payload = ?, updated_at = ? WHERE idempotency_key = ?",
+                (result_payload or "{}", now, key),
+            )
+        else:
+            await self.db.execute(
+                "UPDATE idempotency_ledger SET status = 'failed', updated_at = ? WHERE idempotency_key = ?",
+                (now, key),
+            )
+        await self.db.commit()
+
     async def reset_failed_task(self, workflow_id: str, task_id: str) -> None:
         # Explicit retries release only failures, never completed effects or live locks.
         await self.db.execute(

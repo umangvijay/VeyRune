@@ -1,5 +1,35 @@
 # Changelog
 
+## v5.3.0 — 2026-10-30
+
+### Audit: uncertain-outcome reconciliation + accepted invitations
+
+**F07 — no blind replay of irreversible actions, completed.** The
+idempotency ledger gained the two remaining mechanics: a worker
+housekeeping **sweep** quarantines crash-orphaned `running` entries as
+`uncertain` (never `failed` — the external outcome is unknown), and
+`reconcile_uncertain` lets an operator or provider receipt resolve an
+entry to completed (zero-cost replay safe) or failed (retry needs a new
+key). Both SQLite and Firestore implement them; replay of uncertain
+entries stays blocked with an explicit message. 6 tests
+(`test_uncertain_reconciliation.py`), including "the guarded action must
+not execute again".
+
+**F01 — membership now requires acceptance.** Full invitation lifecycle:
+POST /orgs/{id}/invitations issues a one-time token (only its hash is
+stored; listed invitations never expose it), the invited user accepts via
+POST /orgs/invitations/accept, and membership is created atomically with
+the create-only invariant. Email-matched to the accepting account;
+expiry, revocation, single-use, and one-pending-per-email (an admin
+cannot silently upgrade a pending invite) are all enforced. Both SQLite
+and Firestore sidecars implement the parity contract. The orgs UI now
+issues one-time tokens instead of silently adding members. 5 tests
+(`test_org_invitations.py`), e2e updated to the invitation flow
+(anti-enumeration asserted: unknown emails still receive invites, no
+user-existence leak).
+
+279 backend + 26 frontend + 16 e2e green.
+
 ## v5.2.0 — 2026-10-30
 
 ### Audit closure: explicit artifact products + release evidence packet

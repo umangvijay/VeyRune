@@ -73,6 +73,80 @@ class SQLiteOrgRepository(BaseOrgRepository):
         )
         return [dict(r) for r in rows]
 
+    # ── Invitation lifecycle (audit F01): membership requires acceptance ──
+
+    async def create_invitation(self, org_id: str, email: str, role: str, invited_by: str, token_hash: str, expires_at: str) -> Dict[str, Any]:
+        invitation_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        # One pending invitation per (org, email): a duplicate would let an
+        # admin silently upgrade a pending invite's role.
+        cursor = await self.db.execute(
+            """
+            INSERT INTO org_invitations (invitation_id, org_id, email, role, invited_by, token_hash, status, created_at, expires_at)
+            SELECT ?, ?, ?, ?, ?, ?, 'pending', ?, ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM org_invitations
+                WHERE org_id = ? AND email = ? AND status = 'pending'
+            )
+            """,
+            (invitation_id, org_id, email, role, invited_by, token_hash, now, expires_at, org_id, email),
+        )
+        await self.db.commit()
+        if cursor.rowcount == 0:
+            return {}
+        return {"invitation_id": invitation_id, "org_id": org_id, "email": email, "role": role,
+                "invited_by": invited_by, "expires_at": expires_at}
+
+    async def list_invitations(self, org_id: str, status: str = "pending") -> List[Dict[str, Any]]:
+        rows = await self.db.fetch_all(
+            "SELECT invitation_id, org_id, email, role, invited_by, status, created_at, expires_at FROM org_invitations WHERE org_id = ? AND status = ? ORDER BY created_at DESC",
+            (org_id, status),
+        )
+        return [dict(r) for r in rows]
+
+    async def accept_invitation(self, token_hash: str, user_id: str, email: str) -> Dict[str, Any]:
+        """Atomically accept a pending invitation: email must match the
+        invited address, the invite must be unexpired, and membership
+        creation keeps the create-only invariant. Returns the membership
+        role, or raises ValueError with the reason."""
+        now = datetime.now(timezone.utc)
+        row = await self.db.fetch_one(
+            "SELECT * FROM org_invitations WHERE token_hash = ? AND status = 'pending'",
+            (token_hash,),
+        )
+        if not row:
+            raise ValueError("Invitation not found or already used")
+        if row["email"].casefold() != str(email).casefold():
+            raise ValueError("This invitation was issued to a different email address")
+        if datetime.fromisoformat(row["expires_at"]) < now:
+            await self.db.execute("UPDATE org_invitations SET status = 'expired' WHERE invitation_id = ?", (row["invitation_id"],))
+            await self.db.commit()
+            raise ValueError("This invitation has expired")
+        cursor = await self.db.execute(
+            """
+            INSERT INTO org_members (org_id, user_id, role, added_at, added_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(org_id, user_id) DO NOTHING
+            """,
+            (row["org_id"], user_id, row["role"], now.isoformat(), row["invited_by"]),
+        )
+        await self.db.execute(
+            "UPDATE org_invitations SET status = 'accepted', accepted_at = ?, accepted_by = ? WHERE invitation_id = ?",
+            (now.isoformat(), user_id, row["invitation_id"]),
+        )
+        await self.db.commit()
+        if cursor.rowcount == 0:
+            raise ValueError("Already a member of this organization")
+        return {"org_id": row["org_id"], "role": row["role"]}
+
+    async def revoke_invitation(self, org_id: str, invitation_id: str) -> bool:
+        cursor = await self.db.execute(
+            "UPDATE org_invitations SET status = 'revoked' WHERE invitation_id = ? AND org_id = ? AND status = 'pending'",
+            (invitation_id, org_id),
+        )
+        await self.db.commit()
+        return (cursor.rowcount or 0) > 0
+
     async def add_member(self, org_id: str, user_id: str, role: str, added_by: str) -> bool:
         if await self.get_org(org_id) is None:
             return False

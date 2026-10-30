@@ -2,8 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
-  createOrg, listMyOrgs, getOrg, addOrgMember, removeOrgMember,
-  setOrgMemberRole, deleteOrg, getOrgRuns, OrgRow, OrgMember, OrgRunRow,
+  createOrg, listMyOrgs, getOrg, removeOrgMember,
+  setOrgMemberRole, deleteOrg, getOrgRuns, inviteOrgMember,
+  OrgRow, OrgMember, OrgRunRow,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -24,6 +25,7 @@ export default function OrgsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [lastToken, setLastToken] = useState("");
 
   const loadOrgs = useCallback(async () => {
     try {
@@ -73,18 +75,21 @@ export default function OrgsPage() {
     }
   };
 
+  // Invitations (audit F01): membership requires the invitee's acceptance —
+  // adding someone never silently attaches them (or their history) to the org.
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
     if (!selected) return;
-    setBusy(true); setError(""); setInfo("");
+    setBusy(true); setError(""); setInfo(""); setLastToken("");
     try {
-      await addOrgMember(selected.org_id, email.trim(), role);
-      setInfo(`Member added with the ${role} role.`);
+      const invite = await inviteOrgMember(selected.org_id, email.trim(), role);
+      setLastToken(invite.token);
+      setInfo(`Invitation created for ${invite.email} (${invite.role}). The token below is shown once — share it with them to accept.`);
       setEmail("");
       const detail = await getOrg(selected.org_id);
       setMembers(detail.members || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not add the member");
+      setError(err instanceof Error ? err.message : "Could not create the invitation");
     } finally {
       setBusy(false);
     }
@@ -208,8 +213,17 @@ export default function OrgsPage() {
                     <option value="member">member</option>
                     <option value="viewer">viewer</option>
                   </select>
-                  <button type="submit" className="btn btn-primary" disabled={busy}>Add member</button>
+                  <button type="submit" className="btn btn-primary" disabled={busy}>Invite</button>
                 </form>
+              )}
+              {isAdmin && lastToken && (
+                <div className="glass-panel" style={{ padding: 12, marginBottom: 16, border: "1px solid var(--accent)" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>Invitation token — shown once, copy now:</p>
+                  <code style={{ fontSize: 11, wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>{lastToken}</code>
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-tertiary)" }}>
+                    The invitee signs in and accepts at Settings → Organizations (or POST /orgs/invitations/accept). Membership activates only on acceptance.
+                  </p>
+                </div>
               )}
 
               <div style={{ overflowX: "auto" }}>

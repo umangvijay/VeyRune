@@ -255,6 +255,25 @@ CREATE TABLE IF NOT EXISTS mcp_builds (
 
 CREATE INDEX IF NOT EXISTS idx_mcp_builds_user ON mcp_builds(user_id, created_at);
 
+-- ── Organization invitations (audit F01) ─────────────────────────
+-- Membership requires ACCEPTANCE. The token is stored hashed; the raw
+-- token is returned exactly once to the inviter.
+CREATE TABLE IF NOT EXISTS org_invitations (
+    invitation_id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    invited_by TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    accepted_at TEXT,
+    accepted_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_org_invitations_org ON org_invitations(org_id, status);
+CREATE INDEX IF NOT EXISTS idx_org_invitations_token ON org_invitations(token_hash);
+
 -- ── MCP Tool Cache ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mcp_tools (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

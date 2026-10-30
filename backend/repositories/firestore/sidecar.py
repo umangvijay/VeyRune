@@ -429,6 +429,69 @@ class FirestoreOrgRepository(BaseOrgRepository):
             out.append(m)
         return out
 
+    # ── Invitation lifecycle (audit F01) — Firestore parity ──
+
+    async def create_invitation(self, org_id: str, email: str, role: str, invited_by: str, token_hash: str, expires_at: str) -> Dict[str, Any]:
+        db = await _db()
+        invitation_id = str(uuid.uuid4())
+        pending = db.collection("org_invitations").where("org_id", "==", org_id).where("email", "==", email).where("status", "==", "pending").limit(1)
+        existing = [doc async for doc in pending.stream()]
+        if existing:
+            return {}
+        payload = {"invitation_id": invitation_id, "org_id": org_id, "email": email, "role": role,
+                   "invited_by": invited_by, "token_hash": token_hash, "status": "pending",
+                   "created_at": _now(), "expires_at": expires_at}
+        await db.collection("org_invitations").document(invitation_id).create(payload)
+        return {k: v for k, v in payload.items() if k != "token_hash"}
+
+    async def list_invitations(self, org_id: str, status: str = "pending") -> List[Dict[str, Any]]:
+        db = await _db()
+        query = db.collection("org_invitations").where("org_id", "==", org_id).where("status", "==", status)
+        out = []
+        async for snap in query.stream():
+            data = snap.to_dict() or {}
+            data.pop("token_hash", None)
+            out.append(data)
+        return out
+
+    async def accept_invitation(self, token_hash: str, user_id: str, email: str) -> Dict[str, Any]:
+        db = await _db()
+        query = db.collection("org_invitations").where("token_hash", "==", token_hash).where("status", "==", "pending").limit(1)
+        matches = [doc async for doc in query.stream()]
+        if not matches:
+            raise ValueError("Invitation not found or already used")
+        snap = matches[0]
+        data = snap.to_dict() or {}
+        if str(data.get("email") or "").casefold() != str(email).casefold():
+            raise ValueError("This invitation was issued to a different email address")
+        if datetime.fromisoformat(str(data["expires_at"]).replace("Z", "+00:00")) < datetime.now(timezone.utc):
+            await snap.reference.update({"status": "expired"})
+            raise ValueError("This invitation has expired")
+        # Create-only membership, mirroring add_member's AlreadyExists guard.
+        created = False
+        try:
+            await db.collection("org_members").document(f"{data['org_id']}_{user_id}").create(
+                {"org_id": data["org_id"], "user_id": user_id, "role": data["role"],
+                 "added_at": _now(), "added_by": data.get("invited_by")}
+            )
+            created = True
+        except AlreadyExists:
+            created = False
+        await snap.reference.update({"status": "accepted", "accepted_at": _now(), "accepted_by": user_id})
+        if not created:
+            raise ValueError("Already a member of this organization")
+        return {"org_id": data["org_id"], "role": data["role"]}
+
+    async def revoke_invitation(self, org_id: str, invitation_id: str) -> bool:
+        db = await _db()
+        ref = db.collection("org_invitations").document(invitation_id)
+        snap = await ref.get()
+        data = snap.to_dict() or {}
+        if not snap.exists or data.get("org_id") != org_id or data.get("status") != "pending":
+            return False
+        await ref.update({"status": "revoked"})
+        return True
+
     async def add_member(self, org_id: str, user_id: str, role: str, added_by: str) -> bool:
         if await self.get_org(org_id) is None:
             return False

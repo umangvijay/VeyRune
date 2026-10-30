@@ -20,6 +20,7 @@ const members = [
 test.describe('Organizations', () => {
   test('creates an org, adds a member by email, enforces owner protection, shows oversight', async ({ page }) => {
     const state = { members: [...members] };
+    let invitationCount = 0;
     await page.addInitScript(authInit);
     await page.route('**/api/v1/**', async route => {
       const path = new URL(route.request().url()).pathname;
@@ -36,14 +37,12 @@ test.describe('Organizations', () => {
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ...org, members: state.members }) });
         return;
       }
-      if (path.endsWith('/org-1/members') && method === 'POST') {
+      if (path.endsWith('/org-1/invitations') && method === 'POST') {
         const body = route.request().postDataJSON() as { email: string; role: string };
-        if (body.email === 'ghost@nowhere.com') {
-          await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'No user with that email exists' }) });
-          return;
-        }
-        state.members.push({ user_id: `u-${body.email}`, role: body.role, email: body.email, name: body.email.split("@")[0] });
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ org_id: 'org-1', user_id: `u-${body.email}`, role: body.role }) });
+        // Invitations are anti-enumeration: unknown emails still receive a
+        // pending invite; membership is created on ACCEPTANCE, not here.
+        invitationCount += 1;
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ invitation_id: `inv-${invitationCount}`, org_id: 'org-1', email: body.email, role: body.role, expires_at: '2026-11-06T00:00:00Z', token: `one-time-token-${invitationCount}` }) });
         return;
       }
       if (path === '/api/v1/orgs/org-1/members/owner-1' && method === 'DELETE') {
@@ -75,15 +74,17 @@ test.describe('Organizations', () => {
     await expect(page.getByText(/Organization "Acme Corp" created/)).toBeVisible();
     await expect(page.getByText('owner@example.com').first()).toBeVisible();
 
-    // Add a member by email
+    // Invite a member by email — membership activates on ACCEPTANCE
     await page.getByPlaceholder('teammate@company.com').fill('new@company.com');
-    await page.getByRole('button', { name: 'Add member' }).click();
-    await expect(page.getByText('new@company.com').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Invite' }).click();
+    await expect(page.getByText(/Invitation token — shown once/)).toBeVisible();
+    await expect(page.getByText('one-time-token-1')).toBeVisible();
 
-    // Anti-enumeration surfaces the 404 message
+    // Anti-enumeration: unknown emails receive an invitation too (no user
+    // existence leak), with its own one-time token.
     await page.getByPlaceholder('teammate@company.com').fill('ghost@nowhere.com');
-    await page.getByRole('button', { name: 'Add member' }).click();
-    await expect(page.getByText('No user with that email exists')).toBeVisible();
+    await page.getByRole('button', { name: 'Invite' }).click();
+    await expect(page.getByText('one-time-token-2')).toBeVisible();
 
     // Owner protection: remove button is absent for the owner row
     const ownerRow = page.locator('tr', { hasText: 'owner@example.com' });

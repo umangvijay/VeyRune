@@ -1014,6 +1014,26 @@ export async function addOrgMember(orgId: string, email: string, role: string) {
     `/orgs/${orgId}/members`, { method: "POST", body: JSON.stringify({ email, role }) });
 }
 
+export async function inviteOrgMember(orgId: string, email: string, role: string) {
+  return apiFetch<{ invitation_id: string; org_id: string; email: string; role: string; expires_at: string; token: string }>(
+    `/orgs/${orgId}/invitations`, { method: "POST", body: JSON.stringify({ email, role }) });
+}
+
+export async function listOrgInvitations(orgId: string) {
+  return apiFetch<{ org_id: string; invitations: Array<{ invitation_id: string; email: string; role: string; status: string; expires_at: string }> }>(
+    `/orgs/${orgId}/invitations`);
+}
+
+export async function revokeOrgInvitation(orgId: string, invitationId: string) {
+  return apiFetch<{ org_id: string; invitation_id: string; revoked: boolean }>(
+    `/orgs/${orgId}/invitations/${encodeURIComponent(invitationId)}`, { method: "DELETE" });
+}
+
+export async function acceptOrgInvitation(token: string) {
+  return apiFetch<{ org_id: string; role: string; accepted: boolean }>(
+    "/orgs/invitations/accept", { method: "POST", body: JSON.stringify({ token }) });
+}
+
 export async function removeOrgMember(orgId: string, userId: string) {
   return apiFetch<{ org_id: string; user_id: string; removed: boolean }>(
     `/orgs/${orgId}/members/${encodeURIComponent(userId)}`, { method: "DELETE" });

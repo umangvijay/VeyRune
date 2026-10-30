@@ -68,6 +68,41 @@ class FirestoreIdempotencyRepository(BaseIdempotencyRepository):
             "status": "paused", "updated_at": datetime.now(timezone.utc).isoformat(),
         })
 
+    async def sweep_stale_running(self, older_than_seconds: int = 1800) -> int:
+        """Quarantine 'running' entries whose lease (updated_at) has expired —
+        same semantics as the SQLite implementation (audit F07)."""
+        db = await self._get_db()
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=older_than_seconds)).isoformat()
+        query = db.collection("idempotency_ledger").where("status", "==", "running").where("updated_at", "<", cutoff)
+        swept = 0
+        async for snap in query.stream():
+            await snap.reference.update({"status": "uncertain", "updated_at": datetime.now(timezone.utc).isoformat()})
+            swept += 1
+        return swept
+
+    async def reconcile_uncertain(self, key: str, outcome: str, result_payload: Optional[str] = None) -> None:
+        """Deliberate resolution of an uncertain outcome; refuses anything
+        that is not currently 'uncertain'."""
+        if outcome not in ("completed", "failed"):
+            raise ValueError("outcome must be 'completed' or 'failed'")
+        db = await self._get_db()
+        ref = db.collection("idempotency_ledger").document(key)
+
+        @firestore.async_transactional
+        async def resolve(transaction):
+            snapshot = await ref.get(transaction=transaction)
+            data = snapshot.to_dict() or {}
+            if not snapshot.exists or data.get("status") != "uncertain":
+                raise ValueError("Only 'uncertain' ledger entries can be reconciled")
+            if outcome == "completed":
+                transaction.update(ref, {"status": "completed", "result_payload": result_payload or "{}",
+                                         "updated_at": datetime.now(timezone.utc).isoformat()})
+            else:
+                transaction.update(ref, {"status": "failed", "updated_at": datetime.now(timezone.utc).isoformat()})
+
+        await resolve(db.transaction())
+
     async def reset_failed_task(self, workflow_id: str, task_id: str) -> None:
         db = await self._get_db()
         query = db.collection("idempotency_ledger").where("workflow_id", "==", workflow_id)

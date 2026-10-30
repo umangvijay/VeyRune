@@ -364,6 +364,17 @@ class BaseIdempotencyRepository(ABC):
         """Quarantine an ambiguous external outcome; ordinary retry must not release it."""
         ...
 
+    async def sweep_stale_running(self, older_than_seconds: int = 1800) -> int:
+        """Quarantine 'running' entries orphaned by a worker crash (audit F07).
+        Default no-op for repositories without the sweep; implement to make
+        crash-orphaned locks recoverable as 'uncertain', never 'failed'."""
+        return 0
+
+    async def reconcile_uncertain(self, key: str, outcome: str, result_payload: Optional[str] = None) -> None:
+        """Deliberate resolution of an uncertain outcome after a provider
+        receipt check. Optional operation."""
+        raise NotImplementedError("This ledger does not support reconciliation")
+
     @abstractmethod
     async def commit_pause(self, key: str) -> None:
         """Make a human-paused call reclaimable without erasing completed calls."""

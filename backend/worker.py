@@ -9,7 +9,7 @@ from backend.engine.repo_adapter import maybe_await
 
 logger = logging.getLogger(__name__)
 
-async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None, audit_repo=None):
+async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None, audit_repo=None, idempotency_repo=None):
     logger.info("Worker started, listening for events...")
     
     async def handle_event(event, ctx: MessageContext):
@@ -157,6 +157,18 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                     await maybe_await(token_denylist_repo.purge_expired())
             except Exception:
                 logger.debug("Denylist purge failed", exc_info=True)
+            # Crash-orphaned idempotency locks (audit F07): a worker that died
+            # between claim and commit leaves 'running' forever. Quarantine it
+            # as 'uncertain' — the external outcome is unknown, so blind
+            # replay is never offered; an operator or provider receipt
+            # reconciles it explicitly.
+            try:
+                if idempotency_repo is not None and hasattr(idempotency_repo, "sweep_stale_running"):
+                    swept = await maybe_await(idempotency_repo.sweep_stale_running(older_than_seconds=1800))
+                    if swept:
+                        logger.warning("Idempotency sweep: %d stale running execution(s) quarantined as uncertain", swept)
+            except Exception:
+                logger.debug("Idempotency stale-running sweep failed", exc_info=True)
             # Retention control (enterprise P2): purge old events/audit rows
             # once per day. Workflow runs are never auto-deleted.
             try:

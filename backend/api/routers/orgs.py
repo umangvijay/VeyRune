@@ -5,6 +5,12 @@ POST   /api/v1/orgs                        — create an org (creator = owner)
 GET    /api/v1/orgs                        — orgs the caller belongs to
 GET    /api/v1/orgs/{org_id}               — detail + members (members only)
 POST   /api/v1/orgs/{org_id}/members       — add a member by email (admin+)
+POST   /api/v1/orgs/{org_id}/invitations   — invite by email (admin+); token
+                                             returned once, membership created
+                                             on ACCEPTANCE (audit F01)
+GET    /api/v1/orgs/{org_id}/invitations   — pending invitations (admin+)
+POST   /api/v1/orgs/invitations/accept     — the invited user accepts (token)
+DELETE /api/v1/orgs/{org_id}/invitations/{iid} — revoke a pending invite
 DELETE /api/v1/orgs/{org_id}/members/{uid} — remove a member (admin+; owner protected)
 POST   /api/v1/orgs/{org_id}/members/{uid}/role — set role (owner only)
 GET    /api/v1/orgs/{org_id}/runs          — run oversight (owner/admin): read-only
@@ -17,6 +23,7 @@ foundation.
 """
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel
@@ -58,6 +65,15 @@ class AddMemberRequest(BaseModel):
 
 class SetRoleRequest(BaseModel):
     role: str
+
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str = "member"
+
+
+class AcceptInviteRequest(BaseModel):
+    token: str
 
 
 @router.post("", status_code=201)
@@ -213,6 +229,97 @@ async def org_run_oversight(
             runs.append(r)
     runs.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     return {"org_id": org_id, "runs": runs[:limit], "count": min(len(runs), limit)}
+
+
+# ── Invitation lifecycle (audit F01): membership requires acceptance ──
+
+INVITATION_TTL_DAYS = 7
+
+
+@router.post("/{org_id}/invitations", status_code=201)
+async def invite_member(org_id: str, body: InviteRequest, request: Request, user: AuthenticatedUser = Depends(require_not_viewer)):
+    """Create a pending invitation. The raw token is returned exactly once —
+    the inviter delivers it out of band; only its hash is stored. Membership
+    is created when the invited user ACCEPTS, never by this call."""
+    import hashlib
+    import secrets as secrets_lib
+    from datetime import timedelta
+
+    factory, org, role = await _member_org(org_id, request, user, "admin")
+    if body.role not in ASSIGNABLE_ROLES:
+        raise HTTPException(status_code=422, detail=f"role must be one of {sorted(ASSIGNABLE_ROLES)}")
+    if body.role == "admin" and role != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner can invite an admin")
+    try:
+        email = sanitize_email(body.email)
+    except InputValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+    # If the invited email already belongs to a member, do not invite.
+    existing_user = await factory.user_repo.get_by_email(email)
+    if existing_user and await factory.org_repo.get_member_role(org_id, existing_user["id"]) is not None:
+        raise HTTPException(status_code=409, detail="Already a member; use the owner-only role endpoint")
+
+    token = secrets_lib.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=INVITATION_TTL_DAYS)).isoformat()
+
+    invite = await factory.org_repo.create_invitation(org_id, email, body.role, user.user_id, token_hash, expires_at)
+    if not invite:
+        raise HTTPException(status_code=409, detail="A pending invitation for this email already exists")
+    await factory.audit_repo.log_event({
+        "event_type": "ORG_INVITATION_CREATED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": org_id,
+        "details": {"email": email, "role": body.role},
+    })
+    return {"invitation_id": invite["invitation_id"], "org_id": org_id, "email": email,
+            "role": body.role, "expires_at": invite["expires_at"], "token": token}
+
+
+@router.get("/{org_id}/invitations")
+async def list_pending_invitations(org_id: str, request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    factory, org, role = await _member_org(org_id, request, user, "admin")
+    invitations = await factory.org_repo.list_invitations(org_id, "pending")
+    # Tokens are never listable — only their existence and expiry.
+    return {"org_id": org_id, "invitations": invitations}
+
+
+@router.post("/invitations/accept")
+async def accept_invitation(body: AcceptInviteRequest, request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """The invited user accepts. Membership is created atomically with the
+    create-only invariant; the invitation must match the caller's email and
+    be unexpired."""
+    import hashlib
+
+    factory = _get_factory(request)
+    check_rate_limit(f"user:{user.user_id}", "general")
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    try:
+        membership = await factory.org_repo.accept_invitation(token_hash, user.user_id, user.email)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    await factory.audit_repo.log_event({
+        "event_type": "ORG_INVITATION_ACCEPTED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": membership["org_id"],
+        "details": {"role": membership["role"]},
+    })
+    return {"org_id": membership["org_id"], "role": membership["role"], "accepted": True}
+
+
+@router.delete("/{org_id}/invitations/{invitation_id}")
+async def revoke_invitation(org_id: str, invitation_id: str, request: Request, user: AuthenticatedUser = Depends(require_not_viewer)):
+    factory, org, role = await _member_org(org_id, request, user, "admin")
+    revoked = await factory.org_repo.revoke_invitation(org_id, invitation_id)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Pending invitation not found")
+    await factory.audit_repo.log_event({
+        "event_type": "ORG_INVITATION_REVOKED",
+        "actor_id": user.user_id, "actor_type": "USER",
+        "resource_id": org_id,
+        "details": {"invitation_id": invitation_id},
+    })
+    return {"org_id": org_id, "invitation_id": invitation_id, "revoked": True}
 
 
 @router.delete("/{org_id}")

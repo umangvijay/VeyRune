@@ -22,7 +22,7 @@ does not close a finding.
 | Revocation enforced; denylist outage fails closed (503) | **Verified (local)** | `backend/tests/test_audit_security.py` |
 | Membership creation never mutates roles (router + repository, atomic) | **Verified (local)** | `backend/tests/test_audit_security.py` |
 | Owner-only role-change holds on every path | **Verified (local)** + router guards | `backend/api/routers/orgs.py`, `test_orgs_rbac.py` |
-| Accepted-invitation lifecycle (invite → accept) | **Pending** — first-batch scope excluded personal runs instead; invitation UX remains enterprise-stage work | — |
+| Accepted-invitation lifecycle (invite → accept) | **Verified (local)** — invite tokens hashed + single-use, acceptance creates membership atomically with the create-only invariant, email-matched, expiry + revocation; UI issues one-time tokens | `backend/tests/test_org_invitations.py`, `dashboard/orgs/page.tsx` |
 | SSO / MFA / provisioning | **Pending** (enterprise option) | — |
 
 ## 2. Tenant isolation
@@ -40,7 +40,8 @@ does not close a finding.
 | Expired RUNNING tasks reclaimable (Firestore parity) | **Verified by source + contract tests** — live kill-test requires cloud | `backend/repositories/firestore/workflow_repository.py`, `test_chaos_recovery.py` (SQLite path) |
 | Duplicate delivery executes exactly once | **Verified (local)** — stack-level test | `backend/tests/test_chaos_recovery.py` |
 | Old execution cannot overwrite a reclaimed task (fencing) | **Verified (local)** | `backend/tests/test_chaos_recovery.py` |
-| Uncertain-outcome handling / provider idempotency receipts | **Pending** — ledger distinguishes states; provider-specific reconciliation requires real providers | `backend/engine/idempotency_guard.py` |
+| Uncertain-outcome handling | **Verified (local)** — uncertain state quarantines ambiguous outcomes and crash-orphaned locks (worker sweep); replay blocked with explicit reconciliation message; operator/provider receipt resolves via reconcile_uncertain | `backend/tests/test_uncertain_reconciliation.py` |
+| Provider-specific reconciliation receipts | **Pending** — requires real provider accounts | — |
 | Connector lifecycle: untested revisions cannot execute | **Verified (local)** — per-operation evidence + trust-tier gate | `backend/tests/test_connector_coverage.py`, `test_audit_security.py` (G01/G02) |
 | Standalone server packaging never deployable without protocol tests | **Verified (local)** | `backend/tests/test_standalone_packaging.py` (G03) |
 | Provenance labels (official/extracted/inferred) | **Verified (local)** | `backend/tests/test_connector_coverage.py` (G06) |
@@ -96,13 +97,13 @@ does not close a finding.
 
 | Finding | Implementation | Regression evidence |
 |---|---|---|
-| F01 org oversight | org-scoped runs only (`org_id` ownership) | `test_audit_security.py` |
+| F01 org oversight | org-scoped runs only (`org_id` ownership) + accepted-invitation lifecycle | `test_audit_security.py`, `test_org_invitations.py` |
 | F02 role bypass | 409 on re-add; atomic create-only repos | `test_audit_security.py` |
 | F03 disabled login | password + Google + refresh enforcement | `test_audit_security.py`, `test_auth_http.py` |
 | F04 revocation | fail-closed 503; current-state authorization | `test_audit_security.py`, `test_auth_http.py` |
 | F05 Pub/Sub dep | declared in requirements | `requirements.txt` |
 | F06 Firestore leases | expired-RUNNING reclaim + fencing | `test_chaos_recovery.py`, source parity check |
-| F07 exactly-once | ledger states; provider reconciliation pending | partial |
+| F07 exactly-once | uncertain quarantine + crash sweep + explicit reconciliation | `test_uncertain_reconciliation.py` |
 | F08 budgets | durable ledger + explicit failures | `test_usage_ledger.py` |
 | F09 rate limits | proxy parsing + bounded state; distributed pending | partial |
 | F10 Firestore parity | activation, tx-uniqueness, tx-counters, db id | `test_cloud_contracts.py` |
