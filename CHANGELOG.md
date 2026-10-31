@@ -1,5 +1,31 @@
 # Changelog
 
+## v6.0.0 — 2026-10-31
+
+### Phase 1 tenancy: DB invariants, one invitation service, adversarial suites
+
+The detailed Phase-1 roadmap's outstanding items, closed:
+
+- **1.6 Uniqueness as a database invariant**: a unique partial index on
+  `(org_id, email) WHERE status='pending'` backs the application check —
+  concurrent duplicate invitations across independent connections leave
+  exactly one pending row (proven with two DatabaseManager instances).
+- **1.5 One shared invitation service**: `organization_invitation_service`
+  is the single creation/acceptance path; the invitations route and the
+  legacy members alias both delegate to it. Role validation, member/
+  owner checks, email normalization, token generation (hash-only
+  storage), and audit events live in exactly one place.
+- **1.15 Adversarial tenant isolation** (`test_tenant_isolation.py`, 5
+  tests): personal-run listing/direct-read denial, owner-scoped schedule
+  listing, foreign artifact download denial with real path-contained
+  files, owner-scoped credential reads, removed-member oversight loss.
+- **1.15 Membership concurrency** (`test_membership_concurrency.py`, 3
+  tests, independent connections): duplicate-invite race, accept-vs-
+  revoke race (one consistent outcome), expiration not blocking new
+  invitations.
+
+315→323 backend tests green; 31 frontend + 16 e2e green.
+
 ## v5.9.0 — 2026-10-31
 
 ### §7 explicit states + connector clarity; §9 Outcome Verifier

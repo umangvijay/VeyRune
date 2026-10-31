@@ -275,6 +275,8 @@ CREATE TABLE IF NOT EXISTS org_invitations (
 );
 CREATE INDEX IF NOT EXISTS idx_org_invitations_org ON org_invitations(org_id, status);
 CREATE INDEX IF NOT EXISTS idx_org_invitations_token ON org_invitations(token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_org_invitations_pending_unique
+ON org_invitations(org_id, email) WHERE status = 'pending';
 
 -- ── Shared rate limiting (v5.6 §1) ────────────────────────────────
 -- One fixed-window counter per (identifier, group, window) across all

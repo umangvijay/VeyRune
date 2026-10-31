@@ -129,41 +129,22 @@ async def add_member(org_id: str, body: AddMemberRequest, request: Request, user
     used to enroll members DIRECTLY, bypassing acceptance). It now creates a
     pending invitation — membership is created only on ACCEPTANCE."""
     factory, org, role = await _member_org(org_id, request, user, "admin")
-    if body.role not in ASSIGNABLE_ROLES:
-        raise HTTPException(status_code=422, detail=f"role must be one of {sorted(ASSIGNABLE_ROLES)}")
-    if body.role == "admin" and role != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner can appoint an admin")
+    # One shared invitation service for every creation path (Phase 1.5).
+    from backend.services.organization_invitation_service import (
+        InvitationError, create_invitation as create_invitation_record,
+    )
     try:
-        email = sanitize_email(body.email)
-    except InputValidationError as e:
-        raise HTTPException(status_code=400, detail=e.message)
-    import hashlib
-    import secrets as secrets_lib
-    from datetime import timedelta
-
-    # If the invited email already belongs to a member, refuse (no invite spam).
-    target = await factory.user_repo.get_by_email(email)
-    if target and await factory.org_repo.get_member_role(org_id, target["id"]) is not None:
-        raise HTTPException(status_code=409, detail="Already a member; use the owner-only role endpoint")
-    if target and target["id"] == org["owner_id"] and body.role != "owner":
-        raise HTTPException(status_code=409, detail="The owner's role is fixed")
-    token = secrets_lib.token_urlsafe(32)
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=INVITATION_TTL_DAYS)).isoformat()
-    invite = await factory.org_repo.create_invitation(org_id, email, body.role, user.user_id, token_hash, expires_at)
-    if not invite:
-        raise HTTPException(status_code=409, detail="A pending invitation for this email already exists")
-    await factory.audit_repo.log_event({
-        "event_type": "ORG_INVITATION_CREATED",
-        "actor_id": user.user_id, "actor_type": "USER",
-        "resource_id": org_id,
-        "details": {"email": email, "role": body.role, "via": "members-endpoint"},
-    })
+        invite = await create_invitation_record(
+            factory, org_id=org_id, org=org, inviter_id=user.user_id,
+            inviter_role=role, email=body.email, role=body.role,
+        )
+    except InvitationError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
     # 202 Accepted: this request did NOT create a membership. The token is
     # delivered once; membership exists only after acceptance.
-    return {"org_id": org_id, "email": email, "role": body.role,
+    return {"org_id": org_id, "email": invite["email"], "role": invite["role"],
             "invitation_id": invite["invitation_id"], "expires_at": invite["expires_at"],
-            "token": token, "status": "invitation_pending"}
+            "token": invite["token"], "status": "invitation_pending"}
 
 
 @router.delete("/{org_id}/members/{member_id}")

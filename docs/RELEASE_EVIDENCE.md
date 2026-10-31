@@ -155,6 +155,22 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | §7 connector clarity | lifecycle badges (adapter/standalone · tested · verified · needs review · active) on every integration card | `frontend/src/lib/task-states.ts`, `dashboard/integrations/page.tsx` |
 | §9 Outcome Verifier | bounded read-only service, typed criteria, pass/needs-review/fail; output never mutated | `backend/tests/test_outcome_verifier.py` |
 
+## Phase-1 tenancy closure (31 Oct — detailed Phase 1 roadmap)
+| Item | Status | Evidence |
+|---|---|---|
+| 1.5 One shared invitation service | **Closed** — both creation routes delegate to `organization_invitation_service`; no route enrolls directly | `organization_invitation_service.py`, `test_org_invitations.py` |
+| 1.6 Invitation uniqueness as a DB invariant | **Closed** — unique partial index on `(org_id, email) WHERE status='pending'`; concurrent duplicate creation proven with independent connections | `test_membership_concurrency.py` |
+| 1.7 Transactional acceptance | **Verified (local)** — accept is one repo operation (find→pending→email-match→expiry→create-only membership→accepted); accept/revoke race proven one-outcome | `test_membership_concurrency.py` |
+| 1.8 Owner invariants | **Verified (local)** — owner fixed on member/route paths; owner-only role endpoint; create-only re-adds | `test_orgs_rbac.py`, `test_audit_security.py` |
+| 1.9 Explicit run ownership | **Verified (local)** — `org_id` slice; personal never inferred from membership | `test_audit_security.py` |
+| 1.10 Query-scoped authorization | **Verified (local)** — artifact lists/downloads, schedules, workflows all owner-scoped (adversarial cross-tenant) | `test_tenant_isolation.py` |
+| 1.11 Revocation current-state enforcement | **Verified (local)** — password/Google/refresh/API-key paths; fail-closed denylist | `test_audit_security.py`, `test_auth_http.py` |
+| 1.12 Background authorization | **Partially** — engine re-loads current identity at execution; per-task org-membership recheck before consequential steps remains staged | — |
+| 1.13 Frontend access-change handling | **Partially** — invitation accept UI shipped; full stale-cache clearing on access loss is frontend journey work | `dashboard/orgs/page.tsx` |
+| 1.15 Adversarial matrix | **Verified (local)** — tenant isolation (artifacts/schedules/credentials/oversight) + membership concurrency (independent connections) suites added | `test_tenant_isolation.py`, `test_membership_concurrency.py` |
+| Email-verified recipient identity (1.3) | **Open (product decision)** — Google claims verified; local-account email verification flow is a product feature | — |
+| Ownership transfer (1.8) | **Open (staged)** — dedicated operation per matrix | — |
+
 ## Release claim this packet supports today
 | Item | Implementation | Evidence |
 |---|---|---|
