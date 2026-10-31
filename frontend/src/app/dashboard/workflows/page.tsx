@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { runStateStyle } from "@/lib/task-states";
 import { listWorkflows, WorkflowRun } from "@/lib/api";
 import Link from "next/link";
 
@@ -72,12 +73,8 @@ export default function WorkflowsPage() {
                     <span>Started: {new Date(wf.created_at).toLocaleString()}</span>
                   </div>
                 </div>
-                <span className={`badge ${
-                  wf.status === "COMPLETED" ? "badge-success" :
-                  wf.status === "FAILED" ? "badge-error" :
-                  wf.status === "RUNNING" ? "badge-info" : "badge-neutral"
-                }`}>
-                  {wf.status}
+                <span className={`badge ${runStateStyle(wf.status).badge}`}>
+                  {runStateStyle(wf.status).label}
                 </span>
               </div>
               
@@ -86,11 +83,7 @@ export default function WorkflowsPage() {
                 {wf.tasks.map(t => (
                   <div key={t.task_id} style={{
                     flex: 1, height: 4, borderRadius: 2,
-                    background: 
-                      t.status === "COMPLETED" ? "var(--success)" :
-                      t.status === "FAILED" ? "var(--error)" :
-                      t.status === "RUNNING" ? "var(--info)" :
-                      "var(--bg-tertiary)"
+                    background: runStateStyle(t.status).color
                   }} title={`${t.agent}: ${t.status}`} />
                 ))}
               </div>

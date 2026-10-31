@@ -146,9 +146,16 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | §4 EvaluationService placeholders | **Closed** — records now carry the REAL per-run token spend the model client recorded; generated once per terminal run by the worker | `test_self_healing_and_learning.py` |
 | §5 stage 1 outcome verification | **Closed** — the adaptive-policy reward is positive only for verified usable payloads; a silent-but-empty response records a FAILURE reward | `test_self_healing_and_learning.py`, engine post-loop gate |
 | §7 explicit task states | **Partially** — engine states exist (PENDING/RUNNING/WAITING/WAITING_APPROVAL/RECOVERING/FAILED/COMPLETED); frontend badge mapping complete; "uncertain" surfaced via reconciliation states | engine + dashboard |
-| §9 first subagents (Outcome Verifier / Recovery Analyst) | **Partially** — RecoveryPolicy IS the deterministic Recovery Analyst gate; Outcome Verifier exists for resumes + recovery outcomes; generalized verifier remains future work | `recovery_policy.py` |
+| §9 first subagents (Outcome Verifier / Recovery Analyst) | **Closed** — OutcomeVerifier is a bounded read-only service (typed AcceptanceCriteria → pass/needs-review/fail, never mutates output); RecoveryPolicy is the deterministic Recovery Analyst gate | `backend/tests/test_outcome_verifier.py`, `test_self_healing_and_learning.py` |
 
-## v5.8 additions (31 Oct)
+## v5.9 additions (31 Oct)
+| Item | Implementation | Evidence |
+|---|---|---|
+| §7 explicit task states | authoritative runStateStyle mapping (uncertain/credentials/approval/recovering distinct); builds page wired | `frontend/src/lib/task-states.ts`, `frontend/tests/task-states.test.ts` |
+| §7 connector clarity | lifecycle badges (adapter/standalone · tested · verified · needs review · active) on every integration card | `frontend/src/lib/task-states.ts`, `dashboard/integrations/page.tsx` |
+| §9 Outcome Verifier | bounded read-only service, typed criteria, pass/needs-review/fail; output never mutated | `backend/tests/test_outcome_verifier.py` |
+
+## Release claim this packet supports today
 | Item | Implementation | Evidence |
 |---|---|---|
 | Shared durable rate limiter | guarded-upsert fixed windows (SQLite/Firestore) for auth/contact/webhook/mcp_build; cross-replica + cross-restart tests; worker purges expired windows | `test_shared_limits_and_browser_verification.py` |

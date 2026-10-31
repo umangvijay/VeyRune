@@ -1,5 +1,27 @@
 # Changelog
 
+## v5.9.0 — 2026-10-31
+
+### §7 explicit states + connector clarity; §9 Outcome Verifier
+
+- **Explicit task states (§7):** one authoritative `runStateStyle`
+  mapping — Queued, Running, Waiting for approval, Waiting for
+  credentials, Recovering, Outcome uncertain, Completed, Failed,
+  Cancelled — rendered on the builds page with per-task colors; unknown
+  states fall back safely.
+- **Connector lifecycle clarity (§7):** every integration card shows
+  separate badges for artifact type, tested, verified / needs-review,
+  and active — the "generated ≠ authenticated ≠ tested ≠ active"
+  distinction the audit required.
+- **§9 Outcome Verifier:** a bounded, read-only service with typed
+  acceptance criteria (contains / artifact_exists / http_ok /
+  schema_keys / non_empty) returning pass / needs-review / fail with
+  reasons. It never mutates the output, never executes tools, and never
+  approves its own repair. 6 tests; 5 frontend tests for the state
+  mappings.
+
+315 backend + 31 frontend + 16 e2e green.
+
 ## v5.8.0 — 2026-10-31
 
 ### Shared rate limiting + browser outcome verification

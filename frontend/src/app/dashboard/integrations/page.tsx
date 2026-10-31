@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { connectorStateBadges } from "@/lib/task-states";
 import { listIntegrations, Integration } from "@/lib/api";
 import Link from "next/link";
 
@@ -86,6 +87,11 @@ export default function IntegrationsPage() {
                 {mcp.description || "No description provided."}
               </p>
               
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                {connectorStateBadges(mcp).map(b => (
+                  <span key={b.label} className={`badge ${b.badge}`} style={{ fontSize: 10 }}>{b.label}</span>
+                ))}
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-primary)", paddingTop: 16 }}>
                 <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                   {mcp.validated_tool_count ?? 0} / {mcp.tool_count ?? 0} operations tested
