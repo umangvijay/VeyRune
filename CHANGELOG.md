@@ -1,5 +1,48 @@
 # Changelog
 
+## v6.1.0 — 2026-10-31
+
+### Phase 1 executed end to end (1.1 → 1.18)
+
+With the previous rounds covering 1.5–1.7, 1.9–1.10, and 1.15–1.16, this
+round closed the remaining items and produced the roadmap's deliverable:
+
+- **1.1 Authorization inventory delivered**: `docs/AUTHORIZATION_INVENTORY.md`
+  tabulates 24 protected entry points × actor × resource × required
+  permission × enforcement location × regression test — the alternative-
+  path map the audit required.
+- **1.4 Named permission matrix**: `security/permission_matrix.py` —
+  named actions (organization.invite_member / invite_admin /
+  manage_roles / remove_admin / oversight, credential.use / manage,
+  artifact.download, workflow.create / read) mapped to minimum org
+  roles; owner-only actions explicit; organization roles are distinct
+  from platform roles (an org owner is NOT a platform admin).
+- **1.3 Verified recipient identity**: `email_verified` on the user
+  record (Google provider claims verify; local signup starts
+  unverified), persisted via migration, and gated at invitation
+  acceptance by `REQUIRE_VERIFIED_EMAIL_FOR_INVITES` — both directions
+  regression-tested (unverified 403 → verify → accept 200; policy off
+  preserves the local flow).
+- **1.12 Authorization into background execution**: the worker re-loads
+  the run owner's CURRENT account state before executing any queued
+  task; a disabled owner's task is denied pre-execution with an
+  attributable `BACKGROUND_AUTHORIZATION_DENIED` audit event and
+  acknowledged (not requeued forever). Active owners execute unchanged.
+- **1.11/1.14 verified present**: password change revokes ALL refresh
+  tokens and audits; account disable/enable audit `USER_DISABLED` /
+  `USER_ENABLED`; audit payloads carry no tokens or secrets.
+
+**1.18 completion checklist** — verified across the suite: acceptance-
+only membership; concurrency-safe create/accept/revoke (DB invariant +
+independent-connection tests); one matrix on every endpoint incl. the
+legacy alias; owner protections; personal resources private (org_id
+slice, never inferred); query-scoped lists/downloads; cross-credential
+revocation; background re-check; credential ownership; frontend accept
+UI; attributable secret-free audits; SQLite contract tests green;
+conservative migration (org_id NULL = personal, never inferred).
+
+327 backend + 31 frontend + 16 e2e green.
+
 ## v6.0.0 — 2026-10-31
 
 ### Phase 1 tenancy: DB invariants, one invitation service, adversarial suites

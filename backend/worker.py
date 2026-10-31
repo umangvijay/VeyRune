@@ -11,7 +11,8 @@ from backend.engine.repo_adapter import maybe_await
 
 logger = logging.getLogger(__name__)
 
-async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None, audit_repo=None, idempotency_repo=None):
+async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine, schedule_repo: ScheduleRepository = None, token_denylist_repo=None, audit_repo=None, idempotency_repo=None, user_repo=None):
+    start_worker._audit_ref = audit_repo
     logger.info("Worker started, listening for events...")
     
     async def handle_event(event, ctx: MessageContext):
@@ -27,6 +28,33 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                 await ctx.ack()
                 return
             logger.info(f"Worker processing task {task_id} for run {run_id}")
+            # Phase 1.12: authorization carries into delayed work. Load the
+            # execution owner's CURRENT account state — a token/queue entry
+            # created before a disable must not execute afterwards.
+            run = await maybe_await(workflow_engine.repo.get_run(run_id))
+            if run:
+                owner = None
+                user_repo = getattr(workflow_engine, "user_repo", None)
+                if user_repo is not None:
+                    owner = await maybe_await(user_repo.get_by_id(run.get("user_id")))
+                if owner is not None and not owner.get("is_active", True):
+                    logger.warning(
+                        "Background authorization denied: owner %s is disabled (run %s task %s)",
+                        run.get("user_id"), run_id[:8], task_id)
+                    audit = getattr(start_worker, "_audit_ref", None)
+                    if audit is not None:
+                        try:
+                            from backend.repositories.audit_repository import AuditEvent, ActorType
+                            await audit.log_event(AuditEvent(
+                                event_type="BACKGROUND_AUTHORIZATION_DENIED",
+                                actor_id=run.get("user_id"), actor_type=ActorType.SYSTEM,
+                                resource_id=run_id,
+                                details={"task_id": task_id, "reason": "owner_disabled"},
+                            ))
+                        except Exception:
+                            logger.debug("Denial audit failed", exc_info=True)
+                    await ctx.ack()
+                    return
             await workflow_engine.execute_task(run_id, task_id)
             await _resume_build_waiter(run_id, task_id)
             await _evaluate_terminal_run(run_id)

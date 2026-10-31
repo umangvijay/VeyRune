@@ -511,6 +511,7 @@ class DatabaseManager:
         await self._migrate_task_columns()
         await self._migrate_mcp_build_columns()
         await self._migrate_usage_columns()
+        await self._migrate_user_identity_columns()
         await self._connection.commit()
         logger.info("Database schema migration complete")
 
@@ -558,6 +559,18 @@ class DatabaseManager:
         await self._connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_runs_org ON workflow_runs(org_id)"
         )
+
+    async def _migrate_user_identity_columns(self) -> None:
+        cursor = await self._connection.execute("PRAGMA table_info(users)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        # Phase 1.3 identity fields: verified_email for invitation acceptance;
+        # session_version for bounded-latency revocation (reserved for use).
+        if "email_verified" not in cols:
+            await self._connection.execute(
+                "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
+        if "session_version" not in cols:
+            await self._connection.execute(
+                "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0")
 
     async def _migrate_usage_columns(self) -> None:
         cursor = await self._connection.execute("PRAGMA table_info(usage_ledger)")

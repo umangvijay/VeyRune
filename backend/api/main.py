@@ -297,7 +297,7 @@ async def startup_event():
     run_worker_flag = os.environ.get("RUN_WORKER", "1" if settings.APP_ENV == "development" else "0")
     if run_worker_flag == "1":
         from backend.worker import start_worker
-        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo, factory.audit_repo, factory.idempotency_repo))
+        asyncio.create_task(start_worker(factory.message_bus, workflow_engine, factory.schedule_repo, factory.token_denylist_repo, factory.audit_repo, factory.idempotency_repo, factory.user_repo))
         logger.info("Worker started IN-PROCESS (RUN_WORKER=1). For production, deploy a separate worker service.")
     else:
         logger.info("Worker NOT started in API process (RUN_WORKER=%s). Expecting separate worker service.", run_worker_flag)

@@ -77,9 +77,20 @@ async def create_invitation(
 
 
 async def accept_invitation(factory, *, token: str, user_id: str, user_email: str) -> Dict[str, Any]:
-    """Acceptance: verify the token's hash, delegate to the repo's atomic
-    accept (email-matched, unexpired, create-only membership), audit."""
+    """Acceptance: verify the token's hash, enforce recipient-identity
+    verification (Phase 1.3 — an unverified email address is insufficient
+    proof of control), then delegate to the repo's atomic accept."""
     import hashlib
+    from backend.config.settings import settings as app_settings
+
+    if getattr(app_settings, "REQUIRE_VERIFIED_EMAIL_FOR_INVITES", True):
+        account = await factory.user_repo.get_by_id(user_id)
+        if account is None:
+            raise InvitationError("Account not found", 404)
+        if not account.get("email_verified"):
+            raise InvitationError(
+                "Verify your email address before accepting organization invitations.", 403)
+
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     try:
         membership = await factory.org_repo.accept_invitation(token_hash, user_id, user_email)

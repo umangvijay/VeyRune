@@ -302,6 +302,7 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
                 "google_id": google_user["google_id"],
                 "avatar_url": google_user.get("avatar_url"),
                 "auth_provider": "google",
+                "email_verified": bool(google_user.get("email_verified", True)),
             })
             user = await factory.user_repo.get_by_id(existing["id"])
         else:
@@ -314,6 +315,7 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
                 "auth_provider": "google",
                 "google_id": google_user["google_id"],
                 "avatar_url": google_user.get("avatar_url"),
+                "email_verified": bool(google_user.get("email_verified", True)),
                 "role": "user",
             })
             user = await factory.user_repo.get_by_id(user_id)

@@ -166,9 +166,12 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | 1.10 Query-scoped authorization | **Verified (local)** — artifact lists/downloads, schedules, workflows all owner-scoped (adversarial cross-tenant) | `test_tenant_isolation.py` |
 | 1.11 Revocation current-state enforcement | **Verified (local)** — password/Google/refresh/API-key paths; fail-closed denylist | `test_audit_security.py`, `test_auth_http.py` |
 | 1.12 Background authorization | **Partially** — engine re-loads current identity at execution; per-task org-membership recheck before consequential steps remains staged | — |
-| 1.13 Frontend access-change handling | **Partially** — invitation accept UI shipped; full stale-cache clearing on access loss is frontend journey work | `dashboard/orgs/page.tsx` |
+| 1.13 Frontend access-change handling | **Partially** — invitation accept UI shipped; 401 handling clears session and redirects; full stale-cache clearing on access loss is frontend journey work | `dashboard/orgs/page.tsx`, `auth-session.ts` |
 | 1.15 Adversarial matrix | **Verified (local)** — tenant isolation (artifacts/schedules/credentials/oversight) + membership concurrency (independent connections) suites added | `test_tenant_isolation.py`, `test_membership_concurrency.py` |
-| Email-verified recipient identity (1.3) | **Open (product decision)** — Google claims verified; local-account email verification flow is a product feature | — |
+| 1.3 Verified-recipient identity | **Verified (local)** — `email_verified` identity field (Google claims verified, local signup starts unverified); invitation acceptance gated by `REQUIRE_VERIFIED_EMAIL_FOR_INVITES` with regression tests both ways | `test_background_authorization.py` |
+| 1.4 Named permission matrix | **Verified (local)** — `security/permission_matrix.py` (named actions → minimum org role; owner-only actions explicit; org role ≠ platform role) | `test_orgs_rbac.py`, `test_audit_security.py` |
+| 1.12 Background authorization | **Verified (local)** — the worker re-loads the owner's CURRENT account state before executing any queued task; disabled-owner tasks are denied with an attributable `BACKGROUND_AUTHORIZATION_DENIED` audit event and acknowledged (not requeued) | `test_background_authorization.py` |
+| 1.1 Authorization inventory | **Delivered** — `docs/AUTHORIZATION_INVENTORY.md`: 24 entry points × actor × resource × permission × enforcement × test | `docs/AUTHORIZATION_INVENTORY.md` |
 | Ownership transfer (1.8) | **Open (staged)** — dedicated operation per matrix | — |
 
 ## Release claim this packet supports today

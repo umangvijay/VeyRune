@@ -123,6 +123,10 @@ class Settings(BaseSettings):
     # ── Token Budgets ────────────────────────────────────────────
     # Budget reservation headroom per paid call (v5.6 A3): the estimated
     # output reserve held while a model call runs, settled to actuals after.
+    # Phase 1.3: organization invitations may only be accepted by accounts
+    # whose email address is verified (Google claims verify it; local
+    # accounts require the verification flow).
+    REQUIRE_VERIFIED_EMAIL_FOR_INVITES: bool = False
     MAX_OUTPUT_RESERVE_TOKENS: int = 8192
     DEFAULT_DAILY_TOKEN_LIMIT: int = 1_000_000  # per user per day
     MAX_WORKFLOW_TASKS: int = Field(default=32, ge=1, le=256)

@@ -280,17 +280,18 @@ async def list_pending_invitations(org_id: str, request: Request, user: Authenti
 @router.post("/invitations/accept")
 async def accept_invitation(body: AcceptInviteRequest, request: Request, user: AuthenticatedUser = Depends(get_current_user)):
     """The invited user accepts. Membership is created atomically with the
-    create-only invariant; the invitation must match the caller's email and
-    be unexpired."""
-    import hashlib
-
+    create-only invariant; the invitation must match the caller's verified
+    email and be unexpired (Phase 1.3/1.5 — shared service)."""
+    from backend.services.organization_invitation_service import (
+        InvitationError, accept_invitation as accept_invitation_record,
+    )
     factory = _get_factory(request)
     check_rate_limit(f"user:{user.user_id}", "general")
-    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
     try:
-        membership = await factory.org_repo.accept_invitation(token_hash, user.user_id, user.email)
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        membership = await accept_invitation_record(
+            factory, token=body.token, user_id=user.user_id, user_email=user.email)
+    except InvitationError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
     await factory.audit_repo.log_event({
         "event_type": "ORG_INVITATION_ACCEPTED",
         "actor_id": user.user_id, "actor_type": "USER",
