@@ -122,6 +122,11 @@ class RepositoryFactory:
         from backend.security.shared_rate_limiter import SQLiteSharedRateRepository, set_shared_rate_repo
         self.shared_rate_repo = SQLiteSharedRateRepository(self.db_manager)
         set_shared_rate_repo(self.shared_rate_repo)
+        from backend.services.resource_authorization import (
+            ResourceAuthorizationService, set_resource_authorization_service,
+        )
+        self.resource_authorization = ResourceAuthorizationService(self.org_repo)
+        set_resource_authorization_service(self.resource_authorization)
 
         # In-process message bus for local mode
         self.message_bus = InMemoryMessageBus()
@@ -154,6 +159,11 @@ class RepositoryFactory:
         from backend.security.shared_rate_limiter import FirestoreSharedRateRepository, set_shared_rate_repo
         self.shared_rate_repo = FirestoreSharedRateRepository()
         set_shared_rate_repo(self.shared_rate_repo)
+        from backend.services.resource_authorization import (
+            ResourceAuthorizationService as _RAS, set_resource_authorization_service,
+        )
+        self.resource_authorization = _RAS(self.org_repo)
+        set_resource_authorization_service(self.resource_authorization)
         from backend.repositories.plugin_repository import AsyncFirestorePluginRepository
         self.plugin_repo = AsyncFirestorePluginRepository(await FirestoreDB.get_client())
         self.workflow_repo = FirestoreWorkflowRepository()

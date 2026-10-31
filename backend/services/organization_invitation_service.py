@@ -92,6 +92,15 @@ async def accept_invitation(factory, *, token: str, user_id: str, user_email: st
                 "Verify your email address before accepting organization invitations.", 403)
 
     token_hash = hashlib.sha256(token.encode()).hexdigest()
+    # Phase 1.7: the invitation's continuing authority is revalidated at
+    # acceptance — the organization must still exist and allow membership.
+    # (The repo's atomic accept then creates membership + flips status in
+    # one connection-owned operation; a deleted org cannot grant access.)
+    invite = await factory.org_repo.get_invitation_by_token(token_hash)
+    if invite and invite.get("org_id"):
+        org = await factory.org_repo.get_org(invite["org_id"])
+        if not org:
+            raise InvitationError("The organization for this invitation no longer exists", 409)
     try:
         membership = await factory.org_repo.accept_invitation(token_hash, user_id, user_email)
     except ValueError as e:
@@ -103,3 +112,55 @@ async def accept_invitation(factory, *, token: str, user_id: str, user_email: st
         "details": {"role": membership["role"]},
     })
     return membership
+
+
+async def resend_invitation(factory, *, org_id: str, invitation_id: str,
+                            inviter_id: str, inviter_role: str) -> Dict[str, Any]:
+    """Resend policy (Phase 1.5): rotates the token, extends expiry by the
+    full TTL, and PRESERVES the originally authorized role. Admins may
+    resend member/viewer invites; only the owner may resend an admin's."""
+    if inviter_role not in ("owner", "admin"):
+        raise InvitationError("Only admins or the owner can resend invitations", 403)
+    pending = await factory.org_repo.list_invitations(org_id, "pending")
+    invite = next((i for i in pending if i["invitation_id"] == invitation_id), None)
+    if not invite:
+        raise InvitationError("Pending invitation not found", 404)
+    if invite["role"] == "admin" and inviter_role != "owner":
+        raise InvitationError("Only the owner can resend an admin's invitation", 403)
+    import hashlib
+    import secrets as _secrets
+    from datetime import timedelta
+    token = _secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=INVITATION_TTL_DAYS)).isoformat()
+    updated = await factory.org_repo.resend_invitation(
+        org_id, invitation_id, inviter_id, token_hash, expires_at)
+    if not updated:
+        raise InvitationError("Pending invitation not found", 404)
+    await factory.audit_repo.log_event({
+        "event_type": "ORG_INVITATION_RESENT",
+        "actor_id": inviter_id, "actor_type": "USER",
+        "resource_id": org_id,
+        "details": {"email": updated["email"], "role": updated["role"], "token_rotated": True},
+    })
+    return {"invitation_id": invitation_id, "org_id": org_id, "email": updated["email"],
+            "role": updated["role"], "expires_at": updated["expires_at"], "token": token,
+            "role_preserved": True}
+
+
+async def preview_invitation(factory, *, token: str) -> Dict[str, Any]:
+    """Phase 1.13: let the invitee SEE which organization and role are
+    offered before accepting — without mutating anything."""
+    import hashlib
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    invitation = await factory.org_repo.get_invitation_by_token(token_hash)
+    if not invitation or invitation.get("status") != "pending":
+        raise InvitationError("Invitation not found or already used", 404)
+    org = await factory.org_repo.get_org(invitation["org_id"])
+    return {
+        "org_id": invitation["org_id"],
+        "org_name": (org or {}).get("name", "Unknown organization"),
+        "org_exists": bool(org),
+        "role": invitation["role"],
+        "expires_at": invitation["expires_at"],
+    }

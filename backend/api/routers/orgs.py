@@ -106,14 +106,21 @@ async def list_my_orgs(request: Request, user: AuthenticatedUser = Depends(get_c
 
 
 async def _member_org(org_id: str, request: Request, user: AuthenticatedUser, minimum: str):
-    """Resolve the org + caller's role, enforcing the minimum role."""
+    """Resolve the org + the actor's CURRENT role via the centralized
+    resource-authorization service (Phase 1.2) — never a cached claim."""
+    from backend.services.resource_authorization import AuthorizationDenied
     factory = _get_factory(request)
-    org = await factory.org_repo.get_org(org_id)
-    if not org:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    role = await factory.org_repo.get_member_role(org_id, user.user_id)
-    _require_role(role, minimum, org_id)
-    return factory, org, role
+    service = getattr(factory, "resource_authorization", None)
+    if service is None:
+        from backend.services.resource_authorization import ResourceAuthorizationService
+        service = ResourceAuthorizationService(factory.org_repo)
+    try:
+        ctx = await service.require_membership(org_id, user.user_id, minimum)
+    except AuthorizationDenied as e:
+        if str(e) == "not_a_member":
+            raise HTTPException(status_code=404, detail="Organization not found")
+        raise HTTPException(status_code=403, detail=str(e))
+    return factory, ctx.org, ctx.role
 
 
 @router.get("/{org_id}")
@@ -299,6 +306,38 @@ async def accept_invitation(body: AcceptInviteRequest, request: Request, user: A
         "details": {"role": membership["role"]},
     })
     return {"org_id": membership["org_id"], "role": membership["role"], "accepted": True}
+
+
+@router.post("/{org_id}/invitations/{invitation_id}/resend")
+async def resend_invitation(org_id: str, invitation_id: str, request: Request, user: AuthenticatedUser = Depends(require_not_viewer)):
+    """Resend policy (Phase 1.5): rotates the token, extends expiry, and
+    PRESERVES the originally authorized role — never a role escalation."""
+    from backend.services.organization_invitation_service import (
+        InvitationError, resend_invitation as resend_invitation_record,
+    )
+    factory, org, role = await _member_org(org_id, request, user, "admin")
+    try:
+        result = await resend_invitation_record(
+            factory, org_id=org_id, invitation_id=invitation_id,
+            inviter_id=user.user_id, inviter_role=role,
+        )
+    except InvitationError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    return result
+
+
+@router.post("/invitations/preview")
+async def preview_invitation(body: AcceptInviteRequest, request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+    """Phase 1.13: the invitee sees which organization and role are offered
+    BEFORE accepting. Read-only; requires authentication, never mutates."""
+    from backend.services.organization_invitation_service import (
+        InvitationError, preview_invitation as preview_invitation_record,
+    )
+    factory = _get_factory(request)
+    try:
+        return await preview_invitation_record(factory, token=body.token)
+    except InvitationError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
 
 
 @router.delete("/{org_id}/invitations/{invitation_id}")

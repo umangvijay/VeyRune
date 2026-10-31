@@ -172,7 +172,11 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | 1.4 Named permission matrix | **Verified (local)** — `security/permission_matrix.py` (named actions → minimum org role; owner-only actions explicit; org role ≠ platform role) | `test_orgs_rbac.py`, `test_audit_security.py` |
 | 1.12 Background authorization | **Verified (local)** — the worker re-loads the owner's CURRENT account state before executing any queued task; disabled-owner tasks are denied with an attributable `BACKGROUND_AUTHORIZATION_DENIED` audit event and acknowledged (not requeued) | `test_background_authorization.py` |
 | 1.1 Authorization inventory | **Delivered** — `docs/AUTHORIZATION_INVENTORY.md`: 24 entry points × actor × resource × permission × enforcement × test | `docs/AUTHORIZATION_INVENTORY.md` |
-| Ownership transfer (1.8) | **Open (staged)** — dedicated operation per matrix | — |
+| Ownership transfer (1.8) | **Open (staged)** — dedicated operation per matrix; owner protections enforced on every other path | — |
+| 1.2 Central authorization service | **Closed** — `resource_authorization.py` (resolve_membership / require_membership / require_permission / require_resource_owner); orgs routes delegate | `test_orgs_rbac.py` + all tenancy suites |
+| 1.5 Resend policy | **Closed** — resend rotates the token, extends expiry, PRESERVES role; admin invitations only the owner resends; old token dead | `test_invitation_resend_preview.py` |
+| 1.7 Acceptance revalidation | **Closed** — acceptance revalidates the org still exists; invalid invitations cannot grant membership | `test_invitation_resend_preview.py` |
+| 1.13 Invitation preview | **Closed** — invitee sees org name + role pre-accept, read-only, token still valid after | `test_invitation_resend_preview.py` |
 
 ## Release claim this packet supports today
 | Item | Implementation | Evidence |

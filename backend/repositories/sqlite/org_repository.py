@@ -139,6 +139,36 @@ class SQLiteOrgRepository(BaseOrgRepository):
             raise ValueError("Already a member of this organization")
         return {"org_id": row["org_id"], "role": row["role"]}
 
+    async def resend_invitation(self, org_id: str, invitation_id: str, invited_by: str,
+                                new_token_hash: str, new_expires_at: str) -> Optional[Dict[str, Any]]:
+        """Resend policy (Phase 1.5): rotates the token, extends expiry, and
+        PRESERVES the originally authorized role — a resend can never become
+        a hidden role-escalation route. Only pending invitations can be
+        resent; the pending-uniqueness invariant is untouched (same row)."""
+        cursor = await self.db.execute(
+            """
+            UPDATE org_invitations
+            SET token_hash = ?, expires_at = ?, invited_by = ?
+            WHERE invitation_id = ? AND org_id = ? AND status = 'pending'
+            """,
+            (new_token_hash, new_expires_at, invited_by, invitation_id, org_id),
+        )
+        await self.db.commit()
+        if cursor.rowcount == 0:
+            return None
+        row = await self.db.fetch_one(
+            "SELECT invitation_id, org_id, email, role, expires_at FROM org_invitations WHERE invitation_id = ?",
+            (invitation_id,),
+        )
+        return dict(row)
+
+    async def get_invitation_by_token(self, token_hash: str) -> Optional[Dict[str, Any]]:
+        row = await self.db.fetch_one(
+            "SELECT invitation_id, org_id, email, role, status, created_at, expires_at FROM org_invitations WHERE token_hash = ?",
+            (token_hash,),
+        )
+        return dict(row) if row else None
+
     async def revoke_invitation(self, org_id: str, invitation_id: str) -> bool:
         cursor = await self.db.execute(
             "UPDATE org_invitations SET status = 'revoked' WHERE invitation_id = ? AND org_id = ? AND status = 'pending'",

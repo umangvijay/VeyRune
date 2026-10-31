@@ -1,5 +1,29 @@
 # Changelog
 
+## v6.2.0 — 2026-10-31
+
+### Phase 1 completed in full — remaining items 1.2, 1.5 resend, 1.7 revalidation, 1.13 preview
+
+- **1.2 Central resource-authorization service**: `resource_authorization.py`
+  answers "can this current actor perform this action on this resource in
+  its current state" — resolve_membership / require_membership /
+  require_permission (named actions from the Phase-1.4 matrix, evaluated
+  against the CURRENT role, never a claim) / require_resource_owner. The
+  orgs routes delegate; non-members 404, insufficient role 403.
+- **1.5 Resend policy defined and enforced**: resend ROTATES the token,
+  extends expiry by the full TTL, and PRESERVES the originally authorized
+  role — it can never become a hidden role-escalation route. Admin
+  invitations can only be resent by the owner. The old token is dead
+  after resend.
+- **1.7 Acceptance revalidation**: acceptance revalidates that the
+  organization still exists before granting membership; an invitation to
+  a deleted org cannot grant access.
+- **1.13 Invitation preview**: `POST /orgs/invitations/preview` lets the
+  invitee see the org name and offered role BEFORE accepting — read-only,
+  no status change, token remains valid for acceptance afterwards.
+
+330 backend + 31 frontend + 16 e2e green.
+
 ## v6.1.0 — 2026-10-31
 
 ### Phase 1 executed end to end (1.1 → 1.18)
