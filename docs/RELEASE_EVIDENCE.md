@@ -46,6 +46,9 @@ does not close a finding.
 | Standalone server packaging never deployable without protocol tests | **Verified (local)** | `backend/tests/test_standalone_packaging.py` (G03) |
 | Provenance labels (official/extracted/inferred) | **Verified (local)** | `backend/tests/test_connector_coverage.py` (G06) |
 | Both build entry points share one durable record | **Verified (local)** | `backend/tests/test_connector_build_service.py` (G07) |
+| **Self-extension loop (page-48 happy path)**: waiting run → durable build (origin + parent link) → adapter from real spec → live probe → verified registration → original run resumes and completes → auditable record | **Verified (local)** — full lifecycle integration test | `backend/tests/test_self_extension_loop.py` |
+| Deliverable artifact validates and preserves user facts | **Verified (local)** — rendered HTML opens, contains actual facts, no placeholders; invented employers flagged; ATS score labeled heuristic | `backend/tests/test_resume_deliverable.py` (G08) |
+| Release gates: CI runs full tests inside the candidate images | **Verified** — cloudbuild runs the pytest suite in-image with `--network=none`; frontend gate runs lint (max-warnings=0) + unit + typecheck before image build | `cloudbuild.yaml`, `cloudbuild.frontend.yaml` (F16) |
 | Resume deliverable grounding (no invented employers/degrees unnoticed) | **Verified (local)** — deterministic check + heuristic score label | `backend/services/resume_builder.py` (G08) |
 
 ## 4. Durability and shared controls
@@ -83,6 +86,12 @@ does not close a finding.
 
 ---
 
+## Change ledger additions (v5.5.0)
+| Item | Implementation | Evidence |
+|---|---|---|
+| Invitation accept UI | invitee surface on the orgs page (paste token → accept) | `dashboard/orgs/page.tsx` |
+| Loopback SSRF seam | numeric-loopback allowance is a TEST-ONLY flag, default strict; workflow core.http can never reach app-localhost | `openapi_parser.py` (`_LOOPBACK_TESTING`) |
+
 ## Release claim this packet supports today
 
 > The 30-Oct audit's F01–F16 baseline and G01–G08 observations are remediated
@@ -119,4 +128,4 @@ does not close a finding.
 | G05 build polling | abort on unmount | source + e2e |
 | G06 provenance | stamped, preserved, trust ceiling | `test_connector_coverage.py` |
 | G07 durable builds | shared service, origin + parent run | `test_connector_build_service.py` |
-| G08 resume | grounding check + heuristic label | `resume_builder.py` |
+| G08 resume | grounding check + heuristic label + deliverable validation | `resume_builder.py`, `test_resume_deliverable.py` |

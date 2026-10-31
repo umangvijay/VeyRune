@@ -29,8 +29,9 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 mcp_id, name, version, endpoint, transport, auth_json, scopes,
                 health, health_updated_at, state, spec_hash, spec_version,
                 source_uri, built_at, owner, is_enabled, created_at, updated_at,
-                description, trust_tier, source_type, spec_json, is_public
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                description, trust_tier, source_type, spec_json, is_public,
+                artifact_type, test_coverage_json, capabilities_omitted, spec_provenance
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(mcp_id) DO UPDATE SET
                 name = excluded.name,
                 version = excluded.version,
@@ -50,6 +51,10 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 source_type = excluded.source_type,
                 spec_json = excluded.spec_json,
                 is_public = excluded.is_public,
+                artifact_type = excluded.artifact_type,
+                test_coverage_json = excluded.test_coverage_json,
+                capabilities_omitted = excluded.capabilities_omitted,
+                spec_provenance = excluded.spec_provenance,
                 updated_at = excluded.updated_at
             """,
             (
@@ -76,6 +81,10 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 m.get("source_type", "openapi"),
                 m.get("spec_json"),
                 1 if m.get("is_public", False) else 0,
+                m.get("artifact_type", "adapter"),
+                json.dumps(m.get("test_coverage") or {}),
+                int(m.get("capabilities_omitted") or 0),
+                m.get("spec_provenance", "official_spec"),
             ),
         )
         await self.db.commit()
@@ -289,6 +298,19 @@ class SQLiteMCPRepository(BaseMCPRepository):
         elif not isinstance(scopes_raw, list):
             result["scopes"] = []
         result["is_enabled"] = bool(result.get("is_enabled", 1))
+        # Connector evidence fields (audit G02/G06/G03): deserialize the
+        # coverage summary; default old rows to the adapter product.
+        result.setdefault("artifact_type", "adapter")
+        result.setdefault("spec_provenance", "official_spec")
+        coverage_raw = result.pop("test_coverage_json", None)
+        if isinstance(coverage_raw, str):
+            try:
+                result["test_coverage"] = json.loads(coverage_raw)
+            except json.JSONDecodeError:
+                result["test_coverage"] = {}
+        else:
+            result["test_coverage"] = coverage_raw or {}
+        result["capabilities_omitted"] = int(result.get("capabilities_omitted") or 0)
         return result
 
     async def save_revision(self, mcp_id: str, revision: dict) -> None:

@@ -506,6 +506,10 @@ class DatabaseManager:
             "source_type": "TEXT NOT NULL DEFAULT 'openapi'",
             "spec_json": "TEXT",
             "is_public": "INTEGER NOT NULL DEFAULT 0",
+            "artifact_type": "TEXT NOT NULL DEFAULT 'adapter'",
+            "spec_provenance": "TEXT NOT NULL DEFAULT 'official_spec'",
+            "test_coverage_json": "TEXT NOT NULL DEFAULT '{}'",
+            "capabilities_omitted": "INTEGER NOT NULL DEFAULT 0",
         }
         for col, ddl in additions.items():
             if col not in existing:

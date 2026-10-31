@@ -1,5 +1,37 @@
 # Changelog
 
+## v5.5.0 — 2026-10-31
+
+### The defining lifecycle proven: the self-extending loop runs end to end
+
+**Page-48 happy path, verified locally** (`test_self_extension_loop.py`):
+a waiting run whose capability is missing → the orchestrator requests the
+build through the durable service (origin + parent_run_id link the
+waiter) → the adapter is generated from a real OpenAPI spec → the live
+probe passes against a local capability server → the connector registers
+**verified** with artifact_type=adapter, provenance, and per-operation
+coverage → the original run resumes and completes against the newly
+acquired capability → the build record still points back at the
+completed run. The only hop needing a model is the gap detection
+itself; every durable, policy, and resumption mechanic is proven.
+
+**Supporting work:**
+- Loopback SSRF handling: numeric-loopback allowance is now a TEST-ONLY
+  flag (`OpenAPIParser._LOOPBACK_TESTING`, default False). Workflow
+  core.http keeps strict validation — a user workflow can never reach
+  the app's own localhost; "localhost" the NAME stays rejected (DNS
+  rebinding); the loop test enables the seam only for its own lifetime.
+- Invitation **accept** UI: the invitee surface (paste token → accept)
+  on the orgs page completes the F01 full-stack flow.
+- G08 deliverable validation: rendered resume HTML opens and contains
+  the user's actual facts with no placeholder leakage; invented
+  employers are flagged; the ATS score is labeled heuristic (3 tests).
+- F16 build gates verified: backend CI runs the pytest suite inside the
+  candidate image with `--network=none`; frontend CI runs
+  lint(max-warnings=0) + unit + typecheck before the image build.
+
+283 backend + 26 frontend + 16 e2e green.
+
 ## v5.4.0 — 2026-10-30
 
 ### Clean-image verification: the runtime-parity gate is closed

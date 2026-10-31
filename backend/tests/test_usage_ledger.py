@@ -6,8 +6,12 @@
   is empty (the cross-process property).
 - Ledger failures are explicit (503), never a silent pass.
 """
+from datetime import datetime, timezone
+
 import pytest
 import pytest_asyncio
+
+TODAY = datetime.now(timezone.utc).date().isoformat()
 
 from backend.repositories.sqlite.database import DatabaseManager
 from backend.repositories.usage_repository import (
@@ -30,11 +34,11 @@ async def test_ledger_accumulates_across_processes(db):
     both record spend; the total is the sum, not last-write-wins."""
     process_a = SQLiteUsageRepository(db)
     process_b = SQLiteUsageRepository(db)
-    await process_a.add_usage("user-x", "2026-10-30", 700)
-    await process_b.add_usage("user-x", "2026-10-30", 900)
+    await process_a.add_usage("user-x", TODAY, 700)
+    await process_b.add_usage("user-x", TODAY, 900)
     # A third process reads the shared total.
     process_c = SQLiteUsageRepository(db)
-    assert await process_c.get_usage("user-x", "2026-10-30") == 1600
+    assert await process_c.get_usage("user-x", TODAY) == 1600
 
 
 @pytest.mark.asyncio
@@ -47,7 +51,7 @@ async def test_budget_cap_survives_memory_reset(db):
     repo = SQLiteUsageRepository(db)
     set_usage_repo(repo)
     try:
-        await repo.add_usage("user-cap", "2026-10-30", 1200)
+        await repo.add_usage("user-cap", TODAY, 1200)
         context_manager._usage.clear()  # simulate a fresh process
 
         class FixedSettings:
@@ -69,7 +73,7 @@ async def test_budget_under_limit_when_durable_total_low(db):
     repo = SQLiteUsageRepository(db)
     set_usage_repo(repo)
     try:
-        await repo.add_usage("user-ok", "2026-10-30", 200)
+        await repo.add_usage("user-ok", TODAY, 200)
         context_manager = __import__(
             "backend.agents.context_manager", fromlist=["context_manager"]
         ).context_manager

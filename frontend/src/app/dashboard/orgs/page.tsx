@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   createOrg, listMyOrgs, getOrg, removeOrgMember,
-  setOrgMemberRole, deleteOrg, getOrgRuns, inviteOrgMember,
+  setOrgMemberRole, deleteOrg, getOrgRuns, inviteOrgMember, acceptOrgInvitation,
   OrgRow, OrgMember, OrgRunRow,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -26,6 +26,8 @@ export default function OrgsPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [lastToken, setLastToken] = useState("");
+  const [inviteToken, setInviteToken] = useState("");
+  const [showAccept, setShowAccept] = useState(false);
 
   const loadOrgs = useCallback(async () => {
     try {
@@ -90,6 +92,22 @@ export default function OrgsPage() {
       setMembers(detail.members || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create the invitation");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAccept = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!inviteToken.trim()) return;
+    setBusy(true); setError(""); setInfo("");
+    try {
+      const res = await acceptOrgInvitation(inviteToken.trim());
+      setInfo(`Invitation accepted — you are now a ${res.role} of the organization.`);
+      setInviteToken(""); setShowAccept(false);
+      await loadOrgs();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not accept the invitation");
     } finally {
       setBusy(false);
     }
@@ -166,6 +184,25 @@ export default function OrgsPage() {
             onChange={e => setName(e.target.value)} style={{ maxWidth: 320 }} required />
           <button type="submit" className="btn btn-primary" disabled={busy || !user}>Create</button>
         </form>
+      </div>
+
+      <div className="glass-card panel-3d" style={{ padding: 24, marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Have an invitation?</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAccept(v => !v)}>
+            {showAccept ? "Hide" : "Enter token"}
+          </button>
+        </div>
+        {showAccept && (
+          <form onSubmit={handleAccept} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input className="input" placeholder="Paste your invitation token" value={inviteToken}
+              onChange={e => setInviteToken(e.target.value)} style={{ maxWidth: 460, fontFamily: "var(--font-mono)", fontSize: 12 }} required />
+            <button type="submit" className="btn btn-primary" disabled={busy || !user}>Accept invitation</button>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              Accepting joins the organization with the invited role — your personal work stays yours.
+            </span>
+          </form>
+        )}
       </div>
 
       {orgs.length === 0 ? (

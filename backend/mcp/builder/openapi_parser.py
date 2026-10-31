@@ -42,16 +42,26 @@ class OpenAPIParser:
             raise OpenAPIParserError("OpenAPI spec must be an object")
         return self._normalize(self.raw_spec)
         
+    # TEST-ONLY seam (default False in every deployed process): allows
+    # numeric-loopback targets so the self-extension test loop can exercise
+    # the full build/probe/execute cycle against a local server. Workflow
+    # core.http keeps strict validation — a user workflow must never be able
+    # to reach the app's own localhost (audit SSRF model).
+    _LOOPBACK_TESTING = False
+
     def _validate_ssrf(self, url: str):
         """Reject non-public endpoints, including every IPv4/IPv6 DNS answer."""
         parsed = urllib.parse.urlparse(url or "")
-        if parsed.scheme.lower() != "https" or not parsed.hostname:
+        hostname = (parsed.hostname or "").rstrip(".").lower()
+        loopback = hostname in ("127.0.0.1", "::1") and OpenAPIParser._LOOPBACK_TESTING
+        if not loopback and (parsed.scheme.lower() != "https" or not parsed.hostname):
             raise SSRFViolationError("A complete HTTPS URL is required")
         if parsed.username is not None or parsed.password is not None:
             raise SSRFViolationError("Credentials in URLs are prohibited")
-        hostname = parsed.hostname.rstrip(".").lower()
-        if hostname == "localhost" or hostname.endswith(".localhost") or hostname == "metadata.google.internal":
+        if hostname == "metadata.google.internal" or hostname.endswith(".localhost") or hostname == "localhost":
             raise SSRFViolationError("Local and metadata hosts are prohibited")
+        if loopback:
+            return
         try:
             port = parsed.port or 443
             answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
