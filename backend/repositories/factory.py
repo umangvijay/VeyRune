@@ -119,6 +119,9 @@ class RepositoryFactory:
         from backend.repositories.usage_repository import SQLiteUsageRepository, set_usage_repo
         self.usage_repo = SQLiteUsageRepository(self.db_manager)
         set_usage_repo(self.usage_repo)
+        from backend.security.shared_rate_limiter import SQLiteSharedRateRepository, set_shared_rate_repo
+        self.shared_rate_repo = SQLiteSharedRateRepository(self.db_manager)
+        set_shared_rate_repo(self.shared_rate_repo)
 
         # In-process message bus for local mode
         self.message_bus = InMemoryMessageBus()
@@ -148,6 +151,9 @@ class RepositoryFactory:
         from backend.repositories.usage_repository import FirestoreUsageRepository, set_usage_repo
         self.usage_repo = FirestoreUsageRepository()
         set_usage_repo(self.usage_repo)
+        from backend.security.shared_rate_limiter import FirestoreSharedRateRepository, set_shared_rate_repo
+        self.shared_rate_repo = FirestoreSharedRateRepository()
+        set_shared_rate_repo(self.shared_rate_repo)
         from backend.repositories.plugin_repository import AsyncFirestorePluginRepository
         self.plugin_repo = AsyncFirestorePluginRepository(await FirestoreDB.get_client())
         self.workflow_repo = FirestoreWorkflowRepository()

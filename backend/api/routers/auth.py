@@ -39,7 +39,7 @@ from backend.security.jwt_manager import jwt_manager, JWTManager
 from backend.security.google_oauth import (
     exchange_code_for_tokens, verify_google_id_token, GoogleOAuthError,
 )
-from backend.security.rate_limiter import check_rate_limit, get_client_identifier
+from backend.security.rate_limiter import check_rate_limit, check_shared_rate_limit, get_client_identifier
 from backend.security.input_sanitizer import (
     sanitize_email, sanitize_name, sanitize_text, InputValidationError,
 )
@@ -91,6 +91,7 @@ async def signup(body: SignupRequest, request: Request):
     # Rate limit
     client_id = get_client_identifier(request)
     check_rate_limit(client_id, "auth")
+    await check_shared_rate_limit(client_id, group="auth")
 
     # Sanitize inputs
     try:
@@ -163,6 +164,7 @@ async def login(body: LoginRequest, request: Request):
     # Rate limit
     client_id = get_client_identifier(request)
     check_rate_limit(client_id, "auth")
+    await check_shared_rate_limit(client_id, group="auth")
 
     # Sanitize
     try:
@@ -267,6 +269,7 @@ async def google_auth(body: GoogleAuthRequest, request: Request):
     # Rate limit
     client_id = get_client_identifier(request)
     check_rate_limit(client_id, "auth")
+    await check_shared_rate_limit(client_id, group="auth")
 
     try:
         if body.code:
@@ -371,6 +374,7 @@ async def refresh_token(body: RefreshRequest, request: Request):
     # Rate limit: refresh does a hash + DB lookup per attempt — cap it
     client_id = get_client_identifier(request)
     check_rate_limit(client_id, "auth")
+    await check_shared_rate_limit(client_id, group="auth")
 
     # Verify the refresh JWT
     try:
@@ -501,6 +505,7 @@ async def change_password(
 
     # Rate limit
     check_rate_limit(f"user:{user.user_id}", "auth")
+    await check_shared_rate_limit(f"user:{user.user_id}", group="auth")
 
     # Get user with password hash
     user_data = await factory.user_repo.get_by_id(user.user_id)
@@ -552,6 +557,7 @@ async def create_guest_session(request: Request):
     # Rate limit (tighter for guest creation)
     client_id = get_client_identifier(request)
     check_rate_limit(client_id, "auth")
+    await check_shared_rate_limit(client_id, group="auth")
     
     guest_id = str(uuid.uuid4())
     guest_email = f"guest-{guest_id[:8]}@agentos.local"
@@ -621,6 +627,7 @@ async def create_api_key(
         raise HTTPException(status_code=501, detail="API keys are not available on this deployment")
 
     check_rate_limit(f"user:{user.user_id}", "auth")
+    await check_shared_rate_limit(f"user:{user.user_id}", group="auth")
     import secrets as _secrets
     raw_key = "vry_" + _secrets.token_urlsafe(24)
     key_hash = __import__("hashlib").sha256(raw_key.encode("utf-8")).hexdigest()

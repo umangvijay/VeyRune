@@ -25,6 +25,7 @@ Security model:
 
 import asyncio
 import ipaddress
+import json
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -194,6 +195,9 @@ class WebAgent:
                         pass
                 history.append(f"Opened {start_url}")
 
+            last_effective = None
+            ineffective_repeats = 0
+
             for step_num in range(start_step, max_steps + 1):
                 snapshot = await self._snapshot(page)
                 if emit_browser_frame:
@@ -239,8 +243,13 @@ class WebAgent:
                     await emit_progress(f"Browser step {step_num}: {safe_desc}")
 
                 if action == "done":
+                    # §6: "done" triggers OUTCOME VERIFICATION, not automatic
+                    # success — a run whose every step errored cannot claim it.
                     result = self._redact_secrets(str(decision.get("result", "")), secrets)
                     success = bool(decision.get("success", True))
+                    if success and steps and all(st.get("error") for st in steps):
+                        success = False
+                        result = (result + " — verification failed: every executed step errored.").strip()
                     break
 
                 # Consequential-action gate (v5.6 A6): a form submission or a
@@ -259,10 +268,36 @@ class WebAgent:
                         risk_level=RiskLevel.HIGH,
                     )
 
+                import hashlib as _hashlib
+                action_fingerprint = _hashlib.sha256(json.dumps(
+                    {k: decision.get(k) for k in ("action", "index", "text", "value", "url")},
+                    sort_keys=True, default=str).encode()).hexdigest()
+                url_before = page.url
+
                 try:
                     await self._execute(page, decision, secrets, allowed_domains)
                     history.append(f"Step {step_num}: {safe_desc} — ok")
+
+                    # §6 order 3: repeated ineffective-action detection — the
+                    # same action on an unchanged page twice means the loop is
+                    # stuck; stop so recovery/escalation can take over.
+                    page_state = _hashlib.sha256(
+                        (page.url + "|" + (page.content() or "")[:20000]).encode()).hexdigest()
+                    key = (action_fingerprint, page_state)
+                    if key == last_effective:
+                        ineffective_repeats += 1
+                    else:
+                        ineffective_repeats = 0
+                    last_effective = key
+                    if url_before == page.url and action in ("click", "type", "navigate"):
+                        if ineffective_repeats >= 2:
+                            raise WebAgentError(
+                                "Repeated ineffective action detected: the same action produced "
+                                "no page change twice. The target may be stale — refreshing "
+                                "observation or re-resolving the target is required.")
                 except ChallengePause:
+                    raise
+                except WebAgentError:
                     raise
                 except Exception as e:
                     err = self._redact_secrets(str(e).split("\n")[0], secrets)[:200]

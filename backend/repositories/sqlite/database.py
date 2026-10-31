@@ -276,6 +276,18 @@ CREATE TABLE IF NOT EXISTS org_invitations (
 CREATE INDEX IF NOT EXISTS idx_org_invitations_org ON org_invitations(org_id, status);
 CREATE INDEX IF NOT EXISTS idx_org_invitations_token ON org_invitations(token_hash);
 
+-- ── Shared rate limiting (v5.6 §1) ────────────────────────────────
+-- One fixed-window counter per (identifier, group, window) across all
+-- replicas sharing this database. Edge enforcement (Cloud Armor) is
+-- complementary and remains recommended for L7 volumes.
+CREATE TABLE IF NOT EXISTS rate_limits (
+    identifier TEXT NOT NULL,
+    group_name TEXT NOT NULL,
+    window_start INTEGER NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (identifier, group_name, window_start)
+);
+
 -- ── MCP Tool Cache ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mcp_tools (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

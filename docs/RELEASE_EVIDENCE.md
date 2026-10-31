@@ -134,7 +134,7 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | Orchestrator builds not restart-safe | **Closed** — agent builds dispatch through the queued lifecycle; parent task parks as a durable approval; the worker resolves it and re-dispatches when the build lands | `test_connector_build_service.py` |
 | Browser consequential actions ungated | **Closed** — form submissions and submit-control clicks pass through the persisted, argument-bound approval gate | `web_agent.py` (`_is_consequential`) |
 | Browser session leaks / unbounded pauses | **Closed** — owned resources close by reference even without a registry entry; session leases (30 min) swept by the worker | `browser_sessions.py`, `worker.py` |
-| Rate limiting across replicas | **Open (deployment-stage)** — needs Cloud Armor or a shared store on the actual topology | — |
+| Rate limiting across replicas | **Verified (local) for abuse-sensitive groups** — auth/contact/webhook/mcp_build enforce ONE durable fixed-window limit across replicas and restarts; high-volume groups stay process-local with edge enforcement recommended for deployment | `backend/tests/test_shared_limits_and_browser_verification.py` | — |
 | Generated-code isolated runner | **Open (product work)** — host execution disabled; supported runner is a scoped build | — |
 | Cloud recovery, load, live OAuth, a11y journeys | **Open (deployment-bound)** | — |
 
@@ -147,6 +147,12 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | §5 stage 1 outcome verification | **Closed** — the adaptive-policy reward is positive only for verified usable payloads; a silent-but-empty response records a FAILURE reward | `test_self_healing_and_learning.py`, engine post-loop gate |
 | §7 explicit task states | **Partially** — engine states exist (PENDING/RUNNING/WAITING/WAITING_APPROVAL/RECOVERING/FAILED/COMPLETED); frontend badge mapping complete; "uncertain" surfaced via reconciliation states | engine + dashboard |
 | §9 first subagents (Outcome Verifier / Recovery Analyst) | **Partially** — RecoveryPolicy IS the deterministic Recovery Analyst gate; Outcome Verifier exists for resumes + recovery outcomes; generalized verifier remains future work | `recovery_policy.py` |
+
+## v5.8 additions (31 Oct)
+| Item | Implementation | Evidence |
+|---|---|---|
+| Shared durable rate limiter | guarded-upsert fixed windows (SQLite/Firestore) for auth/contact/webhook/mcp_build; cross-replica + cross-restart tests; worker purges expired windows | `test_shared_limits_and_browser_verification.py` |
+| §6 browser verification + stale detection | done-success requires effective steps; repeated same-action-no-page-change twice raises for recovery | `web_agent.py` |
 
 ## Release claim this packet supports today
 
@@ -169,7 +175,7 @@ is claimed.
 | F06 Firestore leases | expired-RUNNING reclaim + fencing | `test_chaos_recovery.py`, source parity check |
 | F07 exactly-once | uncertain quarantine + crash sweep + explicit reconciliation | `test_uncertain_reconciliation.py` |
 | F08 budgets | durable ledger + explicit failures | `test_usage_ledger.py` |
-| F09 rate limits | proxy parsing + bounded state; distributed pending | partial |
+| F09 rate limits | proxy parsing + bounded state + shared durable limits for sensitive groups | `test_shared_limits_and_browser_verification.py` |
 | F10 Firestore parity | activation, tx-uniqueness, tx-counters, db id | `test_cloud_contracts.py` |
 | F11 refresh race | single-flight + Web Locks + 204 | `e2e/session-expiry.spec.ts` |
 | F12 OAuth/CSP | GIS origins + build var + disabled state | config verification |

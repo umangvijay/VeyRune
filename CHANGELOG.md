@@ -1,5 +1,29 @@
 # Changelog
 
+## v5.8.0 — 2026-10-31
+
+### Shared rate limiting + browser outcome verification
+
+**§1 closed — the last process-local High finding.** Abuse-sensitive
+groups (auth, contact, webhook, mcp_build) now enforce ONE durable
+fixed-window limit across replicas and restarts: a guarded-upsert
+counter in the shared database (SQLite) / transactions (Firestore),
+wired through the factory, purged opportunistically by the worker.
+High-volume groups deliberately stay process-local — a database
+round-trip per request is the wrong trade for volume the edge (Cloud
+Armor) enforces better; that split is documented in the evidence packet.
+Cross-replica and window-reset regressions included.
+
+**§6 — browser outcome verification and stale-target detection.**
+A model saying "done" no longer automatically establishes success: a run
+whose every executed step errored is flipped to failure with the
+verification evidence attached. And the observe-decide-act loop now
+detects **repeated ineffective actions** — the same action fingerprint
+twice with an unchanged page raises for recovery instead of spinning
+until the step budget runs out.
+
+309 backend + 26 frontend + 16 e2e green.
+
 ## v5.7.0 — 2026-10-31
 
 ### Self-healing loop formalized; rewards verify outcomes; evaluations are real

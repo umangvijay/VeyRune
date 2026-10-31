@@ -169,3 +169,38 @@ def get_client_identifier(request: Request, user_id: Optional[str] = None) -> st
     # are caller-controlled and must never replace the authenticated peer here.
     client = request.client
     return f"ip:{client.host}" if client else "ip:unknown"
+
+
+# ── Shared admission (v5.6 §1) ────────────────────────────────────
+# Async helper the abuse-sensitive routes await BEFORE the in-process
+# check. Enforces ONE fixed-window limit across all replicas sharing the
+# durable store; returns cleanly when no shared store is configured.
+
+SHARED_GROUPS = {"auth", "contact", "webhook", "mcp_build"}
+
+
+async def check_shared_rate_limit(identifier: str, group: str = "general",
+                                  window_seconds: int = 60) -> dict:
+    """Durable cross-replica admission for abuse-sensitive groups. Raises
+    HTTPException(429) when the SHARED window is exhausted. When no shared
+    store is configured or the store is down, returns the in-process info —
+    the per-process limit still applies and the edge (Cloud Armor) is the
+    documented volume control."""
+    from backend.security.shared_rate_limiter import shared_admit
+    max_requests = RATE_LIMIT_GROUPS.get(group, RATE_LIMIT_GROUPS["general"])
+    result = await shared_admit(identifier, group, window_seconds, max_requests)
+    if result is False:
+        window = max(1, window_seconds - (int(time.time()) % max(1, window_seconds)))
+        logger.warning("Shared rate limit exceeded: %s on %s (limit=%d/%ds)",
+                       identifier, group, max_requests, window_seconds)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Try again in {window + 1} seconds.",
+            headers={
+                "Retry-After": str(window + 1),
+                "X-RateLimit-Limit": str(max_requests),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(window),
+            },
+        )
+    return {"limit": max_requests, "shared": result is not True and result is not False and result is None}

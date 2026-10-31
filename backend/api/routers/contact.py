@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ConfigDict
 
 from backend.config.settings import settings
-from backend.security.rate_limiter import check_rate_limit, get_client_identifier
+from backend.security.rate_limiter import check_rate_limit, check_shared_rate_limit, get_client_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +200,7 @@ def _send_resend(subject: str, body: str, reply_to: str) -> bool:
 @router.post("")
 async def submit_contact(body: ContactRequest, request: Request):
     check_rate_limit(get_client_identifier(request), "contact")
+    await check_shared_rate_limit(get_client_identifier(request), group="contact")
     if "@" not in body.email or "." not in body.email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Please enter a valid email address.")
     to_addr = _contact_to()

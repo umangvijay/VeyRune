@@ -1,4 +1,5 @@
 import logging
+import time
 import asyncio
 from backend.engine.repo_adapter import persist_task
 from backend.models.schemas import TaskTriggerEvent
@@ -233,6 +234,14 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                     await maybe_await(token_denylist_repo.purge_expired())
             except Exception:
                 logger.debug("Denylist purge failed", exc_info=True)
+            # Shared rate-limit windows (v5.6 §1): bounded store.
+            try:
+                from backend.security.shared_rate_limiter import get_shared_rate_repo
+                repo = get_shared_rate_repo()
+                if repo is not None and hasattr(repo, "purge_expired"):
+                    await maybe_await(repo.purge_expired(older_than_epoch=int(time.time()) - 300))
+            except Exception:
+                logger.debug("Shared rate window purge failed", exc_info=True)
             # Paused browser sessions (human challenges) hold a whole
             # Chromium; expire leases so worker memory stays bounded (v5.6 A7).
             try:
