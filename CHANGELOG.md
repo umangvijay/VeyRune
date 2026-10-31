@@ -1,5 +1,37 @@
 # Changelog
 
+## v5.7.0 — 2026-10-31
+
+### Self-healing loop formalized; rewards verify outcomes; evaluations are real
+
+**§3 — the recovery loop is now a bounded, deterministic policy.**
+`RecoveryPolicy` gates every LLM recovery: per-category ceilings, a 15-
+minute deadline, and a repeated-action detector (the same recovery with
+the same arguments is refused even inside the budget). The
+RecoveryWorker consults it BEFORE running the recovery agent — refusals
+escalate into a structured incident (classification, attempt ledger,
+recovery hint, user options) delivered as a notification and a failed
+task with `[recovery-escalated]` evidence. 10 tests.
+
+**§5 stage 1 — rewards verify outcomes.** The adaptive model policy
+recorded success whenever the model runner finished without an
+exception. It now records success only for a VERIFIED usable payload
+(non-empty reply or real tool result): a silent-but-empty response
+records a FAILURE reward for whichever model ran. Security and
+authorization remain hard constraints outside the reward.
+
+**§4 — evaluations are real.** The model client tracks per-run token
+spend; the worker generates an evaluation record once per terminal run
+carrying that real spend (no more placeholder zeros), and the per-run
+counters drain exactly once.
+
+**Also:** production-readiness.md was verified already reconciled with
+the release evidence packet (the parallel session updated it before this
+turn); per-run usage accounting covers planning, recovery, and browser
+decision paths via the shared llm-context binding.
+
+302 backend + 26 frontend + 16 e2e green.
+
 ## v5.6.0 — 2026-10-31
 
 ### Second-review Phase A: every release blocker and High finding closed

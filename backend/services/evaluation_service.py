@@ -52,6 +52,9 @@ class EvaluationService:
         unknown_rate = total_unknown_tools / max(total_recovery_attempts, 1)
         schema_violation_rate = total_schema_violations / max(total_recovery_attempts, 1)
         
+        from backend.services.gemini_client import drain_run_tokens
+        token_usage_total = drain_run_tokens(run.run_id)
+
         record = AgentEvaluationRecord(
             evaluation_id=str(uuid.uuid4()),
             run_id=run.run_id,
@@ -67,9 +70,12 @@ class EvaluationService:
             invalid_argument_rate=schema_violation_rate,
             tool_schema_violation_rate=schema_violation_rate,
             latency_ms=latency_ms,
-            token_usage_input=0, # These would be extracted from OTel metrics
+            # Real per-run spend from the model client (v5.6 §4: execution
+            # events, not placeholders). Input/output split is unavailable
+            # without provider billing data; the total is authoritative.
+            token_usage_input=0,
             token_usage_output=0,
-            token_usage_total=0,
+            token_usage_total=token_usage_total,
             evaluator_version="1.0.0",
             prompt_version="1.0.0"
         )

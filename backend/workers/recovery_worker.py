@@ -47,12 +47,50 @@ class RecoveryWorker:
         task.recovery_attempts += 1
         await persist_task(self.repo, run.run_id, task)
 
+        # Formal recovery policy gate (v5.6 §3): deterministic caps, deadline,
+        # and repeated-action detection decide whether the LLM recovery may
+        # run at all. Refusals escalate into a structured incident.
+        from backend.engine.failure_classifier import classify_failure
+        from backend.services.recovery_policy import (
+            RecoveryAttempt, RecoveryPolicy,
+        )
+        classifier = classify_failure(task.error or "")
+        prior = [RecoveryAttempt(
+            attempt=i + 1, category=classifier.category, action="retry",
+            action_hash=RecoveryPolicy.action_hash(task.tool or task.agent,
+                                                   classifier.category,
+                                                   task.original_input or task.input_data),
+            rationale=str(h)[:120], verified=False,
+        ) for i, h in enumerate(getattr(task, "recovery_history", []) or [])]
+        policy = RecoveryPolicy(attempts=prior)
+        decision = policy.decide(classifier, task.tool or task.agent,
+                                 task.original_input or task.input_data)
+        if not decision.allowed:
+            from backend.services.notification_service import NotificationService
+            incident = RecoveryPolicy.incident(
+                task.task_id, run.run_id, prior, classifier, decision.reason)
+            task.status = TaskStatus.FAILED
+            task.error = f"[recovery-escalated] {decision.reason}"
+            await persist_task(self.repo, run.run_id, task)
+            try:
+                await NotificationService(getattr(workflow_engine, "notification_repo", None)).create(
+                    user_id=run.user_id,
+                    notification_type="SYSTEM",
+                    title="Automatic recovery stopped — action needed",
+                    body=decision.reason,
+                    metadata={"incident": incident, "run_id": run.run_id, "task_id": task.task_id},
+                )
+            except Exception:
+                logger.debug("Recovery escalation notification failed", exc_info=True)
+            await self._trigger_dag(run.run_id)
+            return
+
         try:
             if self.workflow_engine:
                 from backend.services.llm_context import load_user_llm_keys, load_user_model
                 factory = getattr(self.workflow_engine, "agent_factory", None)
                 router = getattr(factory, "tool_router", None)
-                await load_user_llm_keys(getattr(router, "secrets_repo", None), run.user_id)
+                await load_user_llm_keys(getattr(router, "secrets_repo", None), run.user_id, run_id=run.run_id)
                 await load_user_model(getattr(self.workflow_engine, "settings_repo", None), run.user_id, task.input_data.get("_model"))
             context = RecoveryContext(
                 workflow_id=run.workflow_id,

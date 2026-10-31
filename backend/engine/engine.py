@@ -298,7 +298,7 @@ class WorkflowEngine:
                     secrets_repo = getattr(self.agent_factory.tool_router, "secrets_repo", None)
                 if secrets_repo and run.user_id:
                     from backend.services.llm_context import load_user_llm_keys
-                    await load_user_llm_keys(secrets_repo, run.user_id)
+                    await load_user_llm_keys(secrets_repo, run.user_id, run_id=run_id)
 
                 from backend.services.llm_context import load_user_model
                 await load_user_model(self.settings_repo, run.user_id, task.input_data.get("_model"))
@@ -790,6 +790,7 @@ class WorkflowEngine:
 
         events = None
         last_err: Optional[Exception] = None
+        rewarded_model: Optional[str] = None
         for model_name in candidate_models:
             import time as _time
             _model_started = _time.monotonic()
@@ -824,7 +825,9 @@ class WorkflowEngine:
                         if getattr(part, "text", None) and not getattr(part, "thought", False):
                             await _emit_progress(part.text[:300])
                 last_err = None
-                await adaptive.record(model_name, True, (time.monotonic() - _model_started) * 1000)
+                # Hold the reward until the payload is verified (v5.6 §5
+                # stage 1): a silent-but-empty response is a failure.
+                rewarded_model = model_name
                 break
             except Exception as e:
                 last_err = e
@@ -836,9 +839,19 @@ class WorkflowEngine:
                 break
 
         if events is None:
+            if rewarded_model is not None:
+                await adaptive.record(rewarded_model, False, 0)
             raise last_err or RuntimeError("Agent produced no execution events")
 
         raw = extract_event_payload(events)
+        # Outcome verification (v5.6 §5 stage 1): the reward for the model
+        # that ran is positive ONLY when the payload is usable — a non-empty
+        # reply or a real tool result. Empty output records a failure reward.
+        payload_verified = isinstance(raw, dict) and bool(
+            str(raw.get("reply") or raw.get("message") or "").strip()
+            or raw.get("tool_result"))
+        if rewarded_model is not None:
+            await adaptive.record(rewarded_model, payload_verified, 0)
         if isinstance(raw, dict):
             reply = str(raw.get("reply") or raw.get("message") or "").strip()
             if reply:

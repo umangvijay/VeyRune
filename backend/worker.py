@@ -28,10 +28,28 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
             logger.info(f"Worker processing task {task_id} for run {run_id}")
             await workflow_engine.execute_task(run_id, task_id)
             await _resume_build_waiter(run_id, task_id)
+            await _evaluate_terminal_run(run_id)
             await ctx.ack()
         except Exception as e:
             logger.error(f"Worker encountered unhandled exception: {e}")
             await ctx.nack()
+
+    async def _evaluate_terminal_run(run_id: str):
+        """v5.6 §4: evaluation records come from REAL execution events —
+        generated once per terminal run, with the per-run token spend the
+        model client recorded. Evaluation must not be a placeholder."""
+        try:
+            repo = workflow_engine.repo
+            run = await maybe_await(repo.get_run(run_id))
+            if not run or run.get("status") not in ("COMPLETED", "FAILED"):
+                return
+            # Re-load the full model object so task fields are typed.
+            from backend.models.schemas import WorkflowRun
+            run_model = WorkflowRun.model_validate(run)
+            from backend.services.evaluation_service import EvaluationService
+            EvaluationService(getattr(workflow_engine, "db_client", None)).evaluate_run(run_model)
+        except Exception:
+            logger.debug("Run evaluation failed for %s", run_id, exc_info=True)
 
     async def _resume_build_waiter(run_id: str, task_id: str):
         """v5.6 A10: when a queued capability build completes, auto-resume the

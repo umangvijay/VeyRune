@@ -138,6 +138,16 @@ a fresh result. Configuration of a CI step is not proof that its current run pas
 | Generated-code isolated runner | **Open (product work)** — host execution disabled; supported runner is a scoped build | — |
 | Cloud recovery, load, live OAuth, a11y journeys | **Open (deployment-bound)** | — |
 
+## v5.7 learning + recovery loop closure (31 Oct)
+
+| Item | Status | Evidence |
+|---|---|---|
+| §3 self-healing loop (detect→classify→select→execute→verify→record→escalate) | **Verified (local)** — deterministic RecoveryPolicy with per-category ceilings, deadline, repeated-action detector; RecoveryWorker refuses disallowed recoveries and escalates into structured incidents with user options | `backend/tests/test_self_healing_and_learning.py` |
+| §4 EvaluationService placeholders | **Closed** — records now carry the REAL per-run token spend the model client recorded; generated once per terminal run by the worker | `test_self_healing_and_learning.py` |
+| §5 stage 1 outcome verification | **Closed** — the adaptive-policy reward is positive only for verified usable payloads; a silent-but-empty response records a FAILURE reward | `test_self_healing_and_learning.py`, engine post-loop gate |
+| §7 explicit task states | **Partially** — engine states exist (PENDING/RUNNING/WAITING/WAITING_APPROVAL/RECOVERING/FAILED/COMPLETED); frontend badge mapping complete; "uncertain" surfaced via reconciliation states | engine + dashboard |
+| §9 first subagents (Outcome Verifier / Recovery Analyst) | **Partially** — RecoveryPolicy IS the deterministic Recovery Analyst gate; Outcome Verifier exists for resumes + recovery outcomes; generalized verifier remains future work | `recovery_policy.py` |
+
 ## Release claim this packet supports today
 
 The repository has substantial implementation and previously reported local

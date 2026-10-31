@@ -348,6 +348,21 @@ def _coerce_json(text: str) -> Any:
 
 MAX_OUTPUT_RESERVE_TOKENS = 8192  # reserved headroom per paid call
 
+# Per-run token accounting (v5.6 §4): real spend per workflow run, drained
+# by the EvaluationService when the run completes — replaces the placeholder
+# zero-token evaluation records.
+_run_token_usage: Dict[str, int] = {}
+
+
+def record_run_tokens(run_id: Optional[str], tokens: int) -> None:
+    if not run_id or tokens <= 0:
+        return
+    _run_token_usage[run_id] = _run_token_usage.get(run_id, 0) + int(tokens)
+
+
+def drain_run_tokens(run_id: str) -> int:
+    return _run_token_usage.pop(run_id, 0)
+
 _active_reservation: "contextvars.ContextVar[Optional[dict]]" = contextvars.ContextVar("budget_reservation", default=None)
 
 @asynccontextmanager
@@ -405,6 +420,9 @@ def _record_usage_estimate(prompt: str, output: str) -> None:
         reservation = _active_reservation.get()
         if reservation is not None:
             reservation["actual"] = max(reservation["actual"], total)
+        run_id = get_run_id()
+        if run_id:
+            record_run_tokens(run_id, total)
         elif total > 0:
             import asyncio
             from backend.repositories.usage_repository import record_usage_durably

@@ -15,6 +15,18 @@ _user_model: ContextVar[Optional[str]] = ContextVar("user_model", default=None)
 
 _user_id: ContextVar[Optional[str]] = ContextVar("user_id", default=None)
 
+_run_id: ContextVar[Optional[str]] = ContextVar("run_id", default=None)
+
+
+def set_run_id(run_id: Optional[str]) -> None:
+    """Bind the current workflow run so per-run token usage lands in the
+    evaluation records (v5.6 §4)."""
+    _run_id.set(run_id)
+
+
+def get_run_id() -> Optional[str]:
+    return _run_id.get()
+
 
 def get_user_id() -> Optional[str]:
     return _user_id.get()
@@ -184,9 +196,10 @@ async def load_user_grok_key(secrets_repo, user_id: str) -> Optional[str]:
     return key
 
 
-async def load_user_llm_keys(secrets_repo, user_id: str) -> None:
+async def load_user_llm_keys(secrets_repo, user_id: str, run_id: Optional[str] = None) -> None:
     """Load vault provider credentials into this task's context."""
     _user_id.set(user_id)
+    _run_id.set(run_id)
     if not secrets_repo or not user_id:
         set_user_gemini_key(None)
         set_user_grok_key(None)
