@@ -222,6 +222,7 @@ async def execute_browser_tool(
     task_id: Optional[str] = None,
     emit_progress=None,
     emit_browser_frame=None,
+    approval_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     operation = tool.get("operation") or {}
     origin = str(operation.get("origin") or "")
@@ -251,6 +252,7 @@ async def execute_browser_tool(
             run_id=run_id,
             task_id=task_id,
             emit_progress=emit_progress, emit_browser_frame=emit_browser_frame,
+            approval_ctx=approval_ctx,
         )
         return {"ok": bool(outcome.get("success")), **outcome}
     except ChallengePause:

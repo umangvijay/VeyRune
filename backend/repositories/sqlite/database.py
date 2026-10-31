@@ -248,6 +248,8 @@ CREATE TABLE IF NOT EXISTS mcp_builds (
     error TEXT,
     origin TEXT,
     parent_run_id TEXT,
+    parent_workflow_id TEXT,
+    parent_task_id TEXT,
     wait_reason TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -419,6 +421,7 @@ CREATE TABLE IF NOT EXISTS usage_ledger (
     user_id TEXT NOT NULL,
     day TEXT NOT NULL,
     tokens INTEGER NOT NULL DEFAULT 0,
+    reserved INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, day)
 );
@@ -493,6 +496,7 @@ class DatabaseManager:
         await self._migrate_workflow_thread_columns()
         await self._migrate_task_columns()
         await self._migrate_mcp_build_columns()
+        await self._migrate_usage_columns()
         await self._connection.commit()
         logger.info("Database schema migration complete")
 
@@ -541,12 +545,19 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_runs_org ON workflow_runs(org_id)"
         )
 
+    async def _migrate_usage_columns(self) -> None:
+        cursor = await self._connection.execute("PRAGMA table_info(usage_ledger)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        if "reserved" not in cols:
+            # Atomic budget reservations (v5.6 review blocker A3).
+            await self._connection.execute("ALTER TABLE usage_ledger ADD COLUMN reserved INTEGER NOT NULL DEFAULT 0")
+
     async def _migrate_mcp_build_columns(self) -> None:
         cursor = await self._connection.execute("PRAGMA table_info(mcp_builds)")
         cols = {row[1] for row in await cursor.fetchall()}
         # Build provenance (audit G07): which surface asked for the build and
         # which run is waiting on it.
-        for column in ("origin", "parent_run_id", "wait_reason"):
+        for column in ("origin", "parent_run_id", "wait_reason", "parent_workflow_id", "parent_task_id"):
             if column not in cols:
                 await self._connection.execute(f"ALTER TABLE mcp_builds ADD COLUMN {column} TEXT")
 

@@ -6,8 +6,37 @@ status of each: **verified (local)** means implemented with regression tests tha
 run in this repository; **pending** means it requires resources this repository
 cannot produce (a real deployment, provider accounts, or independent review).
 
-A finding is *closed* only when its evidence line says so. A code change alone
-does not close a finding.
+A finding is *closed* only when its evidence meets the acceptance criteria.
+A code change or passing narrow test alone does not close a broader guarantee.
+
+## Review amendment — 31 October 2026
+
+The blanket remediation claim below has been withdrawn. The prior rows record
+reported historical evidence, not a new full-suite run during this documentation
+update. Review baseline: committed v5.5.0 (`3ef8063`), with concurrent working-tree
+fixes not certified here. See [current status](implementation-status.md) and the
+[22-phase file-by-file roadmap](full-stack-roadmap.md).
+
+| Finding/gate | Revised scope | Acceptance still needed |
+|---|---|---|
+| F01 invitations | Flow exists; legacy direct-add conversion is in progress | All paths plus transactional accept/revoke/duplicate races |
+| F08 usage | Ledger exists; SQLite commit fix is in progress | Separate connections/restart, atomic reservations and complete paid-call accounting |
+| F09 limits | Local counters are bounded | Shared multi-replica enforcement |
+| F07 effects | Quarantine/resolution primitives exist | Actual provider receipts and controlled resolution coverage |
+| G02 coverage | Execution predicate and displayed coverage diverged in a focused check | Changed definitions/credentials invalidate both |
+| G03/G04 runtime | Packaging status checks exist; host execution is disabled | Content-tampering rejection and trusted isolated protocol runner |
+| G07 build recovery | Both paths record metadata; orchestrator still ran inline in baseline | Unified durable dispatch and crash/resume tests |
+| Browser actions | Local observe/act and challenge handling exist | Cleanup, session ownership and action-level approval coverage |
+| Learning | Router records execution outcomes | Verified task rewards and real evaluation metrics |
+
+Focused in-memory checks in the preceding review showed SQLite writes removable
+by rollback, modified standalone contents still marked deployable, and invalidated
+operations still counted in coverage. They are not cloud exploit or full-suite
+claims. Changes arriving concurrently must be rechecked before these rows close.
+
+Historical test totals in this packet differ by release (for example 263 and
+279). Retain exact run logs and revisions rather than treating either number as
+a fresh result. Configuration of a CI step is not proof that its current run passed.
 
 ---
 
@@ -22,7 +51,7 @@ does not close a finding.
 | Revocation enforced; denylist outage fails closed (503) | **Verified (local)** | `backend/tests/test_audit_security.py` |
 | Membership creation never mutates roles (router + repository, atomic) | **Verified (local)** | `backend/tests/test_audit_security.py` |
 | Owner-only role-change holds on every path | **Verified (local)** + router guards | `backend/api/routers/orgs.py`, `test_orgs_rbac.py` |
-| Accepted-invitation lifecycle (invite → accept) | **Verified (local)** — invite tokens hashed + single-use, acceptance creates membership atomically with the create-only invariant, email-matched, expiry + revocation; UI issues one-time tokens | `backend/tests/test_org_invitations.py`, `dashboard/orgs/page.tsx` |
+| Accepted-invitation lifecycle (invite → accept) | **Partial; reopened** — basic invitation tests exist; legacy path and transaction/concurrency acceptance remain | `backend/tests/test_org_invitations.py`, `dashboard/orgs/page.tsx` |
 | SSO / MFA / provisioning | **Pending** (enterprise option) | — |
 
 ## 2. Tenant isolation
@@ -38,35 +67,35 @@ does not close a finding.
 | Evidence required | Status | Where |
 |---|---|---|
 | Expired RUNNING tasks reclaimable (Firestore parity) | **Verified by source + contract tests** — live kill-test requires cloud | `backend/repositories/firestore/workflow_repository.py`, `test_chaos_recovery.py` (SQLite path) |
-| Duplicate delivery executes exactly once | **Verified (local)** — stack-level test | `backend/tests/test_chaos_recovery.py` |
+| Completed local work suppresses duplicate execution | **Verified (local)** — stack-level test | `backend/tests/test_chaos_recovery.py` |
 | Old execution cannot overwrite a reclaimed task (fencing) | **Verified (local)** | `backend/tests/test_chaos_recovery.py` |
 | Uncertain-outcome handling | **Verified (local)** — uncertain state quarantines ambiguous outcomes and crash-orphaned locks (worker sweep); replay blocked with explicit reconciliation message; operator/provider receipt resolves via reconcile_uncertain | `backend/tests/test_uncertain_reconciliation.py` |
 | Provider-specific reconciliation receipts | **Pending** — requires real provider accounts | — |
 | Connector lifecycle: untested revisions cannot execute | **Verified (local)** — per-operation evidence + trust-tier gate | `backend/tests/test_connector_coverage.py`, `test_audit_security.py` (G01/G02) |
-| Standalone server packaging never deployable without protocol tests | **Verified (local)** | `backend/tests/test_standalone_packaging.py` (G03) |
+| Standalone packaging protocol-status checks | **Partial** — tests cover status flags; content-bound evidence and isolated runtime remain | `backend/tests/test_standalone_packaging.py` (G03) |
 | Provenance labels (official/extracted/inferred) | **Verified (local)** | `backend/tests/test_connector_coverage.py` (G06) |
-| Both build entry points share one durable record | **Verified (local)** | `backend/tests/test_connector_build_service.py` (G07) |
+| Both build entry points record build metadata | **Partial** — equivalent queued execution/restart semantics not established | `backend/tests/test_connector_build_service.py` (G07) |
 | **Self-extension loop (page-48 happy path)**: waiting run → durable build (origin + parent link) → adapter from real spec → live probe → verified registration → original run resumes and completes → auditable record | **Verified (local)** — full lifecycle integration test | `backend/tests/test_self_extension_loop.py` |
 | Deliverable artifact validates and preserves user facts | **Verified (local)** — rendered HTML opens, contains actual facts, no placeholders; invented employers flagged; ATS score labeled heuristic | `backend/tests/test_resume_deliverable.py` (G08) |
-| Release gates: CI runs full tests inside the candidate images | **Verified** — cloudbuild runs the pytest suite in-image with `--network=none`; frontend gate runs lint (max-warnings=0) + unit + typecheck before image build | `cloudbuild.yaml`, `cloudbuild.frontend.yaml` (F16) |
+| Release gate configuration | **Configured** — API image pytest, worker import smoke, frontend lint/unit/typecheck; current run evidence and real-backend browser gates remain | `cloudbuild.yaml`, `cloudbuild.frontend.yaml` (F16) |
 | Resume deliverable grounding (no invented employers/degrees unnoticed) | **Verified (local)** — deterministic check + heuristic score label | `backend/services/resume_builder.py` (G08) |
 
 ## 4. Durability and shared controls
 
 | Evidence required | Status | Where |
 |---|---|---|
-| Daily token cap survives restart and spans processes | **Verified (local)** — durable ledger, atomic increments both backends | `backend/tests/test_usage_ledger.py` (F08) |
-| Ledger failures are explicit (503), never silent pass | **Verified (local)** | `backend/tests/test_usage_ledger.py` |
+| Usage ledger persists and enforces a cross-process cap | **Reopened** — commit fix in progress; existing test shares a connection; reservation coverage required | `backend/tests/test_usage_ledger.py` (F08) |
+| Ledger read failures are explicit (503) | **Narrow local evidence** — recording failures and missing accounting need separate coverage | `backend/tests/test_usage_ledger.py` |
 | Rate limiting holds across replicas | **Partially closed** — trusted-proxy parsing, bounded state, group quotas done; *distributed* counters need Cloud Armor or a shared store (deployment-stage) | `backend/security/rate_limiter.py` |
 | Blog/contact submissions durable + validated + rate-limited | **Verified (local)** — backend content repo; restart/scaling test requires deployment | `backend/api/routers/blogs.py`, `contact.py` |
 | Dead-letter quarantine configured | **Verified in Terraform** — DLQ topics, quarantine subscriptions, bounded retries; alerting + replay drill are deployment-stage | `terraform/modules/pubsub/main.tf` |
-| Budget reservations reconcile against provider usage | **Pending** — requires provider billing access | — |
+| Budget reservations reconcile against provider usage | **Pending acceptance** — implement/verify reservation wiring locally; invoice comparison additionally needs provider access | — |
 
 ## 5. Frontend acceptance
 
 | Evidence required | Status | Where |
 |---|---|---|
-| Session refresh: concurrent requests, cross-tab, 204 | **Verified (local)** — single-flight + Web Locks + stale guards; e2e regression | `frontend/src/lib/auth-session.ts`, `e2e/session-expiry.spec.ts` |
+| Session refresh coordination and 204 handling | **Partial** — local tests exist; real two-tab and unsupported-Web-Locks acceptance remain | `frontend/src/lib/auth-session.ts`, `e2e/session-expiry.spec.ts` |
 | OAuth configuration consistent (CSP script/frame/connect + build var + clean disabled state) | **Verified (config)** — live Google sign-in requires real client credentials | `frontend/next.config.ts`, `cloudbuild.frontend.yaml` |
 | ESLint quality gate | **Verified** — 0 errors, 0 warnings | CI-able |
 | Build observation stops on unmount; reload resumes from build ID | **Verified (local)** | `dashboard/integrations/create/page.tsx` (G05) |
@@ -92,17 +121,33 @@ does not close a finding.
 | Invitation accept UI | invitee surface on the orgs page (paste token → accept) | `dashboard/orgs/page.tsx` |
 | Loopback SSRF seam | numeric-loopback allowance is a TEST-ONLY flag, default strict; workflow core.http can never reach app-localhost | `openapi_parser.py` (`_LOOPBACK_TESTING`) |
 
+## v5.6 review closure (second focused review, 31 Oct)
+
+| Finding | Status | Evidence |
+|---|---|---|
+| Membership acceptance bypass (members route) | **Closed** — the route now creates a pending invitation (202); `org_repo.add_member` is never invoked by it; tests assert the smoking gun | `test_v56_review_regressions.py` |
+| SQLite usage persistence (missing commit) | **Closed** — add_usage commits; cross-connection durability test (separate DatabaseManager instances) | `test_v56_review_regressions.py` |
+| Budget not an atomic reservation | **Closed** — guarded-upsert reserve before every paid call, settle after; concurrent near-cap racers cannot both win; budget counts settled+holds | `test_v56_review_regressions.py`, `test_usage_ledger.py` |
+| Firestore invitation races | **Closed** — accept is one transaction (invite read + membership create + status flip); token-hash doc id; deterministic pending marker for duplicate creation | `backend/repositories/firestore/sidecar.py` |
+| Artifact evidence not bound to content | **Closed** — protocol results record `content_hash`; mark_deployable refuses when content changed after testing; exact dependency pins | `test_standalone_packaging.py` |
+| Coverage helper stale/duplicated | **Closed** — one authoritative function, digest-verified when spec_hash/credential supplied; factory passes both | `test_connector_coverage.py` |
+| Orchestrator builds not restart-safe | **Closed** — agent builds dispatch through the queued lifecycle; parent task parks as a durable approval; the worker resolves it and re-dispatches when the build lands | `test_connector_build_service.py` |
+| Browser consequential actions ungated | **Closed** — form submissions and submit-control clicks pass through the persisted, argument-bound approval gate | `web_agent.py` (`_is_consequential`) |
+| Browser session leaks / unbounded pauses | **Closed** — owned resources close by reference even without a registry entry; session leases (30 min) swept by the worker | `browser_sessions.py`, `worker.py` |
+| Rate limiting across replicas | **Open (deployment-stage)** — needs Cloud Armor or a shared store on the actual topology | — |
+| Generated-code isolated runner | **Open (product work)** — host execution disabled; supported runner is a scoped build | — |
+| Cloud recovery, load, live OAuth, a11y journeys | **Open (deployment-bound)** | — |
+
 ## Release claim this packet supports today
 
-> The 30-Oct audit's F01–F16 baseline and G01–G08 observations are remediated
-> and regression-tested at the repository level: 263 backend tests (including
-> 8 adversarial authorization tests), 26 frontend unit tests, 16 browser E2E
-> tests, ESLint clean. The release verdict beyond local evidence is unchanged:
-> **not ready for unrestricted public or enterprise launch** until the
-> deployment-stage items above are demonstrated on the actual production
-> candidate.
+The repository has substantial implementation and previously reported local
+regression/image evidence. Findings listed in the amendment remain open or in
+progress. Neither “all F01–F16/G01–G08 closed” nor “only deployment remains” is
+supported. Required source fixes and candidate-specific operational evidence must
+pass before the selected launch scope is accepted. No production certification
+is claimed.
 
-## Change ledger (implementation vs audit findings)
+## Historical implementation ledger (qualified by the amendment above)
 
 | Finding | Implementation | Regression evidence |
 |---|---|---|

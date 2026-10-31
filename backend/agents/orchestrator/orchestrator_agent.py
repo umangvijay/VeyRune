@@ -113,20 +113,52 @@ def get_orchestrator_agent(tool_router=None, catalog_json: str = "[]", memory_re
                 method = "url"
             else:
                 method = "prompt"
-            # Audit G07: even the agent-initiated build gets ONE durable
-            # record — origin and the waiting parent run persist with it, so
-            # a restart mid-build leaves a recoverable trace and the stage
-            # logs land in the same place as API-initiated builds.
-            from backend.services.connector_build_service import ORIGIN_ORCHESTRATOR, track_inline_build
-            track = await track_inline_build(
-                tool_router.mcp_repo, user_id=user_id, method=method,
+            # Audit G07 + v5.6 A10: the agent-initiated build goes through
+            # the SAME queued lifecycle as API builds (durable record + a
+            # dispatched workflow task), and the parent task PARKS as a
+            # durable approval. The worker resumes it when the build lands —
+            # a restart at any point loses nothing.
+            from backend.services.connector_build_service import (
+                ORIGIN_ORCHESTRATOR, request_durable_build,
+            )
+            dispatch = await request_durable_build(
+                tool_router, user_id=user_id, method=method,
                 source=source, name=name, origin=ORIGIN_ORCHESTRATOR,
                 parent_run_id=(execution_context or {}).get("run_id"),
+                parent_workflow_id=(execution_context or {}).get("workflow_id"),
+                parent_task_id=(execution_context or {}).get("task_id"),
+                workflow_engine=(execution_context or {}).get("workflow_engine"),
             )
-            build_id = track["build_id"]
-            result = await factory_agent.run_build(
-                user_id=user_id, method=method, source=source, name=name,
-                build_id=build_id,
+            build_id = dispatch["build_id"]
+            # Park the parent task as a durable approval. The arguments carry
+            # the build linkage; the worker approves+resumes when the queued
+            # build completes (v5.6 A10).
+            from backend.services.approvals_engine import ApprovalsEngine, ApprovalRequiredException
+            from backend.models.schemas import RiskLevel
+            from backend.models.security import AutonomyLevel
+            pending = ApprovalsEngine().create_approval_request(
+                user_id=user_id,
+                tool_name="build_integration",
+                tool_version="1",
+                risk_level=RiskLevel.HIGH,
+                autonomy_level=AutonomyLevel.L2_SEMI_AUTONOMOUS,
+                arguments={
+                    "build_id": build_id,
+                    "build_run_id": dispatch["run_id"],
+                    "method": method,
+                    "source": source[:400],
+                    "name": name or "",
+                    "_challenge_type": "capability_build",
+                    "_challenge_url": f"sandtable://builds/{build_id}",
+                },
+                workflow_id=(execution_context or {}).get("workflow_id") or "unknown",
+                run_id=(execution_context or {}).get("run_id") or "unknown",
+                task_id=(execution_context or {}).get("task_id") or "unknown",
+            )
+            raise ApprovalRequiredException(
+                f"Building the missing integration (build {build_id[:8]}); "
+                "the workflow resumes automatically when it is ready.",
+                pending,
             )
             # MCPFactoryAgent deliberately returns a status object so the API can
             # persist build diagnostics. At the agent-tool boundary, however, a
@@ -134,7 +166,7 @@ def get_orchestrator_agent(tool_router=None, catalog_json: str = "[]", memory_re
             # string lets the model continue as if the integration exists.
             if result.get("status") != "success":
                 raise RuntimeError(result.get("message") or "MCP integration build failed")
-            if result.get("status") == "success" and api_credential_name:
+            if api_credential_name and result.get("mcp_id"):
                 existing_auth = {}
                 try:
                     mcp_row = await tool_router.mcp_repo.get_mcp(result["mcp_id"])

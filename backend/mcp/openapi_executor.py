@@ -78,6 +78,7 @@ async def execute_openapi_tool(
     task_id: Optional[str] = None,
     emit_progress=None,
     emit_browser_frame=None,
+    approval_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     operation = tool.get("operation") or {}
     if not operation:
@@ -88,6 +89,7 @@ async def execute_openapi_tool(
             tool, arguments, user_id=user_id, secrets_repo=secrets_repo,
             run_id=run_id, task_id=task_id,
             emit_progress=emit_progress, emit_browser_frame=emit_browser_frame,
+            approval_ctx=approval_ctx,
         )
 
     parser = OpenAPIParser()

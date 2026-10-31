@@ -2,27 +2,28 @@
 
 AgentOS is a local-first autonomous workspace. The laptop default is SQLite + an in-process worker. Firestore / Pub/Sub / Cloud Run remain optional when `STORAGE_BACKEND=firestore`.
 
+**Review boundary — 31 October 2026:** topology and component presence do not
+establish deployed guarantees. See [implementation status](implementation-status.md)
+and [the full-stack roadmap](full-stack-roadmap.md). Planned outbox commands,
+atomic budget reservations, managed browser leases, verified ReAct records and
+experiment services are phase contracts, not implied current infrastructure.
+
 ## Tagline
 
 Tell it what you want. It builds the tools and does the work.
 
 ## Runtime
 
-```
-Browser (Next.js :3000)
-        │  REST + SSE + cookies
-        ▼
-FastAPI (:8000)
-  auth, contact SMTP, credentials vault, MCP registry,
-  workflows, resume, studio, approvals
-        │
-        ▼
-Workflow engine (DAG)
-  Intent → Planner (task decomposition) → execute
-        │
-        ├── core.http / core.health / core.chat / core.mcp_build
-        ├── Orchestrator + MCP tool catalog
-        └── WebAgent (Playwright, origin-locked)
+```mermaid
+flowchart TD
+  UI["Next.js workspace"] --> API["FastAPI and authorization"]
+  API --> Engine["Workflow engine"]
+  Engine --> Core["Core tasks"]
+  Engine --> Agent["Orchestrator"]
+  Agent --> Tools["Validated tools"]
+  Agent --> Browser["Browser runtime"]
+  Engine --> Store["State and events"]
+  Store --> UI
 ```
 
 Planner **is** the decomposer. There is no third LLM hop named Decomposer.
@@ -39,7 +40,10 @@ Planner **is** the decomposer. There is no third LLM hop named Decomposer.
 | HTTP API, no spec | `prompt` | Gemini spec **or** sketched OpenAPI against a known public host | HTTP tools |
 | Website, no API | `website` | Playwright tool plan locked to origin | `runOnSite`, `login`, `openHome`, … |
 
-Chat and **Integrations → Create** share this factory. The next task in the same run, or the next message in the thread, can call the new tools.
+Chat and **Integrations → Create** share factory components. Tools still need
+validation, credentials, policy and runtime eligibility. The reviewed API and
+orchestrator build entry points have different dispatch boundaries; roadmap
+phase 04 specifies a common durable command lifecycle.
 
 ## Data stores (local)
 
@@ -47,7 +51,7 @@ Chat and **Integrations → Create** share this factory. The next task in the sa
 | --- | --- |
 | SQLite | `data/agentos.db` — users, runs, tasks, events, MCP registry, schedules |
 | Vault ciphertext | secrets table, AES-256-GCM |
-| Contact inbox | `data/contact_inbox.json` plus SMTP to `CONTACT_TO_EMAIL` |
+| Contact inbox and blogs | Backend content repository: SQLite records or Firestore collections; delivery status is separate from persistence |
 | JWT keys | `backend/security/keys/*.pem` (gitignored) |
 
 ## Data flow
@@ -73,6 +77,11 @@ flowchart LR
 ## Self-healing
 
 Retryable: timeouts, network, 429/quota. Semantic errors can enter RECOVERING when `recovery_enabled` (default on new tasks). Not retried: SSRF, 401/403, CAPTCHA/OTP/MFA (those pause).
+
+Recovery policy must distinguish safe retries from uncertain external effects.
+Advanced verified recovery, persistent evaluations, controlled self-improvement,
+and contextual routing are described separately in roadmap phases 10–14. The
+current adaptive model router does not train model weights.
 
 ## Optional cloud mode
 

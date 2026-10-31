@@ -32,6 +32,22 @@ def manifest_digest(manifest: Dict[str, Any]) -> str:
     ).hexdigest()
 
 
+def content_hash(artifact: Dict[str, Any]) -> str:
+    """Hash of the IMMUTABLE EXECUTABLE CONTENT ONLY (server code, tool
+    schemas, dependency lock) — deliberately excluding test evidence and
+    deployability flags, so recorded protocol tests can be bound to the
+    exact content they validated (v5.6 A8)."""
+    material = {
+        "server_code": artifact.get("server_code"),
+        "tools": artifact.get("tools"),
+        "dependency_lock": artifact.get("dependency_lock"),
+        "spec_provenance": artifact.get("spec_provenance"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, default=str).encode()
+    ).hexdigest()
+
+
 def package_standalone_server(
     *,
     manifest: Dict[str, Any],
@@ -51,18 +67,19 @@ def package_standalone_server(
         "tools": [{k: t.get(k) for k in ("tool_name", "description", "input_schema", "operation")}
                   for t in tools],
         "server_code": server_code,
+        # Exact dependency resolution (v5.6 A8): ranges are not locks —
+        # a rebuild with drifted dependencies would not be the same artifact.
         "dependency_lock": {
-            # Pinned runtime contract for the exported server (audit G03:
-            # "versioned source + dependency lock").
-            "python": "3.11",
-            "mcp": "1.x",
-            "httpx": ">=0.27,<1.0",
-            "pydantic": ">=2.7,<3.0",
+            "python": "3.11.16",
+            "mcp": "1.16.0",
+            "httpx": "0.27.2",
+            "pydantic": "2.9.2",
         },
         "protocol_tests": {name: {"status": "not_run"} for name in REQUIRED_PROTOCOL_TESTS},
         "deployable": False,
         "not_deployable_reason": "Protocol tests have not run in a supported runtime",
     }
+    artifact["content_hash"] = content_hash(artifact)
     artifact["artifact_hash"] = hashlib.sha256(
         json.dumps(artifact, sort_keys=True, default=str).encode()
     ).hexdigest()
@@ -72,7 +89,15 @@ def package_standalone_server(
 def record_protocol_test(artifact: Dict[str, Any], test: str, *, passed: bool, detail: str = "") -> Dict[str, Any]:
     if test not in REQUIRED_PROTOCOL_TESTS:
         raise ValueError(f"Unknown protocol test: {test}")
-    updated = {**artifact, "protocol_tests": {**artifact["protocol_tests"], test: {"status": "passed" if passed else "failed", "detail": detail}}}
+    # Each result is BOUND to the content it exercised (v5.6 A8): if the
+    # server code changes afterwards, the binding breaks and the artifact
+    # can no longer be labeled deployable without re-running the tests.
+    updated = {**artifact, "protocol_tests": {**artifact["protocol_tests"], test: {
+        "status": "passed" if passed else "failed", "detail": detail,
+        "content_hash": content_hash(artifact),
+        "tested_at": datetime.now(timezone.utc).isoformat(),
+    }}}
+    updated["content_hash"] = content_hash(updated)
     updated["artifact_hash"] = hashlib.sha256(
         json.dumps(updated, sort_keys=True, default=str).encode()
     ).hexdigest()
@@ -80,12 +105,23 @@ def record_protocol_test(artifact: Dict[str, Any], test: str, *, passed: bool, d
 
 
 def mark_deployable(artifact: Dict[str, Any]) -> Dict[str, Any]:
-    """Flip deployable only when every protocol test passed on THIS artifact
-    (hash-bound). Anything less keeps the artifact quarantined."""
-    missing = [name for name in REQUIRED_PROTOCOL_TESTS
-               if artifact.get("protocol_tests", {}).get(name, {}).get("status") != "passed"]
-    if missing:
-        raise ValueError(
-            "Standalone server is not deployable: protocol tests not passed: " + ", ".join(missing)
-        )
+    """Flip deployable only when every protocol test passed AND the recorded
+    evidence is bound to the artifact's CURRENT immutable content (v5.6 A8:
+    editing server_code after testing invalidates the evidence)."""
+    current = content_hash(artifact)
+    missing = []
+    stale = []
+    for name in REQUIRED_PROTOCOL_TESTS:
+        entry = artifact.get("protocol_tests", {}).get(name, {})
+        if entry.get("status") != "passed":
+            missing.append(name)
+        elif entry.get("content_hash") != current:
+            stale.append(name)
+    if missing or stale:
+        reasons = []
+        if missing:
+            reasons.append("protocol tests not passed: " + ", ".join(missing))
+        if stale:
+            reasons.append("evidence is bound to different content (artifact changed after testing): " + ", ".join(stale))
+        raise ValueError("Standalone server is not deployable: " + "; ".join(reasons))
     return {**artifact, "deployable": True, "not_deployable_reason": None}

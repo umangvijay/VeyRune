@@ -1,5 +1,49 @@
 # Changelog
 
+## v5.6.0 — 2026-10-31
+
+### Second-review Phase A: every release blocker and High finding closed
+
+The 31-Oct focused review of v5.5.0 found two new release blockers and
+six High findings. All are closed with regressions — 292 backend +
+26 frontend + 16 e2e green.
+
+**Release blockers:**
+- **Membership acceptance bypass removed.** The legacy members route now
+  creates a pending invitation (202) — `org_repo.add_member` is provably
+  never invoked by it; membership exists only on ACCEPTANCE.
+- **Usage commits.** `add_usage` now commits; the durability test uses
+  two separate connections (the old test shared one and masked the bug).
+- **Atomic budget reservations.** Every paid model call runs
+  reserve(estimated max) → run → settle(actual): a guarded upsert makes
+  near-cap racers lose atomically on both SQLite and Firestore; the
+  budget check counts settled actuals plus open holds.
+
+**High:**
+- Firestore invitation acceptance is one transaction (invite read +
+  membership create + status flip); the invitation doc id IS the token
+  hash; a deterministic pending marker blocks duplicate invites atomically.
+- Standalone-server protocol results bind `content_hash` of the immutable
+  executable content; editing server code after testing invalidates
+  deployability. Dependency locks are exact versions.
+- Coverage counting collapsed to ONE authoritative function, digest-
+  verified against spec hash + credential when provided (the stale
+  duplicate is gone).
+- Orchestrator builds now dispatch through the queued lifecycle and park
+  the parent task as a durable approval; the worker resolves the approval
+  and re-dispatches the task when the build lands. A restart at any
+  point loses nothing.
+- Browser consequential actions (form submits, submit-control clicks)
+  pass through the persisted, argument-bound approval gate.
+- Browser resources close by reference even without a registry entry
+  (the Chromium leak); paused sessions carry a 30-minute lease swept by
+  the worker.
+
+**Deliberately deferred (documented in RELEASE_EVIDENCE.md):** shared
+rate limiting (Cloud Armor / shared store on real topology), the
+generated-code isolated runner, cloud recovery drills, live OAuth and
+accessibility journeys.
+
 ## v5.5.0 — 2026-10-31
 
 ### The defining lifecycle proven: the self-extending loop runs end to end

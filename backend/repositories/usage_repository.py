@@ -37,6 +37,10 @@ class SQLiteUsageRepository:
     async def add_usage(self, user_id: str, day: str, tokens: int) -> None:
         if tokens <= 0:
             return
+        # COMMIT is required: DatabaseManager.execute runs on a shared
+        # connection WITHOUT auto-commit. Without it the spend sits in an
+        # open transaction and vanishes on rollback/restart (v5.6 review
+        # blocker) — and other processes/connections can never see it.
         await self.db.execute(
             """
             INSERT INTO usage_ledger (user_id, day, tokens, updated_at)
@@ -47,6 +51,7 @@ class SQLiteUsageRepository:
             """,
             (user_id, day, int(tokens), datetime_now_utc()),
         )
+        await self.db.commit()
 
     async def get_usage(self, user_id: str, day: str) -> int:
         row = await self.db.fetch_one(
@@ -54,6 +59,68 @@ class SQLiteUsageRepository:
             (user_id, day),
         )
         return int(row["tokens"]) if row else 0
+
+    async def reserve_usage(self, user_id: str, day: str, tokens: int, cap: int) -> bool:
+        """Atomic budget reservation (v5.6 A3): the guarded upsert admits the
+        reservation ONLY IF reserved+actual+tokens stays within the cap. Two
+        processes racing near the cap cannot both win — the guard is inside
+        the single UPDATE."""
+        if tokens <= 0:
+            return True
+        cursor = await self.db.execute(
+            """
+            INSERT INTO usage_ledger (user_id, day, tokens, reserved, updated_at)
+            VALUES (?, ?, 0, ?, ?)
+            ON CONFLICT(user_id, day) DO UPDATE SET
+                reserved = reserved + excluded.reserved,
+                updated_at = excluded.updated_at
+            WHERE usage_ledger.reserved + usage_ledger.tokens + excluded.reserved <= %d
+            """ % int(cap),
+            (user_id, day, int(tokens), datetime_now_utc()),
+        )
+        await self.db.commit()
+        return cursor.rowcount > 0
+
+    async def settle_usage(self, user_id: str, day: str, reserved_tokens: int, actual_tokens: int) -> None:
+        """Replace the hold with the real spend: release the reserved amount,
+        count the actual tokens. Committed before returning."""
+        release = int(max(0, reserved_tokens))
+        spend = int(max(0, actual_tokens))
+        now = datetime_now_utc()
+        cursor = await self.db.execute(
+            """
+            UPDATE usage_ledger
+            SET reserved = MAX(0, reserved - ?),
+                tokens = tokens + ?,
+                updated_at = ?
+            WHERE user_id = ? AND day = ?
+            """,
+            (release, spend, now, user_id, day),
+        )
+        if cursor.rowcount == 0:
+            # Defensive: a settle without a visible reservation row still
+            # records the actual spend (the cap check already happened).
+            await self.db.execute(
+                """
+                INSERT INTO usage_ledger (user_id, day, tokens, reserved, updated_at)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(user_id, day) DO UPDATE SET
+                    tokens = tokens + excluded.tokens,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, day, spend, now),
+            )
+        await self.db.commit()
+
+    async def get_committed_usage(self, user_id: str, day: str) -> int:
+        """Spend counted against the cap: settled actuals + open holds."""
+        row = await self.db.fetch_one(
+            "SELECT tokens, reserved FROM usage_ledger WHERE user_id = ? AND day = ?",
+            (user_id, day),
+        )
+        if not row:
+            return 0
+        return int(row["tokens"] or 0) + int(row["reserved"] or 0)
 
 
 class FirestoreUsageRepository:
@@ -92,6 +159,55 @@ class FirestoreUsageRepository:
             return 0
         return int((snap.to_dict() or {}).get("tokens") or 0)
 
+    async def reserve_usage(self, user_id: str, day: str, tokens: int, cap: int) -> bool:
+        from google.cloud import firestore
+        db = await self._get_db()
+        ref = db.collection("usage_ledger").document(self._doc_id(user_id, day))
+
+        @firestore.async_transactional
+        async def reserve(transaction):
+            snap = await ref.get(transaction=transaction)
+            data = snap.to_dict() or {}
+            actual = int(data.get("tokens") or 0)
+            reserved = int(data.get("reserved") or 0)
+            if actual + reserved + int(tokens) > int(cap):
+                return False
+            transaction.set(ref, {
+                "user_id": user_id, "day": day,
+                "tokens": actual, "reserved": reserved + int(tokens),
+                "updated_at": datetime_now_utc(),
+            }, merge=True)
+            return True
+
+        return await reserve(db.transaction())
+
+    async def settle_usage(self, user_id: str, day: str, reserved_tokens: int, actual_tokens: int) -> None:
+        from google.cloud import firestore
+        db = await self._get_db()
+        ref = db.collection("usage_ledger").document(self._doc_id(user_id, day))
+
+        @firestore.async_transactional
+        async def settle(transaction):
+            snap = await ref.get(transaction=transaction)
+            data = snap.to_dict() or {}
+            current_reserved = int(data.get("reserved") or 0)
+            transaction.set(ref, {
+                "user_id": user_id, "day": day,
+                "tokens": int(data.get("tokens") or 0) + int(max(0, actual_tokens)),
+                "reserved": max(0, current_reserved - int(max(0, reserved_tokens))),
+                "updated_at": datetime_now_utc(),
+            }, merge=True)
+
+        await settle(db.transaction())
+
+    async def get_committed_usage(self, user_id: str, day: str) -> int:
+        db = await self._get_db()
+        snap = await db.collection("usage_ledger").document(self._doc_id(user_id, day)).get()
+        if not snap.exists:
+            return 0
+        data = snap.to_dict() or {}
+        return int(data.get("tokens") or 0) + int(data.get("reserved") or 0)
+
 
 # ── Process-wide holder (wired by RepositoryFactory.initialize) ────────
 
@@ -128,4 +244,17 @@ async def get_durable_usage(user_id: str) -> int:
         return await repo.get_usage(user_id, today_utc())
     except Exception:
         logger.exception("Durable usage read failed for %s", user_id)
+        raise
+
+
+async def get_committed_usage(user_id: str) -> int:
+    """Module-level helper: settled actuals + open reservation holds for the
+    user's current UTC day — the number the budget cap counts."""
+    repo = get_usage_repo()
+    if repo is None:
+        return 0
+    try:
+        return await repo.get_committed_usage(user_id, today_utc())
+    except Exception:
+        logger.exception("Committed usage read failed for %s", user_id)
         raise

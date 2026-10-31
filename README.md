@@ -10,6 +10,16 @@ It is not a chatbot with canned replies. Runs hit live HTTP APIs, a real browser
 
 **Stack:** Next.js (port 3000) · FastAPI (port 8000) · SQLite locally · Firestore on Cloud Run · Gemini (AI Studio key locally, or Vertex on GCP).
 
+**Readiness — 31 October 2026:** committed baseline v5.5.0 is under review.
+Local tests do not establish production certification. Membership, spending,
+browser, connector-evidence, and recovery gates remain; newer working-tree fixes
+need regression verification. Registration does not make every tool executable.
+
+Use the [22-phase full-stack roadmap](docs/full-stack-roadmap.md) for implementation
+steps, existing/proposed file paths, dependencies, acceptance tests, and rollout.
+[Current status](docs/implementation-status.md) separates present code from planned
+work; [release evidence](docs/RELEASE_EVIDENCE.md) records verification boundaries.
+
 ## Local and cloud
 
 The same codebase runs in both places. One setting switches storage; Gemini follows the key.
@@ -27,14 +37,14 @@ Repository: [umangvijay/AgentOS-an-Automation-tool](https://github.com/umangvija
 
 ## Features
 
-- **Dynamic MCP factory** — three ways to get tools: an OpenAPI URL, a description of any HTTP API with no spec, or a website with no API (origin-locked Playwright tools). Not a reverse-engineered private API.
+- **Dynamic MCP factory** — candidate tools from OpenAPI, API descriptions, or supported website workflows. Inferred operations require evidence; arbitrary apps are not guaranteed to work. Declarative adapters are the primary product; isolated generated-server execution has separate release gates.
 - **Chat-first automation** — workspace chat plans, builds missing integrations mid-run, then calls the new tools. Follow-up messages reuse the catalog.
 - **Orchestrator + DAG engine** — planner *is* the decomposer. Core nodes (HTTP, health, chat) run without a model.
-- **Self-healing** — timeouts, network errors, and 429/quota retry, lease-based task reclaim after worker crashes, bounded retry storms, and MCP-factory codegen that regenerates itself when its live probe crashes. CAPTCHA, OTP, and MFA pause for you instead of being treated as failures.
-- **Self-evolving routing** — an adaptive policy (UCB1 bandit) learns which model executes tasks best from real outcomes and re-ranks the fallback chain before every task; the leaderboard is public at `/usage/models`. Routing improves with evidence; model weights are never touched.
+- **Recovery foundation** — bounded retries, plan/input repair, leases, and uncertain-outcome quarantine. Provider reconciliation and deployed failure behavior need acceptance evidence. Supported authentication challenges pause for human intervention.
+- **Adaptive routing foundation** — UCB-style ranking and epsilon exploration reorder model candidates. Current execution-success signals need outcome verification before claiming improved task quality. This does not train model weights; see roadmap phases 12–14.
 - **Shared catalog** — publish verified integrations to `/dashboard/catalog`; installs clone the integration per user, never the publisher's credentials.
 - **API keys** — `vry_…` programmatic credentials for MCP clients and CI (hash-stored, shown once, individually revocable).
-- **Enterprise controls** — server-side logout revocation, per-user daily token budget with a hard stop, outbound signed run webhooks, data-retention purge, audit log (API + admin UI), rate limits on every state-changing surface.
+- **Security and operations foundation** — logout revocation, usage accounting, signed run webhooks, retention routines, audit records, and request limits. Atomic spending reservations, shared limits, and broader enterprise controls remain roadmap work.
 - **Human-in-the-loop** — AgentOS never fills CAPTCHA, SMS OTP, or MFA. Complete the check, then Resume.
 - **Vault** — AES-256-GCM credentials. After save, the API returns names only.
 - **ATS resume** — scan against a job description, tailor from notes, HTML preview and download.
@@ -51,6 +61,12 @@ Repository: [umangvijay/AgentOS-an-Automation-tool](https://github.com/umangvija
 | Website, no API | Vault login, then `Create MCP tools for https://…`, then `Log in with vault credential NAME and use runOnSite …` | Browser tools (`runOnSite`, `login`, …) locked to that origin |
 
 Same three paths exist on **Integrations → Create**.
+
+The examples and diagrams describe intended workflows. Execution requires
+operation-specific evidence, credentials, policy approval, and supported runtime
+behavior. A passing probe covers its operation, not an entire integration;
+inferred APIs and browser workflows need their own validation. Registration
+alone does not prove restart-safe execution or standalone-server support.
 
 ## Architecture
 
@@ -191,6 +207,11 @@ Set `LLM_PROVIDER=groq` and `GROQ_API_KEY` or `LLM_PROVIDER=huggingface` and `HF
 
 ## Docs
 
+- [Detailed full-stack roadmap: phases 00–21](docs/full-stack-roadmap.md)
+- [Phase index and execution order](docs/PHASES.md)
+- [Current implementation status](docs/implementation-status.md)
+- [Release evidence and reopened findings](docs/RELEASE_EVIDENCE.md)
+- [Frontend development guide](frontend/README.md)
 - [Architecture](docs/architecture.md)
 - [MCP builder](docs/mcp-builder.md)
 - [Automation](docs/automation.md)
@@ -203,6 +224,9 @@ Set `LLM_PROVIDER=groq` and `GROQ_API_KEY` or `LLM_PROVIDER=huggingface` and `HF
 
 ## Honest limits
 
+- Advanced self-improvement, contextual routing, new specialized subagents, and
+  optional 3D workflow exploration are planned extensions. Their roadmap entries
+  do not imply shipped functionality.
 - Website MCP is **UI automation**, not a hidden official API.
 - CAPTCHA, SMS OTP, and bank MFA require you. AgentOS will not complete them for you.
 - Paid APIs (for example live Stripe charges) need your own keys in the vault.

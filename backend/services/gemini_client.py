@@ -1,7 +1,9 @@
 """Shared Gemini client — real model calls, config-driven model names."""
 
 import asyncio
+import contextvars
 import json
+from contextlib import asynccontextmanager
 import logging
 import re
 from typing import Any, Optional, Type
@@ -344,6 +346,43 @@ def _coerce_json(text: str) -> Any:
 
 
 
+MAX_OUTPUT_RESERVE_TOKENS = 8192  # reserved headroom per paid call
+
+_active_reservation: "contextvars.ContextVar[Optional[dict]]" = contextvars.ContextVar("budget_reservation", default=None)
+
+@asynccontextmanager
+async def _budget_reservation(prompt: str):
+    """Atomic budget reservation (v5.6 A3): reserve the estimated MAXIMUM
+    before the paid call, settle the actual after. Two processes racing near
+    the cap cannot both admit work — the guard is a single guarded upsert."""
+    user_id = get_user_id()
+    from backend.config.settings import settings as app_settings
+    from backend.repositories.usage_repository import get_usage_repo, today_utc
+    repo = get_usage_repo()
+    if not user_id or repo is None:
+        yield None
+        return
+    est_in = (len(prompt or "") + 3) // 4
+    est_max = est_in + app_settings.MAX_OUTPUT_RESERVE_TOKENS
+    ok = await repo.reserve_usage(user_id, today_utc(), est_max,
+                                  cap=app_settings.DEFAULT_DAILY_TOKEN_LIMIT)
+    if not ok:
+        raise GeminiQuotaExceeded(
+            "Daily token budget exhausted (reservation refused). "
+            "Raise the limit in Settings or wait for the window to reset."
+        )
+    state = {"reserved": est_max, "actual": 0}
+    token = _active_reservation.set(state)
+    try:
+        yield state
+    finally:
+        _active_reservation.reset(token)
+        try:
+            await repo.settle_usage(user_id, today_utc(), state["reserved"], state["actual"])
+        except Exception:
+            logger.exception("Budget settlement failed for %s", user_id)
+
+
 def _record_usage_estimate(prompt: str, output: str) -> None:
     """Record an estimated token spend for the user (4 chars/token), so the
     daily budget check in workflow creation actually has data. The budget is
@@ -361,7 +400,12 @@ def _record_usage_estimate(prompt: str, output: str) -> None:
         out = max(0, (len(output or "") + 3) // 4)
         total = inp + out
         context_manager.record_usage(user_id, inp, out)
-        if total > 0:
+        # With an open reservation, the settle path counts the actual spend
+        # (releasing the unused hold). Without one, record durably — committed.
+        reservation = _active_reservation.get()
+        if reservation is not None:
+            reservation["actual"] = max(reservation["actual"], total)
+        elif total > 0:
             import asyncio
             from backend.repositories.usage_repository import record_usage_durably
             try:
@@ -374,7 +418,7 @@ def _record_usage_estimate(prompt: str, output: str) -> None:
         logger.debug("usage estimate recording failed", exc_info=True)
 
 
-async def generate_text(prompt: str, model: Optional[str] = None) -> str:
+async def _generate_text_unreserved(prompt: str, model: Optional[str] = None) -> str:
     if _huggingface_is_only_configured_provider():
         return await _huggingface_complete(prompt, json_mode=False, model=model)
     if not model and _groq_is_only_configured_provider():
@@ -443,7 +487,7 @@ async def generate_text(prompt: str, model: Optional[str] = None) -> str:
         raise last or GeminiQuotaExceeded("Gemini quota exhausted. Add your own key in Settings.")
 
 
-async def generate_json(prompt: str, schema: Optional[Type] = None, model: Optional[str] = None) -> Any:
+async def _generate_json_unreserved(prompt: str, schema: Optional[Type] = None, model: Optional[str] = None) -> Any:
     if _huggingface_is_only_configured_provider():
         return _coerce_json(await _huggingface_complete(prompt, json_mode=True, model=model))
     if not model and _groq_is_only_configured_provider():
@@ -596,3 +640,15 @@ async def search_web(query: str) -> list[dict]:
     if not sources:
         raise RuntimeError("Search returned no grounded sources; research cannot be verified")
     return list(sources.values())
+
+
+async def generate_text(prompt: str, model: Optional[str] = None) -> str:
+    """Public entry: every paid call runs inside an atomic budget reservation
+    (reserve estimated max → run → settle actual)."""
+    async with _budget_reservation(prompt):
+        return await _generate_text_unreserved(prompt, model=model)
+
+
+async def generate_json(prompt: str, schema: Optional[Type] = None, model: Optional[str] = None) -> Any:
+    async with _budget_reservation(prompt):
+        return await _generate_json_unreserved(prompt, schema=schema, model=model)

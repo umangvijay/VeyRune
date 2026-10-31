@@ -200,10 +200,16 @@ class MCPFactoryAgent:
             # A registered definition is not executable until its operation evidence passes policy.
             auto_enable = trust_tier == "verified"
 
-            # Per-operation test coverage (audit G02): the probe proves exactly
-            # one operation; everything else is explicitly untested.
+            # Prefer the spec's own security scheme placement; fall back to the requested auth_type.
+            auth_meta = auth_metadata_from_spec(model, fallback_type=auth_type)
+
+            # Per-operation test coverage (audit G02 / v5.6 A9): digest-verified
+            # against this revision's spec hash and the credential binding.
             from backend.services.tool_validation import coverage_from_tools
-            test_coverage = coverage_from_tools(tools)
+            test_coverage = coverage_from_tools(
+                tools, spec_hash=spec_hash,
+                credential_ref=auth_meta.get("credential_ref"),
+            )
             capabilities_omitted = max(0, total_operations - len(tools))
             await self._log(
                 build_id,
@@ -212,8 +218,6 @@ class MCPFactoryAgent:
                 f"provenance={spec_provenance}; {capabilities_omitted} capability(ies) not selected",
                 logs,
             )
-            # Prefer the spec's own security scheme placement; fall back to the requested auth_type.
-            auth_meta = auth_metadata_from_spec(model, fallback_type=auth_type)
 
             await self._log(build_id, "Registering MCP in the catalog", logs)
             mcp_id = await self.registry.register_mcp(

@@ -4,6 +4,11 @@ Production topology on Cloud Run: `veyrune-api` (FastAPI, RUN_WORKER=0),
 `veyrune-worker` (separate consumer, Pub/Sub), `veyrune-frontend`
 (Next.js standalone), Firestore, Pub/Sub, Secret Manager.
 
+**Verification note — 31 October 2026:** confirm actual project, resource type,
+image digest, configuration and permissions before using any command. This
+document is not evidence that a drill passed. Record outcomes in
+[RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md); roadmap phase 20 defines acceptance.
+
 ## Deploy
 
 ```bash
@@ -38,32 +43,32 @@ gcloud run services update-traffic veyrune-api --region us-central1 \
   --to-revisions <PREVIOUS_REVISION>=100
 ```
 
-Rollback is the first response to a bad deploy — database migrations in
-this codebase are additive (new tables/columns only), so older revisions
-keep working against newer schemas.
+Choose rollback or containment according to the incident. Additive schemas alone
+do not guarantee old-code compatibility: event formats, policy, data semantics,
+and migrations also matter. Test rollback against the actual candidate and data.
 
 ## Kill switch
 
-`scripts/gcp-killswitch/` contains the emergency-stop tooling. Use when
-active abuse (quota burn, runaway schedules) must stop faster than a
-rollback: pause the worker service first (stops all execution), then the
-API if needed:
+`scripts/gcp-killswitch/` contains emergency-stop tooling that must be checked
+against the deployed topology. The pull consumer is a Cloud Run Worker Pool,
+not an HTTP service; do not use a service-scaling command as its stop procedure.
 
-```bash
-gcloud run services update veyrune-worker --region us-central1 --min-instances=0 --max-instances=0
-```
+Before launch, rehearse and record resource-specific steps to stop new schedule
+and API submissions, pause worker consumption, contain already-running browser
+or provider actions, and verify no further expenditure. Preserve uncertain
+effect records for reconciliation. Restart only after checking backlog and
+duplicate-delivery behavior. Do not assume stopping intake cancels in-flight work.
 
 ## Runbook: common incidents
 
-**429s spiking on /workflows** — the per-user rate limit (10/min) or
-daily token budget doing its job. Confirm in audit log
-(`GET /api/v1/admin/audit?event_type=...`); raise per-user limits via
-admin if legitimate.
+**429s spiking on /workflows** — inspect the specific refusal, user/tenant scope,
+replica count, queue pressure and accounting health. Local counters and token
+checks do not by themselves prove global enforcement. Do not raise limits before
+identifying the source and verifying spending reservations.
 
-**Model quality regressions** — check the learned routing:
-`GET /api/v1/usage/models`. The UCB1 policy shifts traffic away from
-failing models automatically; `POST`-reset is admin-only via the repo if
-ever needed.
+**Model quality regressions** — inspect `GET /api/v1/usage/models` alongside
+verified task outcomes. Runner success can differ from useful completion. Use
+documented configuration/rollback procedures; no policy-reset API is implied here.
 
 **Memory/JSON 5xx with hostile payloads** — should not happen: the
 canonical JSON layer (`backend/security/json_safety.py`) plus surrogate
@@ -85,6 +90,10 @@ the worker's daily pass. Workflow runs are never auto-deleted. Export
 before large deletions if compliance requires it.
 
 ## Model selection (A/B guidance)
+
+The observations below are historical, not current model recommendations.
+Do not select or upgrade providers from these tiny samples. Phase 12 requires
+representative outcomes; phase 14 adds controlled routing evaluation.
 
 The adaptive policy (`GET /api/v1/usage/models`) re-ranks the model chain
 from real task outcomes. Live A/B evidence from the audit (n=1 each,

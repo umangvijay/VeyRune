@@ -108,7 +108,10 @@ async def test_f02_repository_duplicate_add_never_mutates_role(factory):
 
 @pytest.mark.asyncio
 async def test_f02_router_readd_returns_409_and_role_holds(client, factory):
-    """Audit acceptance: an admin cannot demote/promote another admin via any add endpoint."""
+    """Audit acceptance: an admin cannot demote/promote another admin via any
+    add endpoint. The members route creates an INVITATION (202) — never a
+    membership; a duplicate pending invite is 409; roles change only through
+    the owner-only role endpoint after acceptance."""
     owner_session = await _signup(client, "owner-f02b@example.com")
     owner_id = owner_session["user"]["id"]
     member_session = await _signup(client, "member-f02b@example.com")
@@ -120,11 +123,20 @@ async def test_f02_router_readd_returns_409_and_role_holds(client, factory):
 
     first = await client.post(f"/api/v1/orgs/{org_id}/members", headers=headers, json={
         "email": "member-f02b@example.com", "role": "admin"})
-    assert first.status_code == 201, first.text
+    assert first.status_code == 202, first.text
+    assert first.json()["status"] == "invitation_pending"
+    # No membership exists before acceptance.
+    assert await factory.org_repo.get_member_role(org_id, member_id) is None
 
     replay = await client.post(f"/api/v1/orgs/{org_id}/members", headers=headers, json={
         "email": "member-f02b@example.com", "role": "viewer"})
     assert replay.status_code == 409, replay.text
+    assert await factory.org_repo.get_member_role(org_id, member_id) is None
+
+    # Accept → member with the invited role.
+    accepted = await client.post("/api/v1/orgs/invitations/accept", headers=_auth_headers(member_session), json={
+        "token": first.json()["token"]})
+    assert accepted.status_code == 200
     assert await factory.org_repo.get_member_role(org_id, member_id) == "admin"
 
     detail = await client.get(f"/api/v1/orgs/{org_id}", headers=headers)
@@ -248,7 +260,10 @@ async def test_f01_oversight_excludes_personal_runs_and_shows_only_org_owned(cli
 
     added = await client.post(f"/api/v1/orgs/{org_id}/members", headers=headers, json={
         "email": "member-f01@example.com", "role": "member"})
-    assert added.status_code == 201, added.text
+    assert added.status_code == 202, added.text
+    accepted = await client.post("/api/v1/orgs/invitations/accept", headers=_auth_headers(member_session), json={
+        "token": added.json()["token"]})
+    assert accepted.status_code == 200, accepted.text
 
     # AFTER membership: oversight must still not surface the personal runs.
     oversight = await client.get(f"/api/v1/orgs/{org_id}/runs", headers=headers)

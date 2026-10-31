@@ -44,6 +44,8 @@ def _org_repo():
         set_member_role=AsyncMock(return_value=True),
         remove_member=AsyncMock(return_value=True),
         delete_org=AsyncMock(return_value=True),
+        create_invitation=AsyncMock(side_effect=lambda oid, email, role, by, th, exp: {
+            "invitation_id": "inv-1", "org_id": oid, "email": email, "role": role, "expires_at": exp}),
     )
     factory = SimpleNamespace(
         org_repo=org_repo,
@@ -81,16 +83,22 @@ async def test_member_cannot_add_users_admin_can():
     assert e.value.status_code == 403
 
     result = await add_member("org-1", SimpleNamespace(email="new@x", role="member"), request, _user("admin1"))
-    assert result["user_id"] == "u-new@x" and result["role"] == "member"
+    # v5.6: the members route creates an INVITATION (202) — membership
+    # requires acceptance; the response carries a one-time token.
+    assert result["status"] == "invitation_pending" and result["role"] == "member"
+    assert result["token"]
 
 
 @pytest.mark.asyncio
-async def test_add_member_anti_enumeration():
+async def test_add_member_is_anti_enumeration_and_never_enrolls_directly():
+    """v5.6: unknown emails receive an invitation (202) — user existence is
+    not revealed, and NO membership row is created by this endpoint."""
     factory, _ = _org_repo()
-    with pytest.raises(HTTPException) as e:
-        await add_member("org-1", SimpleNamespace(email="ghost@x", role="member"), _request(factory), _user("admin1"))
-    assert e.value.status_code == 404
-    assert "exist" in e.value.detail
+    result = await add_member("org-1", SimpleNamespace(email="ghost@x", role="member"), _request(factory), _user("admin1"))
+    assert result["status"] == "invitation_pending"
+    assert result["email"] == "ghost@x"
+    # The repo's membership-creation function was never called.
+    factory.org_repo.add_member.assert_not_called()
 
 
 @pytest.mark.asyncio

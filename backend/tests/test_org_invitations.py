@@ -154,8 +154,10 @@ async def test_f01_viewer_cannot_invite_admin(env):
     member = await _signup(env, "inv5-member@example.com")
     headers = _headers(owner)
     org_id = (await client.post("/api/v1/orgs", json={"name": "Org5"}, headers=headers)).json()["org_id"]
-    await client.post(f"/api/v1/orgs/{org_id}/members", headers=headers, json={
+    invited = await client.post(f"/api/v1/orgs/{org_id}/members", headers=headers, json={
         "email": "inv5-member@example.com", "role": "member"})
+    await client.post("/api/v1/orgs/invitations/accept", headers=_headers(member), json={
+        "token": invited.json()["token"]})
     member_headers = _headers(member)
 
     denied = await client.post(f"/api/v1/orgs/{org_id}/invitations", headers=member_headers, json={

@@ -429,19 +429,39 @@ class FirestoreOrgRepository(BaseOrgRepository):
             out.append(m)
         return out
 
-    # ── Invitation lifecycle (audit F01) — Firestore parity ──
+    # ── Invitation lifecycle (audit F01) — Firestore parity, transactional ──
+    # v5.6 A4: acceptance and duplicate prevention are transactional. The
+    # invitation document id IS the token hash (known at accept time, so a
+    # transaction can address it), and a deterministic PENDING marker doc
+    # (one per org+email) makes duplicate invitation creation atomic.
+
+    @staticmethod
+    def _pending_marker_id(org_id: str, email: str) -> str:
+        import hashlib as _hashlib
+        return f"{org_id}_{_hashlib.sha256(email.casefold().encode()).hexdigest()[:24]}"
 
     async def create_invitation(self, org_id: str, email: str, role: str, invited_by: str, token_hash: str, expires_at: str) -> Dict[str, Any]:
+        from google.api_core.exceptions import AlreadyExists
         db = await _db()
-        invitation_id = str(uuid.uuid4())
+        # Non-transactional pre-check is only an optimization; the atomic
+        # guard is the deterministic PENDING marker created below.
         pending = db.collection("org_invitations").where("org_id", "==", org_id).where("email", "==", email).where("status", "==", "pending").limit(1)
-        existing = [doc async for doc in pending.stream()]
-        if existing:
+        if [d async for d in pending.stream()]:
             return {}
+        invitation_id = token_hash  # the token is the addressable key
         payload = {"invitation_id": invitation_id, "org_id": org_id, "email": email, "role": role,
                    "invited_by": invited_by, "token_hash": token_hash, "status": "pending",
                    "created_at": _now(), "expires_at": expires_at}
-        await db.collection("org_invitations").document(invitation_id).create(payload)
+        marker = db.collection("org_invitations_pending").document(self._pending_marker_id(org_id, email))
+        try:
+            await marker.create({"org_id": org_id, "email": email, "invitation_id": invitation_id})
+        except AlreadyExists:
+            return {}
+        try:
+            await db.collection("org_invitations").document(invitation_id).create(payload)
+        except AlreadyExists:
+            await marker.delete()
+            return {}
         return {k: v for k, v in payload.items() if k != "token_hash"}
 
     async def list_invitations(self, org_id: str, status: str = "pending") -> List[Dict[str, Any]]:
@@ -455,32 +475,41 @@ class FirestoreOrgRepository(BaseOrgRepository):
         return out
 
     async def accept_invitation(self, token_hash: str, user_id: str, email: str) -> Dict[str, Any]:
+        from google.api_core.exceptions import AlreadyExists
         db = await _db()
-        query = db.collection("org_invitations").where("token_hash", "==", token_hash).where("status", "==", "pending").limit(1)
-        matches = [doc async for doc in query.stream()]
-        if not matches:
-            raise ValueError("Invitation not found or already used")
-        snap = matches[0]
-        data = snap.to_dict() or {}
-        if str(data.get("email") or "").casefold() != str(email).casefold():
-            raise ValueError("This invitation was issued to a different email address")
-        if datetime.fromisoformat(str(data["expires_at"]).replace("Z", "+00:00")) < datetime.now(timezone.utc):
-            await snap.reference.update({"status": "expired"})
-            raise ValueError("This invitation has expired")
-        # Create-only membership, mirroring add_member's AlreadyExists guard.
-        created = False
-        try:
-            await db.collection("org_members").document(f"{data['org_id']}_{user_id}").create(
+        # The document id IS the token hash → a single transaction can read
+        # the invite, validate it, create the membership, and flip the status:
+        # concurrent accepts/revoke cannot interleave (v5.6 A4).
+        ref = db.collection("org_invitations").document(token_hash)
+
+        @firestore.async_transactional
+        async def accept(transaction):
+            snapshot = await ref.get(transaction=transaction)
+            data = snapshot.to_dict() or {}
+            if not snapshot.exists or data.get("status") != "pending":
+                raise ValueError("Invitation not found or already used")
+            if str(data.get("email") or "").casefold() != str(email).casefold():
+                raise ValueError("This invitation was issued to a different email address")
+            if datetime.fromisoformat(str(data["expires_at"]).replace("Z", "+00:00")) < datetime.now(timezone.utc):
+                transaction.update(ref, {"status": "expired"})
+                raise ValueError("This invitation has expired")
+            transaction.create(
+                db.collection("org_members").document(f"{data['org_id']}_{user_id}"),
                 {"org_id": data["org_id"], "user_id": user_id, "role": data["role"],
-                 "added_at": _now(), "added_by": data.get("invited_by")}
+                 "added_at": _now(), "added_by": data.get("invited_by")},
             )
-            created = True
+            transaction.update(ref, {"status": "accepted", "accepted_at": _now(), "accepted_by": user_id})
+            return {"org_id": data["org_id"], "role": data["role"]}
+
+        try:
+            result = await accept(db.transaction())
         except AlreadyExists:
-            created = False
-        await snap.reference.update({"status": "accepted", "accepted_at": _now(), "accepted_by": user_id})
-        if not created:
             raise ValueError("Already a member of this organization")
-        return {"org_id": data["org_id"], "role": data["role"]}
+        # Release the pending marker so a NEW invitation can be issued later.
+        marker = db.collection("org_invitations_pending").document(
+            self._pending_marker_id(result["org_id"], email))
+        await marker.delete()
+        return result
 
     async def revoke_invitation(self, org_id: str, invitation_id: str) -> bool:
         db = await _db()
@@ -490,6 +519,9 @@ class FirestoreOrgRepository(BaseOrgRepository):
         if not snap.exists or data.get("org_id") != org_id or data.get("status") != "pending":
             return False
         await ref.update({"status": "revoked"})
+        marker = db.collection("org_invitations_pending").document(
+            self._pending_marker_id(org_id, str(data.get("email") or "")))
+        await marker.delete()
         return True
 
     async def add_member(self, org_id: str, user_id: str, role: str, added_by: str) -> bool:

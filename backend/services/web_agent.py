@@ -56,9 +56,13 @@ _SNAPSHOT_JS = """
     if (style.display === 'none' || style.visibility === 'hidden') continue;
     el.setAttribute('data-agentos-idx', String(idx));
     const text = (['INPUT', 'TEXTAREA'].includes(el.tagName) ? '' : (el.innerText || '')).trim().slice(0, 80);
+    const isSubmit = (el.tagName === 'BUTTON' && (el.getAttribute('type') === 'submit' || !el.getAttribute('type')))
+      || (el.tagName === 'INPUT' && el.getAttribute('type') === 'submit')
+      || !!el.getAttribute('formaction') || !!el.closest('form') && el.tagName === 'BUTTON' && !!el.getAttribute('onclick');
     out.push({
       idx: idx,
       tag: el.tagName.toLowerCase(),
+      submit: isSubmit || undefined,
       type: el.getAttribute('type') || undefined,
       text: text || undefined,
       placeholder: el.getAttribute('placeholder') || undefined,
@@ -119,6 +123,7 @@ class WebAgent:
         run_id: Optional[str] = None,
         task_id: Optional[str] = None,
         emit_progress=None,
+        approval_ctx: Optional[Dict[str, Any]] = None,
         emit_browser_frame=None,
     ) -> Dict[str, Any]:
         """Execute a browsing task. Returns {success, result, steps, final_url}."""
@@ -238,6 +243,22 @@ class WebAgent:
                     success = bool(decision.get("success", True))
                     break
 
+                # Consequential-action gate (v5.6 A6): a form submission or a
+                # click on a submit control is an EXTERNAL EFFECT on the target
+                # site. It passes through the same persisted, argument-bound
+                # approval as email sending — never executed on model say-so.
+                if approval_ctx is not None and self._is_consequential(decision, snapshot):
+                    from backend.services.action_approval import require_approval_for_action
+                    from backend.models.security import RiskLevel
+                    effect = self._describe_effect(decision, snapshot)
+                    require_approval_for_action(
+                        context=approval_ctx,
+                        user_id=approval_ctx.get("user_id", "system"),
+                        tool_name="browser.action",
+                        arguments={"url": snapshot["url"], "effect": effect},
+                        risk_level=RiskLevel.HIGH,
+                    )
+
                 try:
                     await self._execute(page, decision, secrets, allowed_domains)
                     history.append(f"Step {step_num}: {safe_desc} — ok")
@@ -257,20 +278,23 @@ class WebAgent:
             raise
         finally:
             if owns_browser and not paused:
+                # Close the registry entry (if any) AND the locally owned
+                # resources by reference — close_session alone misses the
+                # case where this run never registered a session, which
+                # leaked a whole Chromium instance (v5.6 A7).
                 if run_id and task_id:
                     await close_session(run_id, task_id)
-                else:
-                    for closer in (
-                        (context.close if context else None),
-                        (browser.close if browser else None),
-                        (pw.stop if pw else None),
-                    ):
-                        if closer is None:
-                            continue
-                        try:
-                            await closer()
-                        except Exception:
-                            pass
+                for closer in (
+                    (context.close if context else None),
+                    (browser.close if browser else None),
+                    (pw.stop if pw else None),
+                ):
+                    if closer is None:
+                        continue
+                    try:
+                        await closer()
+                    except Exception:
+                        pass
             elif existing and not paused and run_id and task_id:
                 await close_session(run_id, task_id)
 
@@ -419,6 +443,29 @@ Rules:
         if not isinstance(decision, dict) or "action" not in decision:
             raise WebAgentError(f"Model returned invalid action: {decision}")
         return decision
+
+    # ── Consequential-action gate helpers (v5.6 A6) ───────────────
+
+    @staticmethod
+    def _is_consequential(decision: Dict[str, Any], snapshot: Dict[str, Any]) -> bool:
+        action = str(decision.get("action", "")).lower()
+        if action == "type" and decision.get("submit"):
+            return True
+        if action == "click":
+            idx = decision.get("index")
+            element = next((e for e in (snapshot.get("elements") or []) if e.get("idx") == idx), None)
+            return bool(element and element.get("submit"))
+        return False
+
+    @staticmethod
+    def _describe_effect(decision: Dict[str, Any], snapshot: Dict[str, Any]) -> str:
+        action = str(decision.get("action", "")).lower()
+        idx = decision.get("index")
+        element = next((e for e in (snapshot.get("elements") or []) if e.get("idx") == idx), None)
+        label = (element or {}).get("text") or (element or {}).get("aria") or (element or {}).get("placeholder") or "control"
+        if action == "type":
+            return f"Fill and submit a form on {snapshot['url']} (control: {label[:60]})"
+        return f"Click submit control '{label[:60]}' on {snapshot['url']}"
 
     # ── Act ───────────────────────────────────────────────────────
 

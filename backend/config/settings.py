@@ -121,6 +121,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_GENERAL: int = 60      # per minute general
 
     # ── Token Budgets ────────────────────────────────────────────
+    # Budget reservation headroom per paid call (v5.6 A3): the estimated
+    # output reserve held while a model call runs, settled to actuals after.
+    MAX_OUTPUT_RESERVE_TOKENS: int = 8192
     DEFAULT_DAILY_TOKEN_LIMIT: int = 1_000_000  # per user per day
     MAX_WORKFLOW_TASKS: int = Field(default=32, ge=1, le=256)
     MAX_TASK_TIMEOUT_SECONDS: int = Field(default=600, ge=30, le=3600)

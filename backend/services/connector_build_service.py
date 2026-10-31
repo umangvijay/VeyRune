@@ -30,6 +30,8 @@ async def create_build_record(
     name: Optional[str],
     origin: str,
     parent_run_id: Optional[str] = None,
+    parent_workflow_id: Optional[str] = None,
+    parent_task_id: Optional[str] = None,
     wait_reason: str = "capability_missing",
 ) -> Dict[str, Any]:
     build_id = str(uuid.uuid4())
@@ -41,10 +43,12 @@ async def create_build_record(
         "source": (source or "")[:2000],
         "status": "queued",
         "stage": "queued",
-        # Provenance for recovery (audit G07): who asked, and which run is
-        # waiting for this capability.
+        # Provenance for recovery (audit G07 / v5.6 A10): who asked, and
+        # exactly which run+task is waiting for this capability.
         "origin": origin,
         "parent_run_id": parent_run_id,
+        "parent_workflow_id": parent_workflow_id,
+        "parent_task_id": parent_task_id,
         "wait_reason": wait_reason,
     })
     return {"build_id": build_id}
@@ -59,6 +63,8 @@ async def request_durable_build(
     name: Optional[str],
     origin: str = ORIGIN_API,
     parent_run_id: Optional[str] = None,
+    parent_workflow_id: Optional[str] = None,
+    parent_task_id: Optional[str] = None,
     workflow_engine=None,
 ) -> Dict[str, Any]:
     """Dispatch mode: persist the build AND a workflow task, then enqueue."""
@@ -69,6 +75,7 @@ async def request_durable_build(
     record = await create_build_record(
         factory, user_id=user_id, method=method, source=source, name=name,
         origin=origin, parent_run_id=parent_run_id,
+        parent_workflow_id=parent_workflow_id, parent_task_id=parent_task_id,
     )
     build_id = record["build_id"]
 
@@ -122,10 +129,13 @@ async def track_inline_build(
     name: Optional[str],
     origin: str = ORIGIN_ORCHESTRATOR,
     parent_run_id: Optional[str] = None,
+    parent_workflow_id: Optional[str] = None,
+    parent_task_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Track mode: durable record only; the caller runs the factory inline
     and passes the returned build_id so every stage persists."""
     return await create_build_record(
         factory, user_id=user_id, method=method, source=source, name=name,
         origin=origin, parent_run_id=parent_run_id,
+        parent_workflow_id=parent_workflow_id, parent_task_id=parent_task_id,
     )

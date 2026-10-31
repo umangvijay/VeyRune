@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from backend.engine.repo_adapter import persist_task
 from backend.models.schemas import TaskTriggerEvent
 from backend.models.schedule import SchedulerTriggerEvent
 from backend.repositories.message_bus import MessageBus, MessageContext
@@ -26,10 +27,67 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                 return
             logger.info(f"Worker processing task {task_id} for run {run_id}")
             await workflow_engine.execute_task(run_id, task_id)
+            await _resume_build_waiter(run_id, task_id)
             await ctx.ack()
         except Exception as e:
             logger.error(f"Worker encountered unhandled exception: {e}")
             await ctx.nack()
+
+    async def _resume_build_waiter(run_id: str, task_id: str):
+        """v5.6 A10: when a queued capability build completes, auto-resume the
+        orchestrator task that parked on it. The build record carries the
+        parent linkage; the parked task is a durable approval bound to the
+        build — resolved here and re-dispatched with the approval bound to
+        the task (mirrors the approvals endpoint's resume logic)."""
+        try:
+            repo = workflow_engine.repo
+            run = await maybe_await(repo.get_run(run_id))
+            if not run:
+                return
+            completed = next((t for t in (run.get("tasks") or []) if t.get("task_id") == task_id), None)
+            if not completed or completed.get("agent") != "core.mcp_build":
+                return
+            build_id = ((completed.get("input_data") or {}) .get("build_id"))
+            if not build_id or not hasattr(workflow_engine, "mcp_repo") or workflow_engine.mcp_repo is None:
+                return
+            build = await workflow_engine.mcp_repo.get_build(build_id)
+            parent_run_id = build.get("parent_run_id")
+            parent_task_id = build.get("parent_task_id")
+            if not parent_run_id or not parent_task_id or build.get("status") != "success":
+                return
+            parent_run = await maybe_await(repo.get_run(parent_run_id))
+            if not parent_run:
+                return
+            parent_task = next((t for t in (parent_run.get("tasks") or [])
+                                if t.get("task_id") == parent_task_id), None)
+            if not parent_task or parent_task.get("status") != "WAITING_APPROVAL":
+                return
+            pending = await maybe_await(repo.list_pending_approvals(parent_run.get("user_id") or ""))
+            match = next((a for a in pending
+                          if a.get("run_id") == parent_run_id and a.get("task_id") == parent_task_id
+                          and ((a.get("arguments") or {}).get("build_id") == build_id)), None)
+            if not match:
+                return
+            resolved = await maybe_await(repo.resolve_approval(
+                match["approval_id"], "APPROVED", decision_by="SYSTEM:capability-build"))
+            if not resolved:
+                return
+            await maybe_await(repo.reset_failed_task(parent_run.get("workflow_id"), parent_task_id))
+            fresh = await maybe_await(repo.get_run(parent_run_id))
+            fresh_task = next((t for t in (fresh.get("tasks") or []) if t.get("task_id") == parent_task_id), None)
+            if fresh_task is not None:
+                fresh_task["status"] = "PENDING"
+                fresh_task["error"] = None
+                fresh_task.setdefault("input_data", {})["_approved_request_id"] = match["approval_id"]
+                await persist_task(repo, parent_run_id, fresh_task)
+            await maybe_await(repo.update_run_status(parent_run_id, "RUNNING"))
+            await message_bus.publish("agentos-workflow-events", TaskTriggerEvent(
+                workflow_id=fresh.get("workflow_id"), run_id=parent_run_id, task_id=parent_task_id,
+            ).model_dump(mode="json"))
+            logger.warning("Capability build %s landed; resumed parked task %s/%s",
+                           build_id[:8], parent_run_id[:8], parent_task_id)
+        except Exception:
+            logger.exception("Build-waiter resume failed for %s/%s", run_id, task_id)
 
     # We will gather all consumers at the end
     
@@ -157,6 +215,13 @@ async def start_worker(message_bus: MessageBus, workflow_engine: WorkflowEngine,
                     await maybe_await(token_denylist_repo.purge_expired())
             except Exception:
                 logger.debug("Denylist purge failed", exc_info=True)
+            # Paused browser sessions (human challenges) hold a whole
+            # Chromium; expire leases so worker memory stays bounded (v5.6 A7).
+            try:
+                from backend.services.browser_sessions import sweep_expired_sessions
+                await sweep_expired_sessions()
+            except Exception:
+                logger.debug("Browser session sweep failed", exc_info=True)
             # Crash-orphaned idempotency locks (audit F07): a worker that died
             # between claim and commit leaves 'running' forever. Quarantine it
             # as 'uncertain' — the external outcome is unknown, so blind

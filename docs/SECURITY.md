@@ -1,6 +1,8 @@
 # Security
 
-AgentOS is built to hold logins and API keys. The controls below are what the running code does — not a future wish list.
+AgentOS handles logins and API keys. The controls below describe repository
+mechanisms; their coverage and production configuration require verification.
+See the 31 October amendment in [release evidence](RELEASE_EVIDENCE.md).
 
 **Scope note:** these are repository-level controls, not a security certification.
 Production configuration, deployment IAM, tenant isolation, threat modeling,
@@ -55,7 +57,9 @@ The vault is for *agent* site/API secrets (for example a portal named `bharateng
 ## Tool and browser safety
 
 - OpenAPI executor **SSRF** checks: no private, loopback, or link-local targets.
-- Website MCP is locked to the start URL’s **registrable domain**.
+- The inspected browser navigation guard uses exact allowed hosts; shared-domain
+  sibling tenants are not implicitly trusted. This does not establish complete
+  network egress or action-authorization coverage.
 - Playwright refuses private hosts.
 - Circuit breaker per MCP after repeated failures.
 - Generated schemas and model plans are proposals; runtime policy and the
@@ -103,6 +107,22 @@ On Google Cloud, store `CONTACT_SMTP_PASSWORD` in **Secret Manager** and mount i
 - Commit `.env`, App Passwords, or service-account JSON.
 
 ## Why these controls exist and what remains
+
+The [full-stack roadmap](full-stack-roadmap.md) specifies remaining transaction,
+tenant, spending, browser, generated-code and learning controls. In particular:
+
+- Test invitation acceptance/revocation atomically in both stores and verify
+  every membership path, including newer working-tree fixes.
+- Enforce spending reservations before paid work; durable increments alone do
+  not prevent concurrent overspend. Local rate counters are not shared quotas.
+- Apply exact-action approval to consequential browser steps as well as tools.
+  Browser sessions need ownership, cleanup, expiry and isolated execution.
+- Treat generated-code execution as unsupported until its dedicated runner is
+  proven; AST checks and protocol-status flags are not isolation evidence.
+- Bind connector/artifact test evidence to immutable contents and credential
+  versions. Treat model plans and recovery suggestions as untrusted proposals.
+- Keep self-improvement and RL outside authorization decisions. Promotion,
+  evaluation changes, and permissions need separate controlled ownership.
 
 | Control | Risk reduced | Remaining work |
 | --- | --- | --- |

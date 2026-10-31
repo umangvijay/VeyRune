@@ -123,8 +123,11 @@ async def get_org(org_id: str, request: Request, user: AuthenticatedUser = Depen
     return {**org, "role": role, "members": members}
 
 
-@router.post("/{org_id}/members", status_code=201)
+@router.post("/{org_id}/members", status_code=202)
 async def add_member(org_id: str, body: AddMemberRequest, request: Request, user: AuthenticatedUser = Depends(require_not_viewer)):
+    """Legacy alias for the invitation flow (audit v5.6 finding: this route
+    used to enroll members DIRECTLY, bypassing acceptance). It now creates a
+    pending invitation — membership is created only on ACCEPTANCE."""
     factory, org, role = await _member_org(org_id, request, user, "admin")
     if body.role not in ASSIGNABLE_ROLES:
         raise HTTPException(status_code=422, detail=f"role must be one of {sorted(ASSIGNABLE_ROLES)}")
@@ -134,24 +137,33 @@ async def add_member(org_id: str, body: AddMemberRequest, request: Request, user
         email = sanitize_email(body.email)
     except InputValidationError as e:
         raise HTTPException(status_code=400, detail=e.message)
+    import hashlib
+    import secrets as secrets_lib
+    from datetime import timedelta
+
+    # If the invited email already belongs to a member, refuse (no invite spam).
     target = await factory.user_repo.get_by_email(email)
-    if not target:
-        # Do not reveal whether the email exists — same anti-enumeration rule as login.
-        raise HTTPException(status_code=404, detail="No user with that email exists")
-    if target["id"] == org["owner_id"] and body.role != "owner":
-        raise HTTPException(status_code=409, detail="The owner's role is fixed")
-    if await factory.org_repo.get_member_role(org_id, target["id"]) is not None:
+    if target and await factory.org_repo.get_member_role(org_id, target["id"]) is not None:
         raise HTTPException(status_code=409, detail="Already a member; use the owner-only role endpoint")
-    ok = await factory.org_repo.add_member(org_id, target["id"], body.role, user.user_id)
-    if not ok:
-        raise HTTPException(status_code=409, detail="Membership could not be created; refresh and try again")
+    if target and target["id"] == org["owner_id"] and body.role != "owner":
+        raise HTTPException(status_code=409, detail="The owner's role is fixed")
+    token = secrets_lib.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=INVITATION_TTL_DAYS)).isoformat()
+    invite = await factory.org_repo.create_invitation(org_id, email, body.role, user.user_id, token_hash, expires_at)
+    if not invite:
+        raise HTTPException(status_code=409, detail="A pending invitation for this email already exists")
     await factory.audit_repo.log_event({
-        "event_type": "ORG_MEMBER_ADDED",
+        "event_type": "ORG_INVITATION_CREATED",
         "actor_id": user.user_id, "actor_type": "USER",
         "resource_id": org_id,
-        "details": {"member": target["id"], "role": body.role},
+        "details": {"email": email, "role": body.role, "via": "members-endpoint"},
     })
-    return {"org_id": org_id, "user_id": target["id"], "role": body.role}
+    # 202 Accepted: this request did NOT create a membership. The token is
+    # delivered once; membership exists only after acceptance.
+    return {"org_id": org_id, "email": email, "role": body.role,
+            "invitation_id": invite["invitation_id"], "expires_at": invite["expires_at"],
+            "token": token, "status": "invitation_pending"}
 
 
 @router.delete("/{org_id}/members/{member_id}")

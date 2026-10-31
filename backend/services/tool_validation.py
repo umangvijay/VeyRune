@@ -28,18 +28,36 @@ def validation_provenance(tool: dict) -> str:
     return ((tool.get("operation") or {}).get("_validation") or {}).get("provenance", "official_spec")
 
 
-def coverage_from_tools(tools: list) -> dict:
-    """Per-operation test coverage summary (audit G02). A passing probe is
-    evidence for exactly one operation — never for the integration as a
-    whole."""
+def has_valid_read_probe(tool: dict, spec_hash: str | None, credential_ref=None) -> bool:
+    op = tool.get("operation") or {}
+    evidence = op.get("_validation") or {}
+    return (op.get("http_method") in ("GET", "HEAD")
+            and evidence.get("status") == "passed" and evidence.get("kind") == "read_probe"
+            and evidence.get("credential_ref") == credential_ref
+            and evidence.get("digest") == definition_digest(tool, spec_hash))
+
+
+
+def coverage_from_tools(tools: list, spec_hash: str | None = None, credential_ref=None) -> dict:
+    """Per-operation test coverage summary (audit G02; v5.6 A9 — the single
+    authoritative function: policy, coverage, and UI all count the SAME
+    evidence rule). When spec_hash/credential_ref are provided, evidence is
+    digest-verified exactly as the execution policy verifies it — evidence
+    left stale by an operation change counts as untested."""
     dumped = [t.model_dump(mode="json") if hasattr(t, "model_dump") else t for t in tools]
-    def evidence_of(d: dict) -> dict:
-        return (d.get("operation") or {}).get("_validation") or {}
-    probed = sum(1 for d in dumped
-                 if evidence_of(d).get("kind") == "read_probe" and evidence_of(d).get("status") == "passed")
-    mutating_untested = sum(1 for d in dumped
-                            if (d.get("operation") or {}).get("http_method") not in ("GET", "HEAD")
-                            and evidence_of(d).get("status") != "passed")
+    probed = 0
+    mutating_untested = 0
+    for d in dumped:
+        op = d.get("operation") or {}
+        evidence = op.get("_validation") or {}
+        if spec_hash is not None:
+            passed = has_valid_read_probe(d, spec_hash, credential_ref)
+        else:
+            passed = (evidence.get("kind") == "read_probe" and evidence.get("status") == "passed")
+        if passed:
+            probed += 1
+        elif op.get("http_method") not in ("GET", "HEAD"):
+            mutating_untested += 1
     return {
         "total": len(dumped),
         "read_probe_passed": probed,
@@ -48,33 +66,3 @@ def coverage_from_tools(tools: list) -> dict:
     }
 
 
-def coverage_from_tools(tools: list) -> dict:
-    """Per-operation test coverage summary (audit G02). A passing probe is
-    evidence for exactly one operation — never for the integration as a
-    whole."""
-    total = len(tools)
-    probed = sum(1 for t in tools if has_valid_read_probe(t.model_dump(mode="json") if hasattr(t, "model_dump") else t, None)
-                 or (((t.model_dump(mode="json") if hasattr(t, "model_dump") else t).get("operation") or {}).get("_validation") or {}).get("kind") == "read_probe"
-                 and (((t.model_dump(mode="json") if hasattr(t, "model_dump") else t).get("operation") or {}).get("_validation") or {}).get("status") == "passed")
-    mutating_untested = 0
-    for t in tools:
-        d = t.model_dump(mode="json") if hasattr(t, "model_dump") else t
-        op = d.get("operation") or {}
-        evidence = op.get("_validation") or {}
-        if op.get("http_method") not in ("GET", "HEAD") and evidence.get("status") != "passed":
-            mutating_untested += 1
-    return {
-        "total": total,
-        "read_probe_passed": probed,
-        "untested": total - probed,
-        "mutating_untested": mutating_untested,
-    }
-
-
-def has_valid_read_probe(tool: dict, spec_hash: str | None, credential_ref=None) -> bool:
-    op = tool.get("operation") or {}
-    evidence = op.get("_validation") or {}
-    return (op.get("http_method") in ("GET", "HEAD")
-            and evidence.get("status") == "passed" and evidence.get("kind") == "read_probe"
-            and evidence.get("credential_ref") == credential_ref
-            and evidence.get("digest") == definition_digest(tool, spec_hash))

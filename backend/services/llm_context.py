@@ -215,17 +215,17 @@ async def check_user_budget(settings_repo, user_id: str) -> Optional[Dict[str, A
     from fastapi import HTTPException
     try:
         from backend.agents.context_manager import context_manager
-        from backend.repositories.usage_repository import get_durable_usage
+        from backend.repositories.usage_repository import get_committed_usage
         daily_limit = None
         if settings_repo:
             saved = await settings_repo.get_settings(user_id) or {}
             if saved.get("daily_token_limit") is not None:
                 daily_limit = int(saved["daily_token_limit"])
         budget = context_manager.check_budget(user_id, daily_limit=daily_limit)
-        durable = await get_durable_usage(user_id)
+        # Committed spend = settled actuals + open reservation holds. This is
+        # the durable truth shared across processes (v5.6 A3).
+        durable = await get_committed_usage(user_id)
         if durable > budget["used"]:
-            # Recompute against the durable total without double-counting
-            # this process's already-persisted spend.
             limit = daily_limit if daily_limit is not None else _default_daily_limit()
             used = durable
             remaining = max(0, limit - used)

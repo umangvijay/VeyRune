@@ -168,6 +168,13 @@ class ToolRouter:
                     task_id=context.get("task_id"),
                     emit_progress=context.get("emit_progress"),
                     emit_browser_frame=context.get("emit_browser_frame"),
+                    approval_ctx={
+                        **(context or {}),
+                        "user_id": context.get("user_id", "system"),
+                        "workflow_id": context.get("workflow_id"),
+                        "run_id": context.get("run_id"),
+                        "task_id": context.get("task_id"),
+                    },
                 )
             except Exception as pause:
                 from backend.services.auth_challenges import ChallengePause

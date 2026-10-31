@@ -222,8 +222,9 @@ class SQLiteMCPRepository(BaseMCPRepository):
             INSERT INTO mcp_builds (
                 build_id, user_id, name, method, source, status, stage,
                 logs_json, mcp_id, tools_json, error,
-                origin, parent_run_id, wait_reason, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                origin, parent_run_id, parent_workflow_id, parent_task_id,
+                wait_reason, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 build["build_id"],
@@ -239,6 +240,8 @@ class SQLiteMCPRepository(BaseMCPRepository):
                 build.get("error"),
                 build.get("origin"),
                 build.get("parent_run_id"),
+                build.get("parent_workflow_id"),
+                build.get("parent_task_id"),
                 build.get("wait_reason"),
                 now,
                 now,
